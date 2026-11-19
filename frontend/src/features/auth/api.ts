@@ -9,6 +9,7 @@ export interface Me {
   username: string
   role: 'user' | 'admin'
   twoFactorMethod: TwoFactorMethod
+  onboarded: boolean
 }
 
 export interface LoginResponse {

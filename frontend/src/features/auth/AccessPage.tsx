@@ -37,7 +37,7 @@ export function AccessPage() {
     mutationFn: () => api.post('/auth/access/accept', { token, password: form.password }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: meKey })
-      navigate('/', { replace: true })
+      navigate('/configuracao-inicial', { replace: true })
     },
   })
 

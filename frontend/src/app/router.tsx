@@ -7,6 +7,7 @@ import { LoginPage } from '../features/auth/LoginPage'
 import { ForgotPasswordPage, ForgotPasswordSentPage, ResetPasswordPage } from '../features/auth/PasswordResetPages'
 import { TwoFactorPage } from '../features/auth/TwoFactorPage'
 import { JobsPage } from '../features/jobs/JobsPage'
+import { OnboardingPage } from '../features/onboarding/OnboardingPage'
 import { AppLayout } from './AppLayout'
 import { RequireAuth, RequireGuest } from './RequireAuth'
 
@@ -28,6 +29,7 @@ export const router = createBrowserRouter([
   {
     element: <RequireAuth />,
     children: [
+      { path: '/configuracao-inicial', element: <OnboardingPage /> },
       {
         element: <AppLayout />,
         children: [
