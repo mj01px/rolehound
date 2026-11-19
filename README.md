@@ -27,18 +27,34 @@ compose.yaml                  local PostgreSQL and Mailpit
 
 ## Development
 
-Requires the .NET 10 SDK, Node.js 26 and Docker.
+Requires the .NET 10 SDK, Node.js 26 and PostgreSQL (Docker or a local install).
 
 ```bash
-docker compose up -d                                  # PostgreSQL on 5432, Mailpit UI on http://localhost:8025
-cd backend && dotnet run --project src/Rolehound.Api  # API on http://localhost:5080
-cd frontend && npm ci && npm run dev                  # web app on http://localhost:5173
+docker compose up -d        # PostgreSQL on 5432 and Mailpit on http://localhost:8025
 ```
+
+Without Docker, create the role and databases on a local PostgreSQL:
+
+```bash
+psql -d postgres -c "CREATE ROLE rolehound LOGIN PASSWORD 'rolehound' CREATEDB"
+createdb -O rolehound rolehound && createdb -O rolehound rolehound_test
+```
+
+Then:
+
+```bash
+cd backend && dotnet run --project src/Rolehound.Api   # API on http://localhost:5080, migrates on start
+cd frontend && npm ci && npm run dev                   # web app on http://localhost:5173
+```
+
+In development the first admin comes from `Admin:Email` and `Admin:Username`
+(see `appsettings.Development.json`, or override with `dotnet user-secrets`).
+Without an SMTP server, emails (with their links) are written to the API log.
 
 Checks run by CI on every push:
 
 ```bash
-cd backend && dotnet format --verify-no-changes && dotnet test
+cd backend && dotnet format --verify-no-changes && dotnet test   # API tests need the rolehound_test database
 cd frontend && npm run lint && npm run build
 ```
 

@@ -20,6 +20,23 @@ jobs:
     defaults:
       run:
         working-directory: backend
+    services:
+      # API tests run against a real database; same major version as compose.yaml.
+      postgres:
+        image: postgres:18.7-alpine
+        env:
+          POSTGRES_DB: rolehound_test
+          POSTGRES_USER: rolehound
+          POSTGRES_PASSWORD: rolehound
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U rolehound -d rolehound_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      ROLEHOUND_TEST_CONNECTION: Host=localhost;Port=5432;Database=rolehound_test;Username=rolehound;Password=rolehound
     steps:
       # Actions are pinned to commit SHAs; the comment shows the release.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
