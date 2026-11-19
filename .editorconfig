@@ -12,6 +12,9 @@ indent_size = 4
 [*.json]
 indent_size = 2
 
+[*.{ts,tsx,css,html,yml,yaml}]
+indent_size = 2
+
 # Test names read as sentences with underscores.
 [tests/**.cs]
 dotnet_diagnostic.CA1707.severity = none

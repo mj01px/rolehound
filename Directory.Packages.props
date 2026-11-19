@@ -1,0 +1,26 @@
+<Project>
+
+  <!-- Every package version lives here. Project files list packages without versions. -->
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <!-- Microsoft packages follow the installed .NET 10 runtime patch. -->
+    <MicrosoftPatch>10.0.12</MicrosoftPatch>
+  </PropertyGroup>
+
+  <ItemGroup Label="API">
+    <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="$(MicrosoftPatch)" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="$(MicrosoftPatch)" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="$(MicrosoftPatch)" />
+    <PackageVersion Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" Version="$(MicrosoftPatch)" />
+    <PackageVersion Include="EFCore.NamingConventions" Version="10.0.1" />
+    <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
+  </ItemGroup>
+
+  <ItemGroup Label="Tests">
+    <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="$(MicrosoftPatch)" />
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageVersion Include="xunit.v3" Version="3.2.2" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
+  </ItemGroup>
+
+</Project>
