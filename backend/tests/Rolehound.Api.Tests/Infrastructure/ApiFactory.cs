@@ -29,6 +29,8 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
 
     public FakeOpenRouter OpenRouter { get; } = new();
 
+    public FakeJobSource JobSource { get; } = new();
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
@@ -46,6 +48,8 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
             services.AddSingleton<IEmailSender>(Emails);
             services.AddHttpClient(BreachedPasswordValidator.HttpClientName)
                 .ConfigurePrimaryHttpMessageHandler(() => PwnedPasswords);
+            services.RemoveAll<Rolehound.Connectors.IJobConnector>();
+            services.AddSingleton<Rolehound.Connectors.IJobConnector>(JobSource);
             services.AddHttpClient(Rolehound.Api.Features.Ai.OpenRouterClient.HttpClientName)
                 .ConfigurePrimaryHttpMessageHandler(() => OpenRouter);
         });

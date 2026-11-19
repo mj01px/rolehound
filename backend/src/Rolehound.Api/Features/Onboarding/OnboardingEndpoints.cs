@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
+using Rolehound.Api.Features.Jobs;
 using Rolehound.Api.Infrastructure.Http;
 using Rolehound.Api.Infrastructure.Persistence;
 
@@ -57,7 +58,7 @@ internal static class OnboardingEndpoints
         TypedResults.Ok(new OnboardingStatus(await StepAsync(db, principal.GetUserId(), ct)));
 
     private static async Task<Results<Ok<OnboardingResult>, ProblemHttpResult>> Complete(
-        ClaimsPrincipal principal, RolehoundDbContext db, TimeProvider time, CancellationToken ct)
+        ClaimsPrincipal principal, RolehoundDbContext db, JobScoring scoring, TimeProvider time, CancellationToken ct)
     {
         var userId = principal.GetUserId();
         var step = await StepAsync(db, userId, ct);
@@ -70,7 +71,7 @@ internal static class OnboardingEndpoints
         user.OnboardingCompletedAt ??= time.GetUtcNow();
         await db.SaveChangesAsync(ct);
 
-        // Scoring every active global job for this person arrives with the jobs slice.
-        return TypedResults.Ok(new OnboardingResult(0, 0, 0));
+        var summary = await scoring.RescoreUserAsync(userId, ct);
+        return TypedResults.Ok(new OnboardingResult(summary.JobsAnalyzed, summary.JobsMatching, summary.Highlights));
     }
 }

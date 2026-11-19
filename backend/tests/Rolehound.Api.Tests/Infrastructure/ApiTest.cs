@@ -32,7 +32,7 @@ public abstract class ApiTest(ApiFactory factory) : IAsyncLifetime
         await using var scope = Factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<RolehoundDbContext>();
         await db.Database.ExecuteSqlRawAsync(
-            "TRUNCATE users, account_tokens, security_events, user_claims, user_logins, user_tokens, ai_settings, ai_usage, dossier_versions, score_profiles CASCADE", Ct);
+            "TRUNCATE users, account_tokens, security_events, user_claims, user_logins, user_tokens, ai_settings, ai_usage, dossier_versions, score_profiles, jobs, job_tombstones, user_jobs, source_targets, collection_runs CASCADE", Ct);
         Factory.Emails.Clear();
     }
 

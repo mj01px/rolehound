@@ -4,6 +4,7 @@ using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 using Rolehound.Api.Features.Ai;
+using Rolehound.Api.Features.Jobs;
 using Rolehound.Api.Features.Onboarding;
 using Rolehound.Api.Infrastructure.Http;
 using Rolehound.Api.Infrastructure.Persistence;
@@ -83,7 +84,7 @@ internal static class ScoreProfileEndpoints
     }
 
     private static async Task<Results<Ok<ScoreProfileResponse>, ValidationProblem>> Save(
-        SaveScoreProfileRequest request, ClaimsPrincipal principal, RolehoundDbContext db, TimeProvider time, CancellationToken ct)
+        SaveScoreProfileRequest request, ClaimsPrincipal principal, RolehoundDbContext db, JobScoring scoring, TimeProvider time, CancellationToken ct)
     {
         if (request.Profile is null)
         {
@@ -110,7 +111,12 @@ internal static class ScoreProfileEndpoints
         stored.UpdatedAt = time.GetUtcNow();
         await db.SaveChangesAsync(ct);
 
-        // Rescoring every active job for this person (FR-SCO-03) arrives with the jobs slice.
+        // FR-SCO-03: a saved profile rescores every active job. During onboarding the last step does it.
+        if (await db.Users.AnyAsync(u => u.Id == userId && u.OnboardingCompletedAt != null, ct))
+        {
+            await scoring.RescoreUserAsync(userId, ct);
+        }
+
         return TypedResults.Ok(new ScoreProfileResponse(profile, stored.DossierVersion, stored.UpdatedAt));
     }
 

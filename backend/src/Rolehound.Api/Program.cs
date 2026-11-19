@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Rolehound.Api.Features.Accounts;
 using Rolehound.Api.Features.Accounts.Admin;
 using Rolehound.Api.Features.Ai;
+using Rolehound.Api.Features.Collection;
 using Rolehound.Api.Features.Dossier;
 using Rolehound.Api.Features.Maintenance;
 using Rolehound.Api.Features.Onboarding;
@@ -19,6 +20,7 @@ builder.Services.AddHttpDefaults(builder.Configuration);
 builder.Services.AddEmail(builder.Configuration, builder.Environment);
 builder.Services.AddAccounts(builder.Environment);
 builder.Services.AddAi(builder.Configuration);
+builder.Services.AddCollection(builder.Configuration);
 
 var app = builder.Build();
 
@@ -30,6 +32,7 @@ app.MapOnboardingEndpoints();
 app.MapAiSettingsEndpoints();
 app.MapDossierEndpoints();
 app.MapScoreProfileEndpoints();
+app.MapSourceEndpoints();
 app.MapTaskEndpoints(app.Configuration);
 
 await PrepareDatabaseAsync(app);
@@ -47,6 +50,8 @@ static async Task PrepareDatabaseAsync(WebApplication app)
     }
 
     await scope.ServiceProvider.GetRequiredService<AdminSeeder>().SeedAsync(CancellationToken.None);
+    await CollectionModule.SeedTargetsAsync(
+        scope.ServiceProvider.GetRequiredService<RolehoundDbContext>(), app.Configuration, TimeProvider.System, CancellationToken.None);
 }
 
 // Exposed so integration tests can host the API with WebApplicationFactory.

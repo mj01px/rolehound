@@ -425,6 +425,113 @@ namespace Rolehound.Api.Infrastructure.Persistence.Migrations
                     b.ToTable("ai_usage", (string)null);
                 });
 
+            modelBuilder.Entity("Rolehound.Api.Features.Collection.CollectionRun", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("Added")
+                        .HasColumnType("integer")
+                        .HasColumnName("added");
+
+                    b.Property<int>("Closed")
+                        .HasColumnType("integer")
+                        .HasColumnName("closed");
+
+                    b.Property<string>("Error")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("error");
+
+                    b.Property<DateTimeOffset>("FinishedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("finished_at");
+
+                    b.Property<int>("Listed")
+                        .HasColumnType("integer")
+                        .HasColumnName("listed");
+
+                    b.Property<int>("Reopened")
+                        .HasColumnType("integer")
+                        .HasColumnName("reopened");
+
+                    b.Property<DateTimeOffset>("StartedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("started_at");
+
+                    b.Property<Guid>("TargetId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("target_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_collection_runs");
+
+                    b.HasIndex("StartedAt")
+                        .HasDatabaseName("ix_collection_runs_started_at");
+
+                    b.HasIndex("TargetId")
+                        .HasDatabaseName("ix_collection_runs_target_id");
+
+                    b.ToTable("collection_runs", (string)null);
+                });
+
+            modelBuilder.Entity("Rolehound.Api.Features.Collection.SourceTarget", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<bool>("Enabled")
+                        .HasColumnType("boolean")
+                        .HasColumnName("enabled");
+
+                    b.Property<string>("Key")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("key");
+
+                    b.Property<string>("Label")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("label");
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("last_error");
+
+                    b.Property<int?>("LastJobCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("last_job_count");
+
+                    b.Property<DateTimeOffset?>("LastRunAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_run_at");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("source");
+
+                    b.HasKey("Id")
+                        .HasName("pk_source_targets");
+
+                    b.HasIndex("Source", "Key")
+                        .IsUnique()
+                        .HasDatabaseName("ix_source_targets_source_key");
+
+                    b.ToTable("source_targets", (string)null);
+                });
+
             modelBuilder.Entity("Rolehound.Api.Features.Dossier.DossierVersion", b =>
                 {
                     b.Property<Guid>("Id")
@@ -461,6 +568,212 @@ namespace Rolehound.Api.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_dossier_versions_user_id_number");
 
                     b.ToTable("dossier_versions", (string)null);
+                });
+
+            modelBuilder.Entity("Rolehound.Api.Features.Jobs.Job", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset?>("ClosedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("closed_at");
+
+                    b.Property<string>("Company")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("company");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("description");
+
+                    b.Property<string>("ExternalId")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("external_id");
+
+                    b.Property<DateTimeOffset>("FirstSeenAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("first_seen_at");
+
+                    b.Property<DateTimeOffset>("LastSeenAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_seen_at");
+
+                    b.Property<string>("Location")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("location");
+
+                    b.Property<DateTimeOffset?>("PublishedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("published_at");
+
+                    b.Property<string>("Seniority")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("seniority");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("source");
+
+                    b.Property<string>("SourceWorkMode")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("source_work_mode");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("status");
+
+                    b.Property<Guid?>("TargetId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("target_id");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("title");
+
+                    b.Property<string>("Url")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("url");
+
+                    b.Property<string>("WorkMode")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("work_mode");
+
+                    b.HasKey("Id")
+                        .HasName("pk_jobs");
+
+                    b.HasIndex("TargetId")
+                        .HasDatabaseName("ix_jobs_target_id");
+
+                    b.HasIndex("Source", "ExternalId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_jobs_source_external_id");
+
+                    b.HasIndex("Status", "ClosedAt")
+                        .HasDatabaseName("ix_jobs_status_closed_at");
+
+                    b.ToTable("jobs", (string)null);
+                });
+
+            modelBuilder.Entity("Rolehound.Api.Features.Jobs.JobTombstone", b =>
+                {
+                    b.Property<string>("Source")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("source");
+
+                    b.Property<string>("ExternalId")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("external_id");
+
+                    b.Property<DateTimeOffset>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<DateTimeOffset>("LastListedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_listed_at");
+
+                    b.HasKey("Source", "ExternalId")
+                        .HasName("pk_job_tombstones");
+
+                    b.HasIndex("LastListedAt")
+                        .HasDatabaseName("ix_job_tombstones_last_listed_at");
+
+                    b.ToTable("job_tombstones", (string)null);
+                });
+
+            modelBuilder.Entity("Rolehound.Api.Features.Jobs.UserJob", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.Property<Guid>("JobId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("job_id");
+
+                    b.Property<string>("ArchiveNote")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("archive_note");
+
+                    b.Property<string>("ArchiveReason")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("archive_reason");
+
+                    b.Property<DateTimeOffset?>("ArchivedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("archived_at");
+
+                    b.Property<DateTimeOffset>("FirstScoredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("first_scored_at");
+
+                    b.Property<bool>("IsHighlight")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_highlight");
+
+                    b.Property<bool>("IsRelevant")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_relevant");
+
+                    b.Property<DateTimeOffset?>("LastInteractionAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_interaction_at");
+
+                    b.PrimitiveCollection<string>("MatchedGroups")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("matched_groups");
+
+                    b.Property<int>("Score")
+                        .HasColumnType("integer")
+                        .HasColumnName("score");
+
+                    b.Property<DateTimeOffset>("ScoredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("scored_at");
+
+                    b.PrimitiveCollection<string>("Tags")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("tags");
+
+                    b.HasKey("UserId", "JobId")
+                        .HasName("pk_user_jobs");
+
+                    b.HasIndex("JobId")
+                        .HasDatabaseName("ix_user_jobs_job_id");
+
+                    b.HasIndex("UserId", "IsRelevant", "Score")
+                        .HasDatabaseName("ix_user_jobs_user_id_is_relevant_score");
+
+                    b.ToTable("user_jobs", (string)null);
                 });
 
             modelBuilder.Entity("Rolehound.Api.Features.ScoreProfiles.UserScoreProfile", b =>
@@ -548,6 +861,16 @@ namespace Rolehound.Api.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_ai_usage_users_user_id");
                 });
 
+            modelBuilder.Entity("Rolehound.Api.Features.Collection.CollectionRun", b =>
+                {
+                    b.HasOne("Rolehound.Api.Features.Collection.SourceTarget", null)
+                        .WithMany()
+                        .HasForeignKey("TargetId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_collection_runs_source_targets_target_id");
+                });
+
             modelBuilder.Entity("Rolehound.Api.Features.Dossier.DossierVersion", b =>
                 {
                     b.HasOne("Rolehound.Api.Features.Accounts.User", null)
@@ -556,6 +879,32 @@ namespace Rolehound.Api.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_dossier_versions_users_user_id");
+                });
+
+            modelBuilder.Entity("Rolehound.Api.Features.Jobs.Job", b =>
+                {
+                    b.HasOne("Rolehound.Api.Features.Collection.SourceTarget", null)
+                        .WithMany()
+                        .HasForeignKey("TargetId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_jobs_source_targets_target_id");
+                });
+
+            modelBuilder.Entity("Rolehound.Api.Features.Jobs.UserJob", b =>
+                {
+                    b.HasOne("Rolehound.Api.Features.Jobs.Job", null)
+                        .WithMany()
+                        .HasForeignKey("JobId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_user_jobs_jobs_job_id");
+
+                    b.HasOne("Rolehound.Api.Features.Accounts.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_user_jobs_users_user_id");
                 });
 
             modelBuilder.Entity("Rolehound.Api.Features.ScoreProfiles.UserScoreProfile", b =>

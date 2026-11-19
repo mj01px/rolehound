@@ -19,6 +19,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Rolehound.Connectors\Rolehound.Connectors.csproj" />
     <ProjectReference Include="..\Rolehound.Scoring\Rolehound.Scoring.csproj" />
   </ItemGroup>
 
