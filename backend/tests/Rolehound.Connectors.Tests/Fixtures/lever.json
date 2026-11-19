@@ -1,0 +1,22 @@
+[
+  {
+    "id": "a1b2c3",
+    "text": "Analista de Dados Júnior",
+    "categories": { "location": "Remoto, Brasil", "team": "Dados" },
+    "workplaceType": "remote",
+    "createdAt": 1793000000000,
+    "hostedUrl": "https://jobs.lever.co/exemplo/a1b2c3",
+    "descriptionPlain": "Time de dados de uma fintech.",
+    "lists": [{ "text": "Requisitos", "content": "<li>SQL</li><li>Python</li>" }],
+    "additionalPlain": "Benefícios: auxílio home office."
+  },
+  {
+    "id": "d4e5f6",
+    "text": "Desenvolvedor Backend",
+    "categories": { "location": "Recife, PE" },
+    "workplaceType": "unspecified",
+    "createdAt": 1793000000000,
+    "hostedUrl": "https://jobs.lever.co/exemplo/d4e5f6",
+    "descriptionPlain": "Vaga presencial."
+  }
+]

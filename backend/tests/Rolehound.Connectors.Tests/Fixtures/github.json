@@ -1,0 +1,32 @@
+[
+  {
+    "number": 42,
+    "title": "[São Paulo] Desenvolvedor Python Júnior na Exemplo",
+    "html_url": "https://github.com/exemplo/vagas/issues/42",
+    "created_at": "2026-11-15T12:00:00Z",
+    "body": "## Descrição\nAPI de pagamentos.\n\n**Empresa:** Exemplo Pagamentos\n\n## Local\nSão Paulo",
+    "labels": [{ "name": "Júnior" }, { "name": "CLT" }]
+  },
+  {
+    "number": 1,
+    "title": "Leia as regras antes de postar",
+    "html_url": "https://github.com/exemplo/vagas/issues/1",
+    "created_at": "2020-01-01T00:00:00Z",
+    "body": "Regras do repositório."
+  },
+  {
+    "number": 43,
+    "title": "Ajusta template",
+    "html_url": "https://github.com/exemplo/vagas/pull/43",
+    "created_at": "2026-11-16T12:00:00Z",
+    "body": "",
+    "pull_request": { "url": "https://api.github.com/repos/exemplo/vagas/pulls/43" }
+  },
+  {
+    "number": 44,
+    "title": "Backend Node remoto",
+    "html_url": "https://github.com/exemplo/vagas/issues/44",
+    "created_at": "2026-11-17T12:00:00Z",
+    "body": "Sem linha de empresa."
+  }
+]
