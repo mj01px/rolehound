@@ -1,0 +1,20 @@
+{
+  "groups": [
+    { "name": "core", "weight": 12, "terms": ["python", "django", "django rest", "drf", "postgres", "postgresql", "sql"] },
+    { "name": "adjacent", "weight": 6, "terms": ["java", "spring", "spring boot", "api rest", "apis rest", "rest api", "backend", "back-end", "back end", "docker", "typescript", "react"] },
+    { "name": "domain", "weight": 10, "terms": ["fintech", "bancario", "bancaria", "banco digital", "setor bancario", "instituicao financeira", "mercado financeiro", "financeiro", "financeira", "investimento", "investimentos", "credito", "pagamentos", "meios de pagamento", "seguradora", "seguros", "cooperativa de credito", "erp", "conciliacao", "antifraude", "prevencao a fraude", "compliance"] },
+    { "name": "activity", "weight": 5, "terms": ["automacao", "automatizar", "analise de dados", "tratamento de dados", "integracao", "integracoes", "scripts", "etl", "relatorios"] },
+    { "name": "level_match", "weight": 10, "terms": ["estagio", "estagiario", "junior", "jr", "trainee", "aprendiz", "primeiro emprego", "entry level", "programa de formacao"] },
+    { "name": "work_mode", "weight": 4, "terms": ["remoto", "home office", "hibrido", "anywhere"] },
+    { "name": "level_too_high", "weight": -25, "terms": ["senior", "sr", "sr.", "especialista", "tech lead", "staff", "principal", "arquiteto", "coordenador", "gerente", "head of", "iii", "iv"] },
+    { "name": "level_mid", "weight": -8, "terms": ["pleno", "pl", "pl.", "mid level", "mid-level"] },
+    { "name": "stack_mismatch", "weight": -20, "bodyDampened": true, "terms": ["php", "laravel", "wordpress", "delphi", "cobol", "abap", ".net", "c#", "ruby on rails", "flutter", "react native", "android nativo", "ios", "salesforce", "sap", "vba", "sharepoint"] },
+    { "name": "area_mismatch", "weight": -15, "bodyDampened": true, "terms": ["designer", "ux/ui", "social media", "marketing", "vendas", "comercial", "suporte tecnico n1", "help desk", "infraestrutura de redes", "recrutamento"] }
+  ],
+  "stackGroups": ["core", "adjacent"],
+  "minHighlightScore": 25,
+  "yearsBands": [
+    { "minYears": 5, "penalty": -25 },
+    { "minYears": 3, "penalty": -12 }
+  ]
+}
