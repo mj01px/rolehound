@@ -38,6 +38,9 @@ public sealed class User : IdentityUser<Guid>
 
     public DateTimeOffset? LastLoginAt { get; set; }
 
+    /// <summary>Set when the person finishes onboarding (FR-ONB-01).</summary>
+    public DateTimeOffset? OnboardingCompletedAt { get; set; }
+
     /// <summary>True once the person has set a password through their access link.</summary>
     public bool HasAccess => PasswordHash is not null;
 }

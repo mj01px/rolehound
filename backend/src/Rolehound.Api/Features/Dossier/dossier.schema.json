@@ -1,0 +1,183 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://rolehound.app/schemas/dossier-1.json",
+  "title": "Rolehound Dossier",
+  "description": "Everything Rolehound knows about one person. Version 1. Job titles, degrees, the headline and the summary come in Brazilian Portuguese (pt) and English (en), because resumes are generated in either language and checked against these exact values.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "person", "experience", "education", "skills"],
+  "properties": {
+    "schemaVersion": { "type": "integer", "enum": [1] },
+    "person": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "headline"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "headline": { "$ref": "#/definitions/bilingual" },
+        "location": { "type": "string", "maxLength": 120 },
+        "contact": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "email": { "type": "string", "maxLength": 254 },
+            "phone": { "type": "string", "maxLength": 40 },
+            "linkedin": { "type": "string", "maxLength": 300 },
+            "github": { "type": "string", "maxLength": 300 },
+            "website": { "type": "string", "maxLength": 300 }
+          }
+        }
+      }
+    },
+    "summary": { "$ref": "#/definitions/bilingual" },
+    "experience": {
+      "type": "array",
+      "maxItems": 40,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["company", "title", "start"],
+        "properties": {
+          "company": { "type": "string", "minLength": 1, "maxLength": 160 },
+          "title": { "$ref": "#/definitions/bilingual" },
+          "start": { "$ref": "#/definitions/yearMonth" },
+          "end": { "oneOf": [{ "$ref": "#/definitions/yearMonth" }, { "type": "null" }] },
+          "location": { "type": "string", "maxLength": 120 },
+          "workMode": { "enum": ["remote", "hybrid", "onsite"] },
+          "highlights": { "type": "array", "maxItems": 20, "items": { "type": "string", "minLength": 1, "maxLength": 600 } },
+          "skills": { "$ref": "#/definitions/names" }
+        }
+      }
+    },
+    "projects": {
+      "type": "array",
+      "maxItems": 40,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "description"],
+        "properties": {
+          "name": { "type": "string", "minLength": 1, "maxLength": 160 },
+          "description": { "type": "string", "minLength": 1, "maxLength": 1500 },
+          "url": { "type": "string", "maxLength": 300 },
+          "start": { "$ref": "#/definitions/yearMonth" },
+          "end": { "oneOf": [{ "$ref": "#/definitions/yearMonth" }, { "type": "null" }] },
+          "skills": { "$ref": "#/definitions/names" }
+        }
+      }
+    },
+    "education": {
+      "type": "array",
+      "maxItems": 20,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["institution", "degree", "status"],
+        "properties": {
+          "institution": { "type": "string", "minLength": 1, "maxLength": 160 },
+          "degree": { "$ref": "#/definitions/bilingual" },
+          "start": { "$ref": "#/definitions/yearMonth" },
+          "end": { "oneOf": [{ "$ref": "#/definitions/yearMonth" }, { "type": "null" }] },
+          "status": { "enum": ["completed", "in_progress", "incomplete"] }
+        }
+      }
+    },
+    "skills": {
+      "type": "array",
+      "maxItems": 150,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string", "minLength": 1, "maxLength": 80 },
+          "category": { "enum": ["language", "framework", "database", "tool", "cloud", "method", "domain", "soft", "other"] },
+          "level": { "enum": ["basic", "intermediate", "advanced"] }
+        }
+      }
+    },
+    "languages": {
+      "type": "array",
+      "maxItems": 15,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["language", "level"],
+        "properties": {
+          "language": { "type": "string", "minLength": 1, "maxLength": 60 },
+          "level": { "enum": ["basic", "intermediate", "advanced", "fluent", "native"] }
+        }
+      }
+    },
+    "certifications": {
+      "type": "array",
+      "maxItems": 40,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string", "minLength": 1, "maxLength": 200 },
+          "issuer": { "type": "string", "maxLength": 160 },
+          "date": { "$ref": "#/definitions/yearMonth" },
+          "url": { "type": "string", "maxLength": 300 }
+        }
+      }
+    },
+    "courses": {
+      "type": "array",
+      "maxItems": 60,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string", "minLength": 1, "maxLength": 200 },
+          "institution": { "type": "string", "maxLength": 160 },
+          "date": { "$ref": "#/definitions/yearMonth" },
+          "hours": { "type": "integer", "minimum": 1, "maximum": 5000 }
+        }
+      }
+    },
+    "volunteering": {
+      "type": "array",
+      "maxItems": 20,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["organization", "role"],
+        "properties": {
+          "organization": { "type": "string", "minLength": 1, "maxLength": 160 },
+          "role": { "type": "string", "minLength": 1, "maxLength": 160 },
+          "start": { "$ref": "#/definitions/yearMonth" },
+          "end": { "oneOf": [{ "$ref": "#/definitions/yearMonth" }, { "type": "null" }] },
+          "description": { "type": "string", "maxLength": 1000 }
+        }
+      }
+    },
+    "preferences": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "targetRoles": { "$ref": "#/definitions/names" },
+        "seniority": { "type": "array", "items": { "enum": ["internship", "junior", "mid", "senior"] }, "uniqueItems": true },
+        "workModes": { "type": "array", "items": { "enum": ["remote", "hybrid", "onsite"] }, "uniqueItems": true },
+        "locations": { "$ref": "#/definitions/names" },
+        "avoid": { "$ref": "#/definitions/names" }
+      }
+    }
+  },
+  "definitions": {
+    "bilingual": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pt", "en"],
+      "properties": {
+        "pt": { "type": "string", "minLength": 1, "maxLength": 2000 },
+        "en": { "type": "string", "minLength": 1, "maxLength": 2000 }
+      }
+    },
+    "yearMonth": { "type": "string", "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])$" },
+    "names": { "type": "array", "maxItems": 60, "items": { "type": "string", "minLength": 1, "maxLength": 120 } }
+  }
+}

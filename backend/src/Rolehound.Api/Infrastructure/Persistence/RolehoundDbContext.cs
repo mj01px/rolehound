@@ -3,6 +3,9 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Rolehound.Api.Features.Accounts;
+using Rolehound.Api.Features.Ai;
+using Rolehound.Api.Features.Dossier;
+using Rolehound.Api.Features.ScoreProfiles;
 
 namespace Rolehound.Api.Infrastructure.Persistence;
 
@@ -22,6 +25,14 @@ public sealed class RolehoundDbContext(DbContextOptions<RolehoundDbContext> opti
     public DbSet<AccountToken> AccountTokens => Set<AccountToken>();
 
     public DbSet<SecurityEvent> SecurityEvents => Set<SecurityEvent>();
+
+    public DbSet<AiSettings> AiSettings => Set<AiSettings>();
+
+    public DbSet<AiUsage> AiUsage => Set<AiUsage>();
+
+    public DbSet<DossierVersion> DossierVersions => Set<DossierVersion>();
+
+    public DbSet<UserScoreProfile> ScoreProfiles => Set<UserScoreProfile>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {

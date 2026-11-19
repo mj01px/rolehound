@@ -27,6 +27,8 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
 
     public FakePwnedPasswords PwnedPasswords { get; } = new();
 
+    public FakeOpenRouter OpenRouter { get; } = new();
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
@@ -44,6 +46,8 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
             services.AddSingleton<IEmailSender>(Emails);
             services.AddHttpClient(BreachedPasswordValidator.HttpClientName)
                 .ConfigurePrimaryHttpMessageHandler(() => PwnedPasswords);
+            services.AddHttpClient(Rolehound.Api.Features.Ai.OpenRouterClient.HttpClientName)
+                .ConfigurePrimaryHttpMessageHandler(() => OpenRouter);
         });
     }
 

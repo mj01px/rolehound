@@ -1,10 +1,12 @@
+using Rolehound.Api.Features.Onboarding;
+
 namespace Rolehound.Api.Features.Accounts.SignIn;
 
 internal static class SignInEndpoints
 {
     public static IEndpointRouteBuilder MapSignInEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        var auth = endpoints.MapGroup("/auth").WithTags("Sign in");
+        var auth = endpoints.MapGroup("/auth").WithTags("Sign in").AllowBeforeOnboarding();
 
         auth.MapPost("/login", Login.Handle).AllowAnonymous();
         auth.MapPost("/login/two-factor", LoginTwoFactor.Handle).AllowAnonymous();

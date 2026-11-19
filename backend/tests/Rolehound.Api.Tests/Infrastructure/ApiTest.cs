@@ -32,7 +32,7 @@ public abstract class ApiTest(ApiFactory factory) : IAsyncLifetime
         await using var scope = Factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<RolehoundDbContext>();
         await db.Database.ExecuteSqlRawAsync(
-            "TRUNCATE users, account_tokens, security_events, user_claims, user_logins, user_tokens CASCADE", Ct);
+            "TRUNCATE users, account_tokens, security_events, user_claims, user_logins, user_tokens, ai_settings, ai_usage, dossier_versions, score_profiles CASCADE", Ct);
         Factory.Emails.Clear();
     }
 
@@ -43,7 +43,7 @@ public abstract class ApiTest(ApiFactory factory) : IAsyncLifetime
     }
 
     /// <summary>Creates an account directly in the database, optionally with a password already set.</summary>
-    protected async Task<User> CreateUserAsync(string email, UserRole role = UserRole.User, string? password = StrongPassword)
+    protected async Task<User> CreateUserAsync(string email, UserRole role = UserRole.User, string? password = StrongPassword, bool onboarded = true)
     {
         await using var scope = Factory.Services.CreateAsyncScope();
         var users = scope.ServiceProvider.GetRequiredService<UserManager<User>>();
@@ -54,6 +54,7 @@ public abstract class ApiTest(ApiFactory factory) : IAsyncLifetime
             Role = role,
             CreatedAt = DateTimeOffset.UtcNow,
             EmailConfirmed = true,
+            OnboardingCompletedAt = onboarded ? DateTimeOffset.UtcNow : null,
         };
 
         var result = password is null ? await users.CreateAsync(user) : await users.CreateAsync(user, password);

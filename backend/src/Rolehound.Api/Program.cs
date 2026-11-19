@@ -1,7 +1,11 @@
 using Microsoft.EntityFrameworkCore;
 using Rolehound.Api.Features.Accounts;
 using Rolehound.Api.Features.Accounts.Admin;
+using Rolehound.Api.Features.Ai;
+using Rolehound.Api.Features.Dossier;
 using Rolehound.Api.Features.Maintenance;
+using Rolehound.Api.Features.Onboarding;
+using Rolehound.Api.Features.ScoreProfiles;
 using Rolehound.Api.Infrastructure.Email;
 using Rolehound.Api.Infrastructure.Http;
 using Rolehound.Api.Infrastructure.Persistence;
@@ -14,12 +18,18 @@ builder.Services.AddKeyRing(builder.Configuration, builder.Environment);
 builder.Services.AddHttpDefaults(builder.Configuration);
 builder.Services.AddEmail(builder.Configuration, builder.Environment);
 builder.Services.AddAccounts(builder.Environment);
+builder.Services.AddAi(builder.Configuration);
 
 var app = builder.Build();
 
 app.UseHttpDefaults();
+app.UseOnboardingGate();
 app.MapHealthEndpoints();
 app.MapAccountsEndpoints();
+app.MapOnboardingEndpoints();
+app.MapAiSettingsEndpoints();
+app.MapDossierEndpoints();
+app.MapScoreProfileEndpoints();
 app.MapTaskEndpoints(app.Configuration);
 
 await PrepareDatabaseAsync(app);

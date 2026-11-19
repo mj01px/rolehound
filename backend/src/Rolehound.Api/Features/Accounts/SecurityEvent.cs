@@ -18,6 +18,7 @@ public enum SecurityEventType
     UserDeactivated,
     UserReactivated,
     RoleChanged,
+    AiKeyChanged,
 }
 
 /// <summary>Security audit trail, kept for 15 days (NFR-SEC-10).</summary>

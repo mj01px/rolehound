@@ -1,10 +1,12 @@
+using Rolehound.Api.Features.Onboarding;
+
 namespace Rolehound.Api.Features.Accounts.Profile;
 
 internal static class ProfileEndpoints
 {
     public static IEndpointRouteBuilder MapProfileEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        var account = endpoints.MapGroup("/account").WithTags("Account");
+        var account = endpoints.MapGroup("/account").WithTags("Account").AllowBeforeOnboarding();
 
         account.MapPost("/reauthenticate", Reauthenticate.Handle);
         account.MapPost("/reauthenticate/code", Reauthenticate.SendCode);

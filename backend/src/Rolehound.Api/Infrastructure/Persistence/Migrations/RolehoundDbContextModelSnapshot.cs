@@ -17,7 +17,7 @@ namespace Rolehound.Api.Infrastructure.Persistence.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.12")
+                .HasAnnotation("ProductVersion", "10.0.15")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -283,6 +283,10 @@ namespace Rolehound.Api.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(256)")
                         .HasColumnName("normalized_user_name");
 
+                    b.Property<DateTimeOffset?>("OnboardingCompletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("onboarding_completed_at");
+
                     b.Property<string>("PasswordHash")
                         .HasColumnType("text")
                         .HasColumnName("password_hash");
@@ -333,6 +337,157 @@ namespace Rolehound.Api.Infrastructure.Persistence.Migrations
                     b.ToTable("users", (string)null);
                 });
 
+            modelBuilder.Entity("Rolehound.Api.Features.Ai.AiSettings", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.Property<string>("EncryptedKey")
+                        .HasColumnType("text")
+                        .HasColumnName("encrypted_key");
+
+                    b.Property<string>("KeyHint")
+                        .HasMaxLength(4)
+                        .HasColumnType("character varying(4)")
+                        .HasColumnName("key_hint");
+
+                    b.Property<string>("PitchAndAtsModel")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("pitch_and_ats_model");
+
+                    b.Property<string>("ProfileAndFixModel")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("profile_and_fix_model");
+
+                    b.Property<string>("ResumeModel")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("resume_model");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("UserId")
+                        .HasName("pk_ai_settings");
+
+                    b.ToTable("ai_settings", (string)null);
+                });
+
+            modelBuilder.Entity("Rolehound.Api.Features.Ai.AiUsage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("At")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("at");
+
+                    b.Property<int>("CompletionTokens")
+                        .HasColumnType("integer")
+                        .HasColumnName("completion_tokens");
+
+                    b.Property<string>("Feature")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("feature");
+
+                    b.Property<string>("Model")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("model");
+
+                    b.Property<int>("PromptTokens")
+                        .HasColumnType("integer")
+                        .HasColumnName("prompt_tokens");
+
+                    b.Property<bool>("Succeeded")
+                        .HasColumnType("boolean")
+                        .HasColumnName("succeeded");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ai_usage");
+
+                    b.HasIndex("UserId", "At")
+                        .HasDatabaseName("ix_ai_usage_user_id_at");
+
+                    b.ToTable("ai_usage", (string)null);
+                });
+
+            modelBuilder.Entity("Rolehound.Api.Features.Dossier.DossierVersion", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("content");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<int>("Number")
+                        .HasColumnType("integer")
+                        .HasColumnName("number");
+
+                    b.Property<int>("SchemaVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("schema_version");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_dossier_versions");
+
+                    b.HasIndex("UserId", "Number")
+                        .IsUnique()
+                        .HasDatabaseName("ix_dossier_versions_user_id_number");
+
+                    b.ToTable("dossier_versions", (string)null);
+                });
+
+            modelBuilder.Entity("Rolehound.Api.Features.ScoreProfiles.UserScoreProfile", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.Property<string>("Document")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("document");
+
+                    b.Property<int?>("DossierVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("dossier_version");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("UserId")
+                        .HasName("pk_score_profiles");
+
+                    b.ToTable("score_profiles", (string)null);
+                });
+
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserClaim<System.Guid>", b =>
                 {
                     b.HasOne("Rolehound.Api.Features.Accounts.User", null)
@@ -371,6 +526,46 @@ namespace Rolehound.Api.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_account_tokens_asp_net_users_user_id");
+                });
+
+            modelBuilder.Entity("Rolehound.Api.Features.Ai.AiSettings", b =>
+                {
+                    b.HasOne("Rolehound.Api.Features.Accounts.User", null)
+                        .WithOne()
+                        .HasForeignKey("Rolehound.Api.Features.Ai.AiSettings", "UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_ai_settings_users_user_id");
+                });
+
+            modelBuilder.Entity("Rolehound.Api.Features.Ai.AiUsage", b =>
+                {
+                    b.HasOne("Rolehound.Api.Features.Accounts.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_ai_usage_users_user_id");
+                });
+
+            modelBuilder.Entity("Rolehound.Api.Features.Dossier.DossierVersion", b =>
+                {
+                    b.HasOne("Rolehound.Api.Features.Accounts.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_dossier_versions_users_user_id");
+                });
+
+            modelBuilder.Entity("Rolehound.Api.Features.ScoreProfiles.UserScoreProfile", b =>
+                {
+                    b.HasOne("Rolehound.Api.Features.Accounts.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_score_profiles_users_user_id");
                 });
 #pragma warning restore 612, 618
         }
