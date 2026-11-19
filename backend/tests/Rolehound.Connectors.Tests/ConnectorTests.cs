@@ -6,13 +6,15 @@ namespace Rolehound.Connectors.Tests;
 
 public sealed class ConnectorTests
 {
+    private static readonly HashSet<string> None = [];
+
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
     [Fact]
     public async Task Greenhouse_reads_jobs_and_decodes_escaped_html()
     {
         var handler = new Fixture("greenhouse.json");
-        var snapshot = await new GreenhouseConnector(new HttpClient(handler)).FetchAsync("exemplo", Ct);
+        var snapshot = await new GreenhouseConnector(new HttpClient(handler)).FetchAsync("exemplo", None, Ct);
 
         var job = Assert.Single(snapshot.Jobs);
         Assert.Equal("1001", job.ExternalId);
@@ -28,7 +30,7 @@ public sealed class ConnectorTests
     [Fact]
     public async Task Lever_maps_the_stated_work_mode_and_keeps_the_lists()
     {
-        var snapshot = await new LeverConnector(new HttpClient(new Fixture("lever.json"))).FetchAsync("exemplo", Ct);
+        var snapshot = await new LeverConnector(new HttpClient(new Fixture("lever.json"))).FetchAsync("exemplo", None, Ct);
 
         Assert.Equal(2, snapshot.Jobs.Count);
         var remote = snapshot.Jobs[0];
@@ -42,7 +44,7 @@ public sealed class ConnectorTests
     [Fact]
     public async Task GitHub_skips_pull_requests_and_rules_and_takes_the_company_only_from_the_body()
     {
-        var snapshot = await new GitHubConnector(new HttpClient(new Fixture("github.json"))).FetchAsync("exemplo/vagas", Ct);
+        var snapshot = await new GitHubConnector(new HttpClient(new Fixture("github.json"))).FetchAsync("exemplo/vagas", None, Ct);
 
         Assert.Equal(2, snapshot.Jobs.Count);
         var first = snapshot.Jobs[0];
@@ -57,7 +59,7 @@ public sealed class ConnectorTests
     {
         var connector = new GitHubConnector(new HttpClient(new Fixture("github.json")));
 
-        var error = await Assert.ThrowsAsync<ConnectorException>(() => connector.FetchAsync("not a repo", Ct));
+        var error = await Assert.ThrowsAsync<ConnectorException>(() => connector.FetchAsync("not a repo", None, Ct));
 
         Assert.Equal("target_invalid", error.Code);
     }
@@ -67,7 +69,7 @@ public sealed class ConnectorTests
     {
         var connector = new GreenhouseConnector(new HttpClient(new Fixture(null, HttpStatusCode.NotFound)));
 
-        var error = await Assert.ThrowsAsync<ConnectorException>(() => connector.FetchAsync("ninguem", Ct));
+        var error = await Assert.ThrowsAsync<ConnectorException>(() => connector.FetchAsync("ninguem", None, Ct));
 
         Assert.Equal("target_not_found", error.Code);
     }

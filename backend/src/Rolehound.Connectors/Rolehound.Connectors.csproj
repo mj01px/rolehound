@@ -5,6 +5,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="Rolehound.Connectors.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Rolehound.Scoring\Rolehound.Scoring.csproj" />
   </ItemGroup>
 

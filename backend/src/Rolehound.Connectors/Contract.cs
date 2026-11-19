@@ -14,7 +14,11 @@ public enum JobSource
     Link,
 }
 
-/// <summary>One job as a source lists it, before it becomes a global job.</summary>
+/// <summary>
+/// One job as a source lists it, before it becomes a global job.
+/// <paramref name="HasDetails"/> is false when only the listing entry came
+/// (details already stored, or the detail page failed): stored details are kept.
+/// </summary>
 public sealed record CollectedJob(
     string ExternalId,
     string Title,
@@ -23,13 +27,16 @@ public sealed record CollectedJob(
     string Description,
     string Url,
     WorkMode? WorkMode,
-    DateTimeOffset? PublishedAt);
+    DateTimeOffset? PublishedAt,
+    bool HasDetails = true);
 
 /// <summary>
-/// What one source target answered. A snapshot is authoritative: jobs of the
-/// same target missing from a successful snapshot are closed (FR-JOB).
+/// What one source target answered. An authoritative snapshot is the full
+/// list: jobs of the same target missing from it are closed. A search
+/// (Gupy) is not authoritative; its jobs close only by age.
+/// <paramref name="Warning"/> reports a partial answer that still counts.
 /// </summary>
-public sealed record Snapshot(IReadOnlyList<CollectedJob> Jobs);
+public sealed record Snapshot(IReadOnlyList<CollectedJob> Jobs, bool Authoritative = true, string? Warning = null);
 
 /// <summary>A failure with a stable code; a failed snapshot never closes jobs.</summary>
 public sealed class ConnectorException(string code, string message, Exception? inner = null) : Exception(message, inner)
@@ -39,11 +46,13 @@ public sealed class ConnectorException(string code, string message, Exception? i
 
 /// <summary>
 /// The common contract. A target is what the source is asked for: a
-/// Greenhouse board token, a Lever site name or a GitHub repository.
+/// Greenhouse board token, a Lever site name, a GitHub repository, an InHire
+/// company or a Gupy search term. <c>detailed</c> holds the external ids
+/// already stored with details, so sources with one page per job skip them.
 /// </summary>
 public interface IJobConnector
 {
     JobSource Source { get; }
 
-    Task<Snapshot> FetchAsync(string target, CancellationToken ct);
+    Task<Snapshot> FetchAsync(string target, IReadOnlySet<string> detailed, CancellationToken ct);
 }

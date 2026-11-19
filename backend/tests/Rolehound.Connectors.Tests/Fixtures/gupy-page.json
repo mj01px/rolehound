@@ -1,0 +1,24 @@
+{
+  "pageProps": {
+    "initialJobList": {
+      "data": [
+        {
+          "id": 9001,
+          "name": "Pessoa Desenvolvedora Python",
+          "jobUrl": "https://exemplo.gupy.io/jobs/9001",
+          "careerPageName": "Exemplo Varejo",
+          "city": "Recife",
+          "state": "Pernambuco",
+          "country": "Brasil",
+          "publishedDate": "2026-11-16T15:00:00.000Z",
+          "workplaceType": "remote",
+          "isRemoteWork": true,
+          "description": "<p>Back-end com Django.</p>",
+          "skills": [{ "name": "Python" }, { "name": "SQL" }]
+        },
+        { "id": 9002, "name": "", "jobUrl": "https://exemplo.gupy.io/jobs/9002" }
+      ],
+      "pagination": { "total": 100, "limit": 12, "offset": 0 }
+    }
+  }
+}

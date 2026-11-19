@@ -1,0 +1,6 @@
+[
+  { "jobId": "aaa-111", "displayName": "Desenvolvedor(a) Back-end Júnior", "careerPage": { "careerPage": "default", "id": "default" } },
+  { "jobId": "bbb-222", "displayName": "Analista de Dados", "careerPageId": "default", "link": "https://exemplo.inhire.com.br/vagas/bbb-222" },
+  { "jobId": "ccc-333", "displayName": "Vaga de outra página", "careerPage": { "careerPage": "tecnologia" } },
+  { "jobId": "", "displayName": "Sem id", "careerPageId": "default" }
+]

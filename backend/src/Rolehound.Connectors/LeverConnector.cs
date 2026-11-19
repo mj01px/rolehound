@@ -1,6 +1,5 @@
 using System.Text;
 using System.Text.Json;
-using Rolehound.Scoring;
 
 namespace Rolehound.Connectors;
 
@@ -16,7 +15,7 @@ public sealed class LeverConnector(HttpClient http) : IJobConnector
 
     public JobSource Source => JobSource.Lever;
 
-    public async Task<Snapshot> FetchAsync(string target, CancellationToken ct)
+    public async Task<Snapshot> FetchAsync(string target, IReadOnlySet<string> detailed, CancellationToken ct)
     {
         var site = Uri.EscapeDataString(target.Trim());
         using var document = await HttpJson.GetAsync(http, new Uri($"{BaseUrl}{site}?mode=json"), $"Lever {target}", ct);
@@ -45,7 +44,7 @@ public sealed class LeverConnector(HttpClient http) : IJobConnector
                 ? DateTimeOffset.FromUnixTimeMilliseconds(ms)
                 : null;
 
-            result.Add(new CollectedJob(id, title, target, location, Description(posting), url, WorkModeOf(posting.String("workplaceType")), published));
+            result.Add(new CollectedJob(id, title, target, location, Description(posting), url, HttpJson.WorkModeOf(posting.String("workplaceType")), published));
         }
 
         return new Snapshot(result);
@@ -66,12 +65,4 @@ public sealed class LeverConnector(HttpClient http) : IJobConnector
         var plain = text.ToString().Trim();
         return plain.Length > HtmlText.MaxLength ? plain[..HtmlText.MaxLength] : plain;
     }
-
-    private static WorkMode? WorkModeOf(string? value) => value switch
-    {
-        "remote" => WorkMode.Remote,
-        "hybrid" => WorkMode.Hybrid,
-        "on-site" => WorkMode.Onsite,
-        _ => null,
-    };
 }

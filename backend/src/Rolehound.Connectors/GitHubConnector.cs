@@ -19,7 +19,7 @@ public sealed partial class GitHubConnector(HttpClient http) : IJobConnector
 
     public JobSource Source => JobSource.GitHub;
 
-    public async Task<Snapshot> FetchAsync(string target, CancellationToken ct)
+    public async Task<Snapshot> FetchAsync(string target, IReadOnlySet<string> detailed, CancellationToken ct)
     {
         var repo = target.Trim();
         if (!RepoPattern().IsMatch(repo))
