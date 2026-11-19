@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { QRCodeSVG } from 'qrcode.react'
 import { useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router'
 import { ApiError, api, errorMessage } from '../../lib/api'
@@ -240,9 +241,11 @@ function TwoFactorRow({ security }: { security: Security }) {
         <form className={styles.panel} onSubmit={submitCode} noValidate>
           {setup.kind === 'totp' ? (
             <>
-              <p className={styles.muted}>
-                No app autenticador, adicione uma conta com esta chave (ou <a href={setup.authenticatorUri}>abra direto no app</a>, no celular):
-              </p>
+              <p className={styles.muted}>Aponte a câmera do app autenticador para o código. Sem câmera, digite a chave abaixo.</p>
+              <div className={styles.qr}>
+                {/* Fixed dark on light: scanners need that contrast, whatever the theme. */}
+                <QRCodeSVG value={setup.authenticatorUri} size={168} marginSize={2} bgColor="#fafafa" fgColor="#09090b" title="QR code para o app autenticador" />
+              </div>
               <p className={styles.key}>{setup.sharedKey}</p>
             </>
           ) : (
