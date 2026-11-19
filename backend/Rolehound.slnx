@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Rolehound.Api/Rolehound.Api.csproj" />
+    <Project Path="src/Rolehound.Scoring/Rolehound.Scoring.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Rolehound.Api.Tests/Rolehound.Api.Tests.csproj" />
+    <Project Path="tests/Rolehound.Scoring.Tests/Rolehound.Scoring.Tests.csproj" />
+  </Folder>
+</Solution>

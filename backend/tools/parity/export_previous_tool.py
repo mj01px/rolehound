@@ -8,7 +8,7 @@ per job.
 The output holds third-party job text and may hold personal data. Write it
 outside this repository. Usage:
 
-    python3 -I tools/parity/export_previous_tool.py \
+    python3 -I backend/tools/parity/export_previous_tool.py \
         --backend PATH_TO_PREVIOUS_TOOL/backend \
         --database PATH_TO/job-watcher.sqlite3 \
         --output ~/.rolehound/parity/jobs.jsonl
@@ -24,7 +24,7 @@ import sqlite3
 import sys
 from pathlib import Path
 
-REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
+REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 
 
 def parse_args() -> argparse.Namespace:

@@ -5,7 +5,7 @@ namespace Rolehound.Scoring.Tests;
 /// <summary>
 /// Compares the engine with the previous tool on real jobs (BR-SCO-70). The
 /// data holds third-party text and personal data, so it lives outside the
-/// repository; export it with tools/parity/export_previous_tool.py and point
+/// repository; export it with backend/tools/parity/export_previous_tool.py and point
 /// ROLEHOUND_PARITY_FIXTURE at the file. Without it the test is skipped.
 /// </summary>
 public class ParityTests
