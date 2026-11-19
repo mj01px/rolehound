@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
@@ -13,8 +14,11 @@ namespace Rolehound.Api.Infrastructure.Persistence;
 /// tokens; roles are a column on the user).
 /// </summary>
 public sealed class RolehoundDbContext(DbContextOptions<RolehoundDbContext> options)
-    : IdentityUserContext<User, Guid>(options)
+    : IdentityUserContext<User, Guid>(options), IDataProtectionKeyContext
 {
+    /// <summary>ASP.NET Data Protection key ring, wrapped by a certificate outside the database (see DataProtectionExtensions).</summary>
+    public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
+
     public DbSet<AccountToken> AccountTokens => Set<AccountToken>();
 
     public DbSet<SecurityEvent> SecurityEvents => Set<SecurityEvent>();

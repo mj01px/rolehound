@@ -21,6 +21,8 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
     public static string ConnectionString =>
         Environment.GetEnvironmentVariable("ROLEHOUND_TEST_CONNECTION") ?? DefaultConnection;
 
+    public const string TaskKey = "test-task-key-0123456789-abcdefghijklmnop";
+
     public CapturedEmails Emails { get; } = new();
 
     public FakePwnedPasswords PwnedPasswords { get; } = new();
@@ -31,6 +33,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
         builder.UseSetting("ConnectionStrings:Rolehound", ConnectionString);
         builder.UseSetting("Database:MigrateOnStart", "true");
         builder.UseSetting("Web:BaseUrl", "http://app.test");
+        builder.UseSetting("Tasks:Key", TaskKey);
         builder.UseSetting("RateLimits:AnonymousPerMinute", "100000");
         builder.UseSetting("RateLimits:ReadsPerMinute", "100000");
         builder.UseSetting("RateLimits:WritesPerMinute", "100000");

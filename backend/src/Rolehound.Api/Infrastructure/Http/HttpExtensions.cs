@@ -1,8 +1,7 @@
 using System.Globalization;
-using System.Security.Claims;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
-using Microsoft.Extensions.Options;
+using Microsoft.AspNetCore.RateLimiting;
 using Rolehound.Api.Infrastructure.Persistence;
 
 namespace Rolehound.Api.Infrastructure.Http;
@@ -31,10 +30,10 @@ internal static class HttpExtensions
             .AllowAnyHeader()
             .WithMethods("GET", "POST", "PUT", "PATCH", "DELETE")));
 
+        services.AddSingleton<RateLimits>();
         services.AddRateLimiter(options =>
         {
             options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
-            options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(Partition);
             options.OnRejected = async (context, ct) =>
             {
                 if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
@@ -46,6 +45,8 @@ internal static class HttpExtensions
                     .ExecuteAsync(context.HttpContext);
             };
         });
+        services.AddOptions<RateLimiterOptions>()
+            .Configure<RateLimits>((options, limits) => options.GlobalLimiter = limits.Limiter);
 
         services.AddSingleton(TimeProvider.System);
         return services;
@@ -76,6 +77,16 @@ internal static class HttpExtensions
         app.UseCors(WebAppCors);
         app.UseAuthentication();
         app.UseRateLimiter();
+        app.Use(async (context, next) =>
+        {
+            var limits = context.RequestServices.GetRequiredService<RateLimits>();
+            context.Response.OnStarting(() =>
+            {
+                limits.WriteHeaders(context);
+                return Task.CompletedTask;
+            });
+            await next();
+        });
         app.UseAuthorization();
 
         if (app.Environment.IsDevelopment())
@@ -94,29 +105,4 @@ internal static class HttpExtensions
 
         return endpoints;
     }
-
-    // Signed-in people are limited per account, split into reads and writes;
-    // everyone else per IP address.
-    private static RateLimitPartition<string> Partition(HttpContext context)
-    {
-        var limits = context.RequestServices.GetRequiredService<IOptions<RateLimitOptions>>().Value;
-        var userId = context.User.FindFirstValue(ClaimTypes.NameIdentifier);
-
-        if (userId is null)
-        {
-            var ip = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
-            return Window($"anon:{ip}", limits.AnonymousPerMinute);
-        }
-
-        var isRead = HttpMethods.IsGet(context.Request.Method) || HttpMethods.IsHead(context.Request.Method);
-        return isRead ? Window($"read:{userId}", limits.ReadsPerMinute) : Window($"write:{userId}", limits.WritesPerMinute);
-    }
-
-    private static RateLimitPartition<string> Window(string key, int permits) =>
-        RateLimitPartition.GetFixedWindowLimiter(key, _ => new FixedWindowRateLimiterOptions
-        {
-            PermitLimit = permits,
-            Window = TimeSpan.FromMinutes(1),
-            QueueLimit = 0,
-        });
 }

@@ -3,8 +3,8 @@
   <!-- Every package version lives here. Project files list packages without versions. -->
   <PropertyGroup>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
-    <!-- Microsoft packages follow the installed .NET 10 runtime patch. -->
-    <MicrosoftPatch>10.0.12</MicrosoftPatch>
+    <!-- Microsoft packages: latest .NET 10 patch (security fixes). Keep in step with the SDK in global.json. -->
+    <MicrosoftPatch>10.0.15</MicrosoftPatch>
   </PropertyGroup>
 
   <ItemGroup Label="API">
@@ -14,6 +14,7 @@
     <PackageVersion Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" Version="$(MicrosoftPatch)" />
     <PackageVersion Include="EFCore.NamingConventions" Version="10.0.1" />
     <PackageVersion Include="MailKit" Version="4.18.2" />
+    <PackageVersion Include="Microsoft.AspNetCore.DataProtection.EntityFrameworkCore" Version="$(MicrosoftPatch)" />
     <PackageVersion Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="$(MicrosoftPatch)" />
     <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
   </ItemGroup>
