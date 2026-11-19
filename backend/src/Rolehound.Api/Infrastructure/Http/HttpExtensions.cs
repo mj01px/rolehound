@@ -1,4 +1,8 @@
+using System.Globalization;
+using System.Security.Claims;
+using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Options;
 using Rolehound.Api.Infrastructure.Persistence;
 
 namespace Rolehound.Api.Infrastructure.Http;
@@ -6,8 +10,9 @@ namespace Rolehound.Api.Infrastructure.Http;
 internal static class HttpExtensions
 {
     private const string ReadyTag = "ready";
+    private const string WebAppCors = "web-app";
 
-    public static IServiceCollection AddHttpDefaults(this IServiceCollection services)
+    public static IServiceCollection AddHttpDefaults(this IServiceCollection services, IConfiguration configuration)
     {
         // Errors leave the API as RFC 9457 problem details, never as stack traces.
         services.AddProblemDetails();
@@ -16,6 +21,33 @@ internal static class HttpExtensions
         services.AddHealthChecks()
             .AddDbContextCheck<RolehoundDbContext>("database", tags: [ReadyTag]);
 
+        services.AddOptions<WebOptions>().Bind(configuration.GetSection(WebOptions.Section)).ValidateDataAnnotations().ValidateOnStart();
+        services.Configure<RateLimitOptions>(configuration.GetSection(RateLimitOptions.Section));
+
+        var webOrigin = new Uri(configuration[$"{WebOptions.Section}:{nameof(WebOptions.BaseUrl)}"] ?? new WebOptions().BaseUrl).GetLeftPart(UriPartial.Authority);
+        services.AddCors(options => options.AddPolicy(WebAppCors, policy => policy
+            .WithOrigins(webOrigin)
+            .AllowCredentials()
+            .AllowAnyHeader()
+            .WithMethods("GET", "POST", "PUT", "PATCH", "DELETE")));
+
+        services.AddRateLimiter(options =>
+        {
+            options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+            options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(Partition);
+            options.OnRejected = async (context, ct) =>
+            {
+                if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
+                {
+                    context.HttpContext.Response.Headers.RetryAfter = ((int)Math.Ceiling(retryAfter.TotalSeconds)).ToString(CultureInfo.InvariantCulture);
+                }
+
+                await Problems.Problem(StatusCodes.Status429TooManyRequests, "rate_limited", "Muitas requisições. Aguarde um pouco e tente de novo.")
+                    .ExecuteAsync(context.HttpContext);
+            };
+        });
+
+        services.AddSingleton(TimeProvider.System);
         return services;
     }
 
@@ -24,9 +56,31 @@ internal static class HttpExtensions
         app.UseExceptionHandler();
         app.UseStatusCodePages();
 
+        if (!app.Environment.IsDevelopment() && !app.Environment.IsEnvironment("Testing"))
+        {
+            app.UseHsts();
+            app.UseHttpsRedirection();
+        }
+
+        app.Use(async (context, next) =>
+        {
+            var headers = context.Response.Headers;
+            headers.XContentTypeOptions = "nosniff";
+            headers.XFrameOptions = "DENY";
+            headers["Referrer-Policy"] = "no-referrer";
+            // The API serves JSON only; nothing may load or frame it.
+            headers.ContentSecurityPolicy = "default-src 'none'; frame-ancestors 'none'";
+            await next();
+        });
+
+        app.UseCors(WebAppCors);
+        app.UseAuthentication();
+        app.UseRateLimiter();
+        app.UseAuthorization();
+
         if (app.Environment.IsDevelopment())
         {
-            app.MapOpenApi();
+            app.MapOpenApi().AllowAnonymous();
         }
 
         return app;
@@ -35,9 +89,34 @@ internal static class HttpExtensions
     public static IEndpointRouteBuilder MapHealthEndpoints(this IEndpointRouteBuilder endpoints)
     {
         // Liveness: the process answers. Readiness: its dependencies answer too.
-        endpoints.MapHealthChecks("/health/live", new HealthCheckOptions { Predicate = _ => false });
-        endpoints.MapHealthChecks("/health/ready", new HealthCheckOptions { Predicate = check => check.Tags.Contains(ReadyTag) });
+        endpoints.MapHealthChecks("/health/live", new HealthCheckOptions { Predicate = _ => false }).AllowAnonymous().DisableRateLimiting();
+        endpoints.MapHealthChecks("/health/ready", new HealthCheckOptions { Predicate = check => check.Tags.Contains(ReadyTag) }).AllowAnonymous().DisableRateLimiting();
 
         return endpoints;
     }
+
+    // Signed-in people are limited per account, split into reads and writes;
+    // everyone else per IP address.
+    private static RateLimitPartition<string> Partition(HttpContext context)
+    {
+        var limits = context.RequestServices.GetRequiredService<IOptions<RateLimitOptions>>().Value;
+        var userId = context.User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        if (userId is null)
+        {
+            var ip = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+            return Window($"anon:{ip}", limits.AnonymousPerMinute);
+        }
+
+        var isRead = HttpMethods.IsGet(context.Request.Method) || HttpMethods.IsHead(context.Request.Method);
+        return isRead ? Window($"read:{userId}", limits.ReadsPerMinute) : Window($"write:{userId}", limits.WritesPerMinute);
+    }
+
+    private static RateLimitPartition<string> Window(string key, int permits) =>
+        RateLimitPartition.GetFixedWindowLimiter(key, _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = permits,
+            Window = TimeSpan.FromMinutes(1),
+            QueueLimit = 0,
+        });
 }
