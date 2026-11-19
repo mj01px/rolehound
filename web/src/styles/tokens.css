@@ -1,0 +1,44 @@
+/* Rolehound design tokens. Source of truth: the Rolehound design system. Dark theme only. */
+:root {
+  --bg: #09090b;
+  --surface: #121215;
+  --surface-raised: #18181b;
+  --border: #27272a;
+  --border-control: #6b6b75;
+  --ink: #fafafa;
+  --muted: #a1a1aa;
+  --faint: #8b8b94;
+  --signal: #10b981;
+  --signal-bright: #34d399;
+  --on-signal: #04140d;
+  --signal-wash: #0f2a21;
+  --action: #fafafa;
+  --action-hover: #e4e4e7;
+  --on-action: #09090b;
+  --amber: #f59e0b;
+  --danger: #f87171;
+  --danger-wash: #2a1414;
+
+  --status-interest: #a1a1aa;
+  --status-applied: #38bdf8;
+  --status-screening: #a78bfa;
+  --status-challenge: var(--amber);
+  --status-interview: #f472b6;
+  --status-offer: var(--signal);
+  --status-rejected: var(--danger);
+  --status-withdrawn: var(--faint);
+
+  --font-sans: "Geist", system-ui, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, monospace;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+}
