@@ -1,0 +1,31 @@
+# Local development services. Credentials here are for a throwaway local
+# database only; real environments get theirs from the host's secret store.
+name: rolehound
+
+services:
+  postgres:
+    image: postgres:18.7-alpine
+    environment:
+      POSTGRES_DB: rolehound
+      POSTGRES_USER: rolehound
+      POSTGRES_PASSWORD: rolehound
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      # Postgres 18 images keep data under /var/lib/postgresql/<major>/docker.
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rolehound -d rolehound"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  mailpit:
+    # Catches every email the API sends in development. Web UI on port 8025.
+    image: axllent/mailpit:v1.33.1
+    ports:
+      - "127.0.0.1:1025:1025"
+      - "127.0.0.1:8025:8025"
+
+volumes:
+  postgres-data:
