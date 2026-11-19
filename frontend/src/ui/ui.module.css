@@ -1,0 +1,145 @@
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  font: 500 14px/1 var(--font-sans);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.primary {
+  background: var(--action);
+  color: var(--on-action);
+}
+
+.primary:hover:not(:disabled) {
+  background: var(--action-hover);
+}
+
+.secondary {
+  background: transparent;
+  color: var(--ink);
+  border-color: var(--border-control);
+}
+
+.secondary:hover:not(:disabled) {
+  background: var(--surface);
+}
+
+.ghost {
+  background: transparent;
+  color: var(--muted);
+}
+
+.ghost:hover:not(:disabled) {
+  color: var(--ink);
+}
+
+.danger {
+  background: transparent;
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+.large {
+  height: 44px;
+  font-size: 15px;
+}
+
+.block {
+  width: 100%;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.labelRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.label {
+  font: 500 13px/16px var(--font-sans);
+  color: var(--ink);
+}
+
+.input {
+  height: 44px;
+  padding: 0 14px;
+  border-radius: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border-control);
+  color: var(--ink);
+  font: 400 15px var(--font-sans);
+  width: 100%;
+  outline: none;
+}
+
+.input::placeholder {
+  color: var(--faint);
+}
+
+.input:focus-visible {
+  outline: 2px solid var(--signal-bright);
+  outline-offset: 2px;
+}
+
+.inputError {
+  border-color: var(--danger);
+}
+
+.help {
+  font: 400 12px/16px var(--font-sans);
+  color: var(--faint);
+}
+
+.error {
+  font: 400 12px/16px var(--font-sans);
+  color: var(--danger);
+}
+
+.alert {
+  margin: 0;
+  padding: var(--space-3);
+  border-radius: 8px;
+  background: var(--danger-wash);
+  color: var(--danger);
+  font: 400 13px/18px var(--font-sans);
+}
+
+.notice {
+  margin: 0;
+  padding: var(--space-3);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  font: 400 13px/18px var(--font-sans);
+}
+
+.link {
+  color: var(--muted);
+  font-size: 13px;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  font-family: var(--font-sans);
+}
+
+.link:hover {
+  color: var(--ink);
+}

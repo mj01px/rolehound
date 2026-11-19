@@ -1,6 +1,44 @@
 import { createBrowserRouter } from 'react-router'
-import { StatusPage } from '../features/status/StatusPage'
+import { SettingsPage } from '../features/account/SettingsPage'
+import { AdminUsersPage } from '../features/admin/AdminUsersPage'
+import { AccessPage } from '../features/auth/AccessPage'
+import { ConfirmEmailPage } from '../features/auth/ConfirmEmailPage'
+import { LoginPage } from '../features/auth/LoginPage'
+import { ForgotPasswordPage, ForgotPasswordSentPage, ResetPasswordPage } from '../features/auth/PasswordResetPages'
+import { TwoFactorPage } from '../features/auth/TwoFactorPage'
+import { JobsPage } from '../features/jobs/JobsPage'
+import { AppLayout } from './AppLayout'
+import { RequireAuth, RequireGuest } from './RequireAuth'
 
+// Paths are in Portuguese: people see them. Links in emails point to
+// /acesso, /nova-senha and /confirmar-email.
 export const router = createBrowserRouter([
-  { path: '/', element: <StatusPage /> },
+  {
+    element: <RequireGuest />,
+    children: [
+      { path: '/entrar', element: <LoginPage /> },
+      { path: '/entrar/verificacao', element: <TwoFactorPage /> },
+      { path: '/esqueci-senha', element: <ForgotPasswordPage /> },
+      { path: '/esqueci-senha/enviado', element: <ForgotPasswordSentPage /> },
+    ],
+  },
+  { path: '/acesso', element: <AccessPage /> },
+  { path: '/nova-senha', element: <ResetPasswordPage /> },
+  { path: '/confirmar-email', element: <ConfirmEmailPage /> },
+  {
+    element: <RequireAuth />,
+    children: [
+      {
+        element: <AppLayout />,
+        children: [
+          { path: '/', element: <JobsPage /> },
+          { path: '/configuracoes', element: <SettingsPage /> },
+          {
+            element: <RequireAuth admin />,
+            children: [{ path: '/admin/usuarios', element: <AdminUsersPage /> }],
+          },
+        ],
+      },
+    ],
+  },
 ])
