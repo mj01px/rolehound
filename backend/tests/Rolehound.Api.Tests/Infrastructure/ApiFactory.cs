@@ -29,7 +29,9 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
 
     public FakeOpenRouter OpenRouter { get; } = new();
 
-    public FakeJobSource JobSource { get; } = new();
+    public FakeJobSource JobSource { get; } = new(Rolehound.Connectors.JobSource.Greenhouse);
+
+    public FakeJobSource Gupy { get; } = new(Rolehound.Connectors.JobSource.Gupy, authoritative: false);
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -50,6 +52,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
                 .ConfigurePrimaryHttpMessageHandler(() => PwnedPasswords);
             services.RemoveAll<Rolehound.Connectors.IJobConnector>();
             services.AddSingleton<Rolehound.Connectors.IJobConnector>(JobSource);
+            services.AddSingleton<Rolehound.Connectors.IJobConnector>(Gupy);
             services.AddHttpClient(Rolehound.Api.Features.Ai.OpenRouterClient.HttpClientName)
                 .ConfigurePrimaryHttpMessageHandler(() => OpenRouter);
         });

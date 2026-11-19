@@ -1,5 +1,7 @@
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Rolehound.Api.Features.Jobs;
+using Rolehound.Api.Features.ScoreProfiles;
 using Rolehound.Api.Infrastructure.Persistence;
 using Rolehound.Connectors;
 using Rolehound.Scoring;
@@ -11,8 +13,10 @@ public sealed record CollectionSummary(int Targets, int Failed, int Added, int R
 /// <summary>
 /// One collection run over every enabled target (PRD 6). Each successful
 /// snapshot is authoritative for its target: new jobs are added, returning ones
-/// reopen, missing ones close. A failed snapshot changes nothing. Deleted jobs
+/// reopen, missing ones close. A search snapshot (Gupy) only adds and reopens;
+/// its jobs close by age. A failed snapshot changes nothing. Deleted jobs
 /// (tombstones) never come back. New and reopened jobs are scored for everyone.
+/// Gupy terms are the union of everyone's search terms (FR-SCO).
 /// Idempotent: running twice in a row changes nothing the second time.
 /// </summary>
 public sealed partial class CollectionRunner(
@@ -30,6 +34,7 @@ public sealed partial class CollectionRunner(
     public async Task<CollectionSummary> RunAsync(CancellationToken ct)
     {
         var byKind = connectors.ToDictionary(c => c.Source);
+        await SyncSearchTermsAsync(ct);
         var targets = await db.SourceTargets.Where(t => t.Enabled).OrderBy(t => t.Source).ThenBy(t => t.Key).ToListAsync(ct);
         int failed = 0, added = 0, reopened = 0, closed = 0;
 
@@ -44,10 +49,12 @@ public sealed partial class CollectionRunner(
             db.CollectionRuns.Add(run);
             try
             {
-                var snapshot = await connector.FetchAsync(target.Key, ct);
+                var detailed = (await db.Jobs.Where(j => j.TargetId == target.Id && j.Description != string.Empty)
+                    .Select(j => j.ExternalId).ToListAsync(ct)).ToHashSet(StringComparer.Ordinal);
+                var snapshot = await connector.FetchAsync(target.Key, detailed, ct);
                 var changed = await ApplyAsync(target, snapshot, run, ct);
                 target.LastJobCount = run.Listed;
-                target.LastError = null;
+                run.Error = target.LastError = snapshot.Warning;
                 await db.SaveChangesAsync(ct);
                 await scoring.ScoreJobsAsync(changed, ct);
             }
@@ -66,8 +73,54 @@ public sealed partial class CollectionRunner(
             closed += run.Closed;
         }
 
+        closed += await CloseAgedAsync(ct);
         return new CollectionSummary(targets.Count, failed, added, reopened, closed);
     }
+
+    /// <summary>
+    /// Makes the Gupy targets match the union of the search terms of everyone
+    /// active and onboarded: new terms are added, terms nobody uses any more
+    /// are disabled (their jobs stay and age out).
+    /// </summary>
+    private async Task SyncSearchTermsAsync(CancellationToken ct)
+    {
+        var documents = await db.ScoreProfiles.AsNoTracking()
+            .Join(db.Users.AsNoTracking(), p => p.UserId, u => u.Id, (p, u) => new { p.Document, u.IsActive, u.OnboardingCompletedAt })
+            .Where(r => r.IsActive && r.OnboardingCompletedAt != null)
+            .Select(r => r.Document)
+            .ToListAsync(ct);
+
+        var wanted = documents
+            .SelectMany(d => JsonSerializer.Deserialize<ProfileDocument>(d, ScoreProfileEndpoints.Json)?.SearchTerms ?? [])
+            .Select(NormalizeTerm)
+            .Where(t => t.Length is > 0 and <= 100)
+            .ToHashSet(StringComparer.Ordinal);
+
+        var current = await db.SourceTargets.Where(t => t.Source == JobSource.Gupy).ToListAsync(ct);
+        foreach (var target in current)
+        {
+            target.Enabled = wanted.Remove(target.Key);
+        }
+
+        foreach (var term in wanted)
+        {
+            db.SourceTargets.Add(new SourceTarget { Source = JobSource.Gupy, Key = term, CreatedAt = time.GetUtcNow() });
+        }
+
+        await db.SaveChangesAsync(ct);
+    }
+
+    /// <summary>Closes active jobs of sources that expire by age, wherever they came from.</summary>
+    private async Task<int> CloseAgedAsync(CancellationToken ct)
+    {
+        var now = time.GetUtcNow();
+        var oldest = now - MaxAge;
+        return await db.Jobs
+            .Where(j => ExpiringSources.Contains(j.Source) && j.Status == SourceStatus.Active && (j.PublishedAt ?? j.FirstSeenAt) < oldest)
+            .ExecuteUpdateAsync(s => s.SetProperty(j => j.Status, SourceStatus.Closed).SetProperty(j => j.ClosedAt, now), ct);
+    }
+
+    internal static string NormalizeTerm(string term) => string.Join(' ', term.Trim().ToLowerInvariant().Split(' ', StringSplitOptions.RemoveEmptyEntries));
 
     /// <summary>Applies a snapshot; returns the jobs to score (new, reopened or changed).</summary>
     private async Task<List<Job>> ApplyAsync(SourceTarget target, Snapshot snapshot, CollectionRun run, CancellationToken ct)
@@ -147,9 +200,9 @@ public sealed partial class CollectionRunner(
         }
 
         var listedIds = ids.ToHashSet(StringComparer.Ordinal);
-        foreach (var job in existing.Where(j => j.Status == SourceStatus.Active))
+        foreach (var job in existing.Where(j => j.Status == SourceStatus.Active && j.TargetId == target.Id))
         {
-            var missing = !listedIds.Contains(job.ExternalId);
+            var missing = snapshot.Authoritative && !listedIds.Contains(job.ExternalId);
             var aged = expires && (job.PublishedAt ?? job.FirstSeenAt) < oldest;
             if (missing || aged)
             {
@@ -162,20 +215,27 @@ public sealed partial class CollectionRunner(
         return changed;
     }
 
-    /// <summary>Copies the source's fields and recomputes work mode and seniority. True when something changed.</summary>
+    /// <summary>
+    /// Copies the source's fields and recomputes work mode and seniority. True when
+    /// something changed. A listing entry without details keeps the stored details.
+    /// </summary>
     private static bool Update(Job job, CollectedJob item, SourceTarget target)
     {
         var company = string.IsNullOrWhiteSpace(target.Label) ? item.Company : target.Label;
-        var changed = job.Title != item.Title || job.Description != item.Description || job.Company != company
-            || job.Location != item.Location || job.SourceWorkMode != item.WorkMode;
+        var keepDetails = !item.HasDetails && job.Description.Length > 0;
+        var changed = job.Title != item.Title || job.Company != company
+            || (!keepDetails && (job.Description != item.Description || job.Location != item.Location || job.SourceWorkMode != item.WorkMode));
 
         job.Title = Cut(item.Title, 500);
         job.Company = Cut(company, 200);
-        job.Location = Cut(item.Location, 300);
-        job.Description = item.Description;
         job.Url = Cut(item.Url, 1000);
-        job.SourceWorkMode = item.WorkMode;
-        job.PublishedAt = item.PublishedAt;
+        if (!keepDetails)
+        {
+            job.Location = Cut(item.Location, 300);
+            job.Description = item.Description;
+            job.SourceWorkMode = item.WorkMode;
+            job.PublishedAt = item.PublishedAt;
+        }
 
         var text = job.ToText();
         job.WorkMode = JobClassifier.DetectWorkMode(text);

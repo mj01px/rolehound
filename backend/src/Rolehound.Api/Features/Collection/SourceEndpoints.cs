@@ -18,11 +18,12 @@ public sealed record UpdateSourceTargetRequest(bool Enabled, string? Label);
 
 /// <summary>
 /// Admin › Fontes (US-26): the boards, sites and repositories collection reads,
-/// plus a manual run. Gupy and InHire are not offered until their access is decided.
+/// plus a manual run. Gupy terms are not added here: they follow everyone's
+/// search terms, so the list only shows them.
 /// </summary>
 internal static partial class SourceEndpoints
 {
-    private static readonly JobSource[] Configurable = [JobSource.Greenhouse, JobSource.Lever, JobSource.GitHub];
+    private static readonly JobSource[] Configurable = [JobSource.Greenhouse, JobSource.Lever, JobSource.GitHub, JobSource.InHire];
 
     public static IEndpointRouteBuilder MapSourceEndpoints(this IEndpointRouteBuilder endpoints)
     {
@@ -54,16 +55,26 @@ internal static partial class SourceEndpoints
     {
         if (!Enum.TryParse<JobSource>(request.Source, ignoreCase: true, out var source) || !Configurable.Contains(source))
         {
-            return Problems.Validation("source", "Fonte inválida: use greenhouse, lever ou github.");
+            return Problems.Validation("source", source == JobSource.Gupy
+                ? "Os termos do Gupy vêm dos perfis de score de quem usa o app."
+                : "Fonte inválida: use greenhouse, lever, github ou inhire.");
         }
 
         var key = request.Key?.Trim() ?? string.Empty;
-        var valid = source == JobSource.GitHub ? RepoPattern().IsMatch(key) : SlugPattern().IsMatch(key);
+        if (source == JobSource.InHire)
+        {
+            key = key.ToLowerInvariant();
+        }
+
+        var (valid, hint) = source switch
+        {
+            JobSource.GitHub => (RepoPattern().IsMatch(key), "Use o formato dono/repositorio, como backend-br/vagas."),
+            JobSource.InHire => (InHirePattern().IsMatch(key), "Use empresa ou empresa/pagina, como em empresa.inhire.app/pagina/vagas."),
+            _ => (SlugPattern().IsMatch(key), "Use o identificador da empresa no endereço de vagas, como stone em job-boards.greenhouse.io/stone."),
+        };
         if (!valid)
         {
-            return Problems.Validation("key", source == JobSource.GitHub
-                ? "Use o formato dono/repositorio, como backend-br/vagas."
-                : "Use o identificador da empresa no endereço de vagas, como stone em job-boards.greenhouse.io/stone.");
+            return Problems.Validation("key", hint);
         }
 
         if (await db.SourceTargets.AnyAsync(t => t.Source == source && t.Key == key, ct))
@@ -85,6 +96,11 @@ internal static partial class SourceEndpoints
             return Problems.NotFound();
         }
 
+        if (target.Source == JobSource.Gupy)
+        {
+            return Problems.Conflict("source_managed", "Os termos do Gupy seguem os perfis de score; mude o termo no perfil.");
+        }
+
         target.Enabled = request.Enabled;
         target.Label = Clean(request.Label);
         await db.SaveChangesAsync(ct);
@@ -98,6 +114,11 @@ internal static partial class SourceEndpoints
         if (target is null)
         {
             return Problems.NotFound();
+        }
+
+        if (target.Source == JobSource.Gupy)
+        {
+            return Problems.Conflict("source_managed", "Os termos do Gupy seguem os perfis de score; mude o termo no perfil.");
         }
 
         var now = time.GetUtcNow();
@@ -119,6 +140,9 @@ internal static partial class SourceEndpoints
 
     [GeneratedRegex("^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")]
     private static partial Regex RepoPattern();
+
+    [GeneratedRegex("^[a-z0-9-]{1,63}(/[a-z0-9-]{1,63})?$")]
+    private static partial Regex InHirePattern();
 
     [GeneratedRegex("^[A-Za-z0-9_.-]{1,100}$")]
     private static partial Regex SlugPattern();

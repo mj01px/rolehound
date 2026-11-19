@@ -169,9 +169,52 @@ public sealed class CollectionTests(ApiFactory factory) : ApiTest(factory)
         Assert.Equal(HttpStatusCode.Forbidden, (await user.GetAsync(new Uri("/admin/sources", UriKind.Relative), Ct)).StatusCode);
     }
 
+    [Fact]
+    public async Task Gupy_searches_follow_everyones_terms_and_close_only_by_age()
+    {
+        var ana = await CreateUserAsync("ana@exemplo.test");
+        await GiveProfileAsync(ana.Id);
+        await AddTargetAsync("exemplo");
+        Factory.Gupy.Lists("python", FakeJobSource.Job("g1", "Dev Python"), FakeJobSource.Job("g2", "Dev Python Pleno"));
+
+        await RunAsync();
+        Assert.Contains("python", Factory.Gupy.Asked);
+
+        // A search that no longer shows a job does not close it.
+        Factory.Gupy.Lists("python", FakeJobSource.Job("g1", "Dev Python"));
+        var second = await RunAsync();
+        Assert.Equal(0, second.Closed);
+        Assert.Equal(SourceStatus.Active, await StatusOfAsync("g2"));
+
+        await using (var scope = Factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<RolehoundDbContext>();
+            await db.Jobs.Where(j => j.ExternalId == "g2").ExecuteUpdateAsync(s => s.SetProperty(j => j.PublishedAt, DateTimeOffset.UtcNow.AddDays(-31)), Ct);
+        }
+
+        var third = await RunAsync();
+        Assert.Equal(1, third.Closed);
+        Assert.Equal(SourceStatus.Closed, await StatusOfAsync("g2"));
+
+        // Nobody searches for the term any more: its target is disabled.
+        await using (var scope = Factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<RolehoundDbContext>();
+            await db.ScoreProfiles.ExecuteDeleteAsync(Ct);
+        }
+
+        await RunAsync();
+        await using (var scope = Factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<RolehoundDbContext>();
+            Assert.False((await db.SourceTargets.SingleAsync(t => t.Source == JobSource.Gupy, Ct)).Enabled);
+        }
+    }
+
     private async Task AddTargetAsync(string key)
     {
         Factory.JobSource.Clear();
+        Factory.Gupy.Clear();
         await using var scope = Factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<RolehoundDbContext>();
         db.SourceTargets.Add(new SourceTarget { Source = JobSource.Greenhouse, Key = key, CreatedAt = DateTimeOffset.UtcNow });
