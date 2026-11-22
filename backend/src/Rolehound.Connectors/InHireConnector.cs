@@ -17,7 +17,7 @@ namespace Rolehound.Connectors;
 /// Details are fetched only for jobs not stored with details yet. The job link
 /// is the one the listing gives; it is built from the title only when missing.
 /// </summary>
-public sealed partial class InHireConnector(HttpClient http) : IJobConnector
+public sealed partial class InHireConnector(HttpClient http) : IJobConnector, IJobLinkReader
 {
     public const string ListUrl = "https://api.inhire.app/job-posts/public/pages/lean";
     public const string DetailUrl = "https://api.inhire.app/job-posts/public/pages/";
@@ -89,6 +89,37 @@ public sealed partial class InHireConnector(HttpClient http) : IJobConnector
 
         var warning = failures > 0 ? $"InHire {target}: {failures} vaga(s) sem detalhes; tenta de novo na próxima coleta." : null;
         return new Snapshot(jobs, Authoritative: true, warning);
+    }
+
+    /// <summary>tenant.inhire.app[/page]/vagas/{id}[/slug]; the API links use inhire.com.br.</summary>
+    public JobLink? Parse(Uri url)
+    {
+        var host = url.Host.ToLowerInvariant();
+        var tenant = host.EndsWith(".inhire.app", StringComparison.Ordinal) ? host[..^".inhire.app".Length]
+            : host.EndsWith(".inhire.com.br", StringComparison.Ordinal) ? host[..^".inhire.com.br".Length]
+            : null;
+        var match = JobPath().Match(url.AbsolutePath);
+        if (tenant is null || !match.Success || !TargetPattern().IsMatch(tenant) || tenant is "www" or "api")
+        {
+            return null;
+        }
+
+        var target = match.Groups[1].Success ? $"{tenant}/{match.Groups[1].Value.ToLowerInvariant()}" : tenant;
+        return new JobLink(target, match.Groups[2].Value);
+    }
+
+    public async Task<CollectedJob> FetchOneAsync(JobLink link, Uri url, CancellationToken ct)
+    {
+        var tenant = link.Target.Split('/')[0];
+        var headers = new Dictionary<string, string> { ["X-Tenant"] = tenant };
+        using var detail = await HttpJson.GetAsync(http, new Uri(DetailUrl + Uri.EscapeDataString(link.ExternalId)), $"InHire {tenant}", ct, headers);
+        var title = detail.RootElement.String("displayName")?.Trim();
+        if (string.IsNullOrEmpty(title))
+        {
+            throw new ConnectorException("source_invalid", $"InHire {tenant}: vaga fora do formato esperado.");
+        }
+
+        return ParseDetail(link.ExternalId, title, url.GetLeftPart(UriPartial.Path), detail.RootElement.String("tenantName")?.Trim() is { Length: > 0 } name ? name : tenant, detail.RootElement);
     }
 
     internal static CollectedJob ParseDetail(string id, string title, string url, string tenant, JsonElement detail)
@@ -168,6 +199,9 @@ public sealed partial class InHireConnector(HttpClient http) : IJobConnector
 
     [GeneratedRegex("^([a-z0-9-]+)(?:/([a-z0-9-]+))?$")]
     private static partial Regex TargetPattern();
+
+    [GeneratedRegex("^(?:/([A-Za-z0-9-]+))?/vagas/([A-Za-z0-9-]+)(?:/[^/]*)?/?$")]
+    private static partial Regex JobPath();
 
     [GeneratedRegex("""[()\[\]{}'"]""")]
     private static partial Regex PairedPunctuation();

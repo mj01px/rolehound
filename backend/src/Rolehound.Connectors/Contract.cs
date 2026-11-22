@@ -44,6 +44,23 @@ public sealed class ConnectorException(string code, string message, Exception? i
     public string Code { get; } = code;
 }
 
+/// <summary>Where one job lives at its source: the target and the job's id there.</summary>
+public sealed record JobLink(string Target, string ExternalId);
+
+/// <summary>
+/// Reads one job from a link a person pasted (FR-JOB-10). Only sources with a
+/// connector implement it; any other link is never fetched (FR-JOB-11).
+/// </summary>
+public interface IJobLinkReader
+{
+    JobSource Source { get; }
+
+    /// <summary>The job this link points to, or null when the link is not one of this source's job pages.</summary>
+    JobLink? Parse(Uri url);
+
+    Task<CollectedJob> FetchOneAsync(JobLink link, Uri url, CancellationToken ct);
+}
+
 /// <summary>
 /// The common contract. A target is what the source is asked for: a
 /// Greenhouse board token, a Lever site name, a GitHub repository, an InHire

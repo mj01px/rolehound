@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 
 namespace Rolehound.Connectors;
 
@@ -9,7 +10,7 @@ namespace Rolehound.Connectors;
 /// The target is the site name (the name in jobs.lever.co/{site}).
 /// Lever states the work mode, which wins over the text (BR-SCO work mode rules).
 /// </summary>
-public sealed class LeverConnector(HttpClient http) : IJobConnector
+public sealed partial class LeverConnector(HttpClient http) : IJobConnector, IJobLinkReader
 {
     public const string BaseUrl = "https://api.lever.co/v0/postings/";
 
@@ -28,27 +29,53 @@ public sealed class LeverConnector(HttpClient http) : IJobConnector
         var result = new List<CollectedJob>();
         foreach (var posting in document.RootElement.EnumerateArray())
         {
-            var id = posting.String("id");
-            var title = posting.String("text")?.Trim();
-            var url = posting.String("hostedUrl");
-            if (string.IsNullOrEmpty(id) || string.IsNullOrEmpty(title) || string.IsNullOrEmpty(url))
+            if (Parse(posting, target) is { } job)
             {
-                continue;
+                result.Add(job);
             }
-
-            var location = posting.TryGetProperty("categories", out var categories) && categories.ValueKind == JsonValueKind.Object
-                ? categories.String("location") ?? string.Empty
-                : string.Empty;
-
-            DateTimeOffset? published = posting.TryGetProperty("createdAt", out var created) && created.TryGetInt64(out var ms)
-                ? DateTimeOffset.FromUnixTimeMilliseconds(ms)
-                : null;
-
-            result.Add(new CollectedJob(id, title, target, location, Description(posting), url, HttpJson.WorkModeOf(posting.String("workplaceType")), published));
         }
 
         return new Snapshot(result);
     }
+
+    public JobLink? Parse(Uri url)
+    {
+        var match = LinkPath().Match(url.AbsolutePath);
+        return url.Host == "jobs.lever.co" && match.Success ? new JobLink(match.Groups[1].Value, match.Groups[2].Value) : null;
+    }
+
+    public async Task<CollectedJob> FetchOneAsync(JobLink link, Uri url, CancellationToken ct)
+    {
+        var subject = $"Lever {link.Target}";
+        using var document = await HttpJson.GetAsync(
+            http, new Uri($"{BaseUrl}{Uri.EscapeDataString(link.Target)}/{Uri.EscapeDataString(link.ExternalId)}?mode=json"), subject, ct);
+        return Parse(document.RootElement, link.Target)
+            ?? throw new ConnectorException("source_invalid", $"{subject}: vaga fora do formato esperado.");
+    }
+
+    private static CollectedJob? Parse(JsonElement posting, string target)
+    {
+        var id = posting.String("id");
+        var title = posting.String("text")?.Trim();
+        var url = posting.String("hostedUrl");
+        if (string.IsNullOrEmpty(id) || string.IsNullOrEmpty(title) || string.IsNullOrEmpty(url))
+        {
+            return null;
+        }
+
+        var location = posting.TryGetProperty("categories", out var categories) && categories.ValueKind == JsonValueKind.Object
+            ? categories.String("location") ?? string.Empty
+            : string.Empty;
+
+        DateTimeOffset? published = posting.TryGetProperty("createdAt", out var created) && created.TryGetInt64(out var ms)
+            ? DateTimeOffset.FromUnixTimeMilliseconds(ms)
+            : null;
+
+        return new CollectedJob(id, title, target, location, Description(posting), url, HttpJson.WorkModeOf(posting.String("workplaceType")), published);
+    }
+
+    [GeneratedRegex("^/([A-Za-z0-9_.-]+)/([0-9a-fA-F-]{36})(/apply)?/?$")]
+    private static partial Regex LinkPath();
 
     private static string Description(JsonElement posting)
     {

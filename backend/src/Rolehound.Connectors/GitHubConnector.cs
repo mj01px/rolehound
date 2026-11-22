@@ -11,7 +11,7 @@ namespace Rolehound.Connectors;
 /// skipped. The company comes only from a "Empresa:" line in the body; when
 /// there is none it stays empty (never guessed from the title).
 /// </summary>
-public sealed partial class GitHubConnector(HttpClient http) : IJobConnector
+public sealed partial class GitHubConnector(HttpClient http) : IJobConnector, IJobLinkReader
 {
     public const string BaseUrl = "https://api.github.com/repos/";
     private const int PerPage = 100;
@@ -54,6 +54,27 @@ public sealed partial class GitHubConnector(HttpClient http) : IJobConnector
         }
 
         return new Snapshot(result);
+    }
+
+    public JobLink? Parse(Uri url)
+    {
+        var match = IssuePath().Match(url.AbsolutePath);
+        return url.Host == "github.com" && match.Success
+            ? new JobLink($"{match.Groups[1].Value}/{match.Groups[2].Value}", match.Groups[3].Value)
+            : null;
+    }
+
+    public async Task<CollectedJob> FetchOneAsync(JobLink link, Uri url, CancellationToken ct)
+    {
+        var subject = $"GitHub {link.Target}";
+        using var document = await HttpJson.GetAsync(http, new Uri($"{BaseUrl}{link.Target}/issues/{link.ExternalId}"), subject, ct);
+        if (document.RootElement.TryGetProperty("state", out var state) && state.GetString() == "closed")
+        {
+            throw new ConnectorException("job_closed", $"{subject}: essa vaga já foi fechada no GitHub.");
+        }
+
+        return Parse(document.RootElement, link.Target)
+            ?? throw new ConnectorException("source_invalid", $"{subject}: esse link não é uma vaga.");
     }
 
     internal static CollectedJob? Parse(JsonElement issue, string repo)
@@ -103,6 +124,9 @@ public sealed partial class GitHubConnector(HttpClient http) : IJobConnector
         var value = Markup().Replace(match.Groups[1].Value, string.Empty).Trim();
         return value.Length is > 1 and < 120 ? value : string.Empty;
     }
+
+    [GeneratedRegex("^/([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+)/issues/([0-9]+)/?$")]
+    private static partial Regex IssuePath();
 
     [GeneratedRegex("^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")]
     private static partial Regex RepoPattern();
