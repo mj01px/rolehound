@@ -6,6 +6,8 @@ import { ConfirmEmailPage } from '../features/auth/ConfirmEmailPage'
 import { LoginPage } from '../features/auth/LoginPage'
 import { ForgotPasswordPage, ForgotPasswordSentPage, ResetPasswordPage } from '../features/auth/PasswordResetPages'
 import { TwoFactorPage } from '../features/auth/TwoFactorPage'
+import { AdminSourcesPage } from '../features/admin/AdminSourcesPage'
+import { JobDetailPage } from '../features/jobs/JobDetailPage'
 import { JobsPage } from '../features/jobs/JobsPage'
 import { OnboardingPage } from '../features/onboarding/OnboardingPage'
 import { AppLayout } from './AppLayout'
@@ -34,10 +36,14 @@ export const router = createBrowserRouter([
         element: <AppLayout />,
         children: [
           { path: '/', element: <JobsPage /> },
+          { path: '/vagas/:id', element: <JobDetailPage /> },
           { path: '/configuracoes', element: <SettingsPage /> },
           {
             element: <RequireAuth admin />,
-            children: [{ path: '/admin/usuarios', element: <AdminUsersPage /> }],
+            children: [
+              { path: '/admin/usuarios', element: <AdminUsersPage /> },
+              { path: '/admin/fontes', element: <AdminSourcesPage /> },
+            ],
           },
         ],
       },

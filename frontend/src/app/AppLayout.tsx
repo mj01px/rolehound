@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { NavLink, Outlet, useNavigate } from 'react-router'
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router'
 import { useMe } from '../features/auth/api'
 import { api } from '../lib/api'
 import { Logo } from '../ui/Logo'
@@ -11,6 +11,7 @@ const navClass = ({ isActive }: { isActive: boolean }) => (isActive ? `${styles.
 export function AppLayout() {
   const me = useMe().data
   const navigate = useNavigate()
+  const location = useLocation()
   const queryClient = useQueryClient()
   const logout = useMutation({
     mutationFn: () => api.post('/auth/logout'),
@@ -29,7 +30,7 @@ export function AppLayout() {
             <span>rolehound</span>
           </div>
           <div className={styles.group}>
-            <NavLink to="/" end className={navClass}>
+            <NavLink to="/" className={() => navClass({ isActive: location.pathname === '/' || location.pathname.startsWith('/vagas/') })}>
               Vagas
             </NavLink>
           </div>
@@ -38,6 +39,9 @@ export function AppLayout() {
               <span className={styles.groupLabel}>Admin</span>
               <NavLink to="/admin/usuarios" className={navClass}>
                 Usuários
+              </NavLink>
+              <NavLink to="/admin/fontes" className={navClass}>
+                Fontes
               </NavLink>
             </div>
           )}

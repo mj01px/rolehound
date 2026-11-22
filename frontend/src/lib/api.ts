@@ -70,6 +70,7 @@ export const api = {
   get: <T>(path: string, signal?: AbortSignal) => request<T>('GET', path, undefined, signal),
   post: <T = void>(path: string, body?: unknown) => request<T>('POST', path, body ?? {}),
   put: <T = void>(path: string, body?: unknown) => request<T>('PUT', path, body ?? {}),
+  delete: <T = void>(path: string) => request<T>('DELETE', path),
 }
 
 /** A message a person can read, for any error thrown by the API client. */
