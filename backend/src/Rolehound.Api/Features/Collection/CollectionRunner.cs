@@ -112,7 +112,8 @@ public sealed partial class CollectionRunner(
     /// <summary>
     /// Closes active jobs of sources that expire by age, wherever they came from,
     /// and jobs added by link that no collection target lists (no snapshot will
-    /// ever close them), 30 days after they arrived.
+    /// ever close them), 30 days after they arrived. Jobs in someone's funnel
+    /// never expire (BR-JOB-05).
     /// </summary>
     private async Task<int> CloseAgedAsync(CancellationToken ct)
     {
@@ -122,6 +123,7 @@ public sealed partial class CollectionRunner(
             .Where(j => j.Status == SourceStatus.Active)
             .Where(j => (ExpiringSources.Contains(j.Source) && (j.PublishedAt ?? j.FirstSeenAt) < oldest)
                 || (j.TargetId == null && j.OpenedAt < oldest))
+            .Where(j => !db.Applications.Any(a => a.JobId == j.Id))
             .ExecuteUpdateAsync(s => s.SetProperty(j => j.Status, SourceStatus.Closed).SetProperty(j => j.ClosedAt, now), ct);
     }
 
@@ -207,10 +209,12 @@ public sealed partial class CollectionRunner(
         }
 
         var listedIds = ids.ToHashSet(StringComparer.Ordinal);
+        var existingIds = existing.Select(j => j.Id).ToList();
+        var inFunnel = (await db.Applications.Where(a => existingIds.Contains(a.JobId)).Select(a => a.JobId).ToListAsync(ct)).ToHashSet();
         foreach (var job in existing.Where(j => j.Status == SourceStatus.Active && j.TargetId == target.Id))
         {
             var missing = snapshot.Authoritative && !listedIds.Contains(job.ExternalId);
-            var aged = expires && (job.PublishedAt ?? job.FirstSeenAt) < oldest;
+            var aged = expires && (job.PublishedAt ?? job.FirstSeenAt) < oldest && !inFunnel.Contains(job.Id);
             if (missing || aged)
             {
                 job.Status = SourceStatus.Closed;

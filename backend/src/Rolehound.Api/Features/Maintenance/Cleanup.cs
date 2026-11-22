@@ -43,7 +43,7 @@ internal static class Cleanup
     /// <summary>
     /// Deletes jobs closed at the source with no interaction from anyone in the
     /// last 30 days, leaving a tombstone so collection never brings them back.
-    /// Jobs in someone's funnel are kept (joins with the funnel slice).
+    /// Jobs in someone's funnel are kept.
     /// </summary>
     private static async Task<(int Jobs, int Tombstones)> DeleteOldJobsAsync(RolehoundDbContext db, DateTimeOffset now, CancellationToken ct)
     {
@@ -51,6 +51,7 @@ internal static class Cleanup
         var candidates = await db.Jobs
             .Where(j => j.Status == SourceStatus.Closed && j.ClosedAt < closedBefore)
             .Where(j => !db.UserJobs.Any(u => u.JobId == j.Id && u.LastInteractionAt > closedBefore))
+            .Where(j => !db.Applications.Any(a => a.JobId == j.Id))
             .Select(j => new { j.Id, j.Source, j.ExternalId, j.LastSeenAt })
             .ToListAsync(ct);
 

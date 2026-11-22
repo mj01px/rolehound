@@ -6,6 +6,7 @@ using Rolehound.Api.Features.Accounts;
 using Rolehound.Api.Features.Ai;
 using Rolehound.Api.Features.Collection;
 using Rolehound.Api.Features.Dossier;
+using Rolehound.Api.Features.Funnel;
 using Rolehound.Api.Features.Jobs;
 using Rolehound.Api.Features.ScoreProfiles;
 
@@ -45,6 +46,10 @@ public sealed class RolehoundDbContext(DbContextOptions<RolehoundDbContext> opti
     public DbSet<SourceTarget> SourceTargets => Set<SourceTarget>();
 
     public DbSet<CollectionRun> CollectionRuns => Set<CollectionRun>();
+
+    public DbSet<Application> Applications => Set<Application>();
+
+    public DbSet<Interaction> Interactions => Set<Interaction>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {

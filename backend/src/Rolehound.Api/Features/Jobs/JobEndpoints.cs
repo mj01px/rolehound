@@ -36,6 +36,7 @@ public sealed record JobDetailResponse(
     string Url,
     IReadOnlyList<string> MatchedGroups,
     bool AddedByUser,
+    Guid? ApplicationId,
     DateTimeOffset? ClosedAt,
     DateTimeOffset? ArchivedAt,
     string? ArchiveNote);
@@ -94,7 +95,7 @@ internal static class JobEndpoints
 
         var userId = principal.GetUserId();
         var since = await TouchVisitAsync(db, userId, time, ct);
-        var visible = Visible(db, userId);
+        var visible = Listed(Visible(db, userId));
 
         var filtered = visible;
         if (!string.IsNullOrWhiteSpace(q))
@@ -157,12 +158,14 @@ internal static class JobEndpoints
 
         var (job, user) = (row.Job, row.User);
         var arrived = job.OpenedAt > user.FirstScoredAt ? job.OpenedAt : user.FirstScoredAt;
+        var applicationId = await db.Applications.Where(a => a.UserId == userId && a.JobId == id).Select(a => (Guid?)a.Id).SingleOrDefaultAsync(ct);
         return TypedResults.Ok(new JobDetailResponse(
-            ToItem(job, user, since != null && arrived > since),
+            ToItem(job, user, applicationId is null && since != null && arrived > since),
             job.Description,
             job.Url,
             user.MatchedGroups,
             user.AddedByUser,
+            applicationId,
             job.ClosedAt,
             user.ArchivedAt,
             user.ArchiveNote));
@@ -186,6 +189,11 @@ internal static class JobEndpoints
         if (userJob is null)
         {
             return Problems.NotFound("Vaga não encontrada.");
+        }
+
+        if (await db.Applications.AnyAsync(a => a.UserId == userJob.UserId && a.JobId == id, ct))
+        {
+            return Problems.Conflict("application_exists", "Essa vaga está no seu funil. Mude o status lá.");
         }
 
         var now = time.GetUtcNow();
@@ -221,12 +229,18 @@ internal static class JobEndpoints
         public required Job Job { get; init; }
 
         public required UserJob User { get; init; }
+
+        public bool InFunnel { get; init; }
     }
 
+    /// <summary>BR-VIS-01: matched the profile, added by the person, or in their funnel.</summary>
     private static IQueryable<Row> Visible(RolehoundDbContext db, Guid userId) =>
         db.UserJobs
-            .Where(u => u.UserId == userId && (u.IsRelevant || u.AddedByUser))
-            .Join(db.Jobs, u => u.JobId, j => j.Id, (u, j) => new Row { Job = j, User = u });
+            .Where(u => u.UserId == userId && (u.IsRelevant || u.AddedByUser || db.Applications.Any(a => a.UserId == userId && a.JobId == u.JobId)))
+            .Join(db.Jobs, u => u.JobId, j => j.Id, (u, j) => new Row { Job = j, User = u, InFunnel = db.Applications.Any(a => a.UserId == userId && a.JobId == j.Id) });
+
+    /// <summary>The list views leave out jobs in the person's funnel (BR-VIS-02, BR-FUN-03).</summary>
+    private static IQueryable<Row> Listed(IQueryable<Row> rows) => rows.Where(r => !r.InFunnel);
 
     private static IQueryable<Row> Open(IQueryable<Row> rows) =>
         rows.Where(r => r.Job.Status == SourceStatus.Active && r.User.ArchivedAt == null);
