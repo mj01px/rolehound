@@ -7,6 +7,7 @@ using Rolehound.Api.Features.Collection;
 using Rolehound.Api.Features.Funnel;
 using Rolehound.Api.Features.Jobs;
 using Rolehound.Api.Features.Pitch;
+using Rolehound.Api.Features.TailoredResume;
 using Rolehound.Api.Features.Dossier;
 using Rolehound.Api.Features.Maintenance;
 using Rolehound.Api.Features.Onboarding;
@@ -25,6 +26,7 @@ builder.Services.AddEmail(builder.Configuration, builder.Environment);
 builder.Services.AddAccounts(builder.Environment);
 builder.Services.AddAi(builder.Configuration);
 builder.Services.AddCollection(builder.Configuration);
+builder.Services.AddTailoredResume(builder.Configuration);
 
 var app = builder.Build();
 
@@ -42,6 +44,7 @@ app.MapFunnelEndpoints();
 app.MapPitchEndpoints();
 app.MapResumeEndpoints();
 app.MapAtsEndpoints();
+app.MapTailoredResumeEndpoints();
 app.MapTaskEndpoints(app.Configuration);
 
 await PrepareDatabaseAsync(app);

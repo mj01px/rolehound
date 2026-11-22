@@ -40,6 +40,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
         builder.UseSetting("Database:MigrateOnStart", "true");
         builder.UseSetting("Web:BaseUrl", "http://app.test");
         builder.UseSetting("Tasks:Key", TaskKey);
+        builder.UseSetting("TailoredResume:WorkerEnabled", "false");
         builder.UseSetting("RateLimits:AnonymousPerMinute", "100000");
         builder.UseSetting("RateLimits:ReadsPerMinute", "100000");
         builder.UseSetting("RateLimits:WritesPerMinute", "100000");

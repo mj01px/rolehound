@@ -10,6 +10,7 @@ using Rolehound.Api.Features.Dossier;
 using Rolehound.Api.Features.Funnel;
 using Rolehound.Api.Features.Jobs;
 using Rolehound.Api.Features.Pitch;
+using Rolehound.Api.Features.TailoredResume;
 using Rolehound.Api.Features.ScoreProfiles;
 
 namespace Rolehound.Api.Infrastructure.Persistence;
@@ -58,6 +59,8 @@ public sealed class RolehoundDbContext(DbContextOptions<RolehoundDbContext> opti
     public DbSet<ResumeText> ResumeTexts => Set<ResumeText>();
 
     public DbSet<AtsReport> AtsReports => Set<AtsReport>();
+
+    public DbSet<ResumeGeneration> ResumeGenerations => Set<ResumeGeneration>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
