@@ -5,6 +5,7 @@ using Rolehound.Api.Features.Ai;
 using Rolehound.Api.Features.Collection;
 using Rolehound.Api.Features.Funnel;
 using Rolehound.Api.Features.Jobs;
+using Rolehound.Api.Features.Pitch;
 using Rolehound.Api.Features.Dossier;
 using Rolehound.Api.Features.Maintenance;
 using Rolehound.Api.Features.Onboarding;
@@ -37,6 +38,7 @@ app.MapScoreProfileEndpoints();
 app.MapSourceEndpoints();
 app.MapJobEndpoints();
 app.MapFunnelEndpoints();
+app.MapPitchEndpoints();
 app.MapTaskEndpoints(app.Configuration);
 
 await PrepareDatabaseAsync(app);

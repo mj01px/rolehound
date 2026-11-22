@@ -11,6 +11,9 @@ public sealed record ChatMessage(string Role, string Content);
 
 public sealed record ChatResult(string Content, int PromptTokens, int CompletionTokens, string? FinishReason);
 
+/// <summary>A finished answer: its text, the model that wrote it and the tokens spent, retries included.</summary>
+public sealed record AiAnswer(string Content, string Model, int PromptTokens, int CompletionTokens);
+
 /// <summary>An AI failure with a stable code; endpoints turn it into a problem response.</summary>
 public sealed class AiException(string code, string message) : Exception(message)
 {

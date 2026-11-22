@@ -8,6 +8,7 @@ using Rolehound.Api.Features.Collection;
 using Rolehound.Api.Features.Dossier;
 using Rolehound.Api.Features.Funnel;
 using Rolehound.Api.Features.Jobs;
+using Rolehound.Api.Features.Pitch;
 using Rolehound.Api.Features.ScoreProfiles;
 
 namespace Rolehound.Api.Infrastructure.Persistence;
@@ -50,6 +51,8 @@ public sealed class RolehoundDbContext(DbContextOptions<RolehoundDbContext> opti
     public DbSet<Application> Applications => Set<Application>();
 
     public DbSet<Interaction> Interactions => Set<Interaction>();
+
+    public DbSet<PitchVersion> PitchVersions => Set<PitchVersion>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {

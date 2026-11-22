@@ -919,6 +919,77 @@ namespace Rolehound.Api.Infrastructure.Persistence.Migrations
                     b.ToTable("user_jobs", (string)null);
                 });
 
+            modelBuilder.Entity("Rolehound.Api.Features.Pitch.PitchVersion", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("CompletionTokens")
+                        .HasColumnType("integer")
+                        .HasColumnName("completion_tokens");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<int>("DossierVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("dossier_version");
+
+                    b.Property<string>("Instruction")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("instruction");
+
+                    b.Property<Guid>("JobId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("job_id");
+
+                    b.Property<string>("Language")
+                        .IsRequired()
+                        .HasMaxLength(2)
+                        .HasColumnType("character varying(2)")
+                        .HasColumnName("language");
+
+                    b.Property<string>("Model")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("model");
+
+                    b.Property<int>("Number")
+                        .HasColumnType("integer")
+                        .HasColumnName("number");
+
+                    b.Property<int>("PromptTokens")
+                        .HasColumnType("integer")
+                        .HasColumnName("prompt_tokens");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasMaxLength(10000)
+                        .HasColumnType("character varying(10000)")
+                        .HasColumnName("text");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_pitch_versions");
+
+                    b.HasIndex("JobId")
+                        .HasDatabaseName("ix_pitch_versions_job_id");
+
+                    b.HasIndex("UserId", "JobId", "Number")
+                        .IsUnique()
+                        .HasDatabaseName("ix_pitch_versions_user_id_job_id_number");
+
+                    b.ToTable("pitch_versions", (string)null);
+                });
+
             modelBuilder.Entity("Rolehound.Api.Features.ScoreProfiles.UserScoreProfile", b =>
                 {
                     b.Property<Guid>("UserId")
@@ -1075,6 +1146,23 @@ namespace Rolehound.Api.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_user_jobs_users_user_id");
+                });
+
+            modelBuilder.Entity("Rolehound.Api.Features.Pitch.PitchVersion", b =>
+                {
+                    b.HasOne("Rolehound.Api.Features.Jobs.Job", null)
+                        .WithMany()
+                        .HasForeignKey("JobId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_pitch_versions_jobs_job_id");
+
+                    b.HasOne("Rolehound.Api.Features.Accounts.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_pitch_versions_users_user_id");
                 });
 
             modelBuilder.Entity("Rolehound.Api.Features.ScoreProfiles.UserScoreProfile", b =>

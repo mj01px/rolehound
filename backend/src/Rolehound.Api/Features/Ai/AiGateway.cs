@@ -25,6 +25,11 @@ public sealed class AiGateway(
     public string Protect(string apiKey) => KeyProtector.Protect(apiKey);
 
     public async Task<string> CompleteJsonAsync(
+        Guid userId, AiSlot slot, AiFeature feature, IReadOnlyList<ChatMessage> messages, string schemaName, JsonNode schema, int maxTokens, CancellationToken ct) =>
+        (await CompleteAsync(userId, slot, feature, messages, schemaName, schema, maxTokens, ct)).Content;
+
+    /// <summary>Like <see cref="CompleteJsonAsync"/>, also telling which model answered and the tokens used, for features that persist their output.</summary>
+    public async Task<AiAnswer> CompleteAsync(
         Guid userId, AiSlot slot, AiFeature feature, IReadOnlyList<ChatMessage> messages, string schemaName, JsonNode schema, int maxTokens, CancellationToken ct)
     {
         var settings = await db.AiSettings.AsNoTracking().SingleOrDefaultAsync(s => s.UserId == userId, ct);
@@ -38,18 +43,21 @@ public sealed class AiGateway(
 
         var apiKey = KeyProtector.Unprotect(settings.EncryptedKey);
         var result = await CallAndLogAsync(userId, feature, apiKey, model, messages, schemaName, schema, maxTokens, ct);
+        var (promptTokens, completionTokens) = (result.PromptTokens, result.CompletionTokens);
 
         // Truncated output: one retry with twice the room, then give up (PRD 10.1).
         if (result.FinishReason == "length")
         {
             result = await CallAndLogAsync(userId, feature, apiKey, model, messages, schemaName, schema, maxTokens * 2, ct);
+            promptTokens += result.PromptTokens;
+            completionTokens += result.CompletionTokens;
             if (result.FinishReason == "length")
             {
                 throw new AiException("ai_truncated", "A resposta do modelo veio cortada. Tente outro modelo.");
             }
         }
 
-        return result.Content;
+        return new AiAnswer(result.Content, model, promptTokens, completionTokens);
     }
 
     /// <summary>A tiny call that proves the key reaches the model. Costs a handful of tokens on the person's key.</summary>
