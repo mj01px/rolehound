@@ -6,6 +6,7 @@ import { Button } from '../../ui/Button'
 import { useEnterFunnel } from '../funnel/api'
 import { AtsPanel } from '../ats/AtsPanel'
 import { PitchPanel } from '../pitch/PitchPanel'
+import { ResumePanel } from '../resume/ResumePanel'
 import { useArchive, useJob, useRestore } from './api'
 import { ago, archiveReasonLabel, archiveReasons, seniorityLabels, sourceLabels, workModeLabels, type ArchiveReason } from './labels'
 import styles from './jobs.module.css'
@@ -124,6 +125,8 @@ export function JobDetailPage() {
       <PitchPanel jobId={id} />
 
       <AtsPanel jobId={id} />
+
+      <ResumePanel jobId={id} />
 
       <section aria-labelledby="description-title" className={styles.section}>
         <h2 id="description-title" className={styles.sectionTitle}>

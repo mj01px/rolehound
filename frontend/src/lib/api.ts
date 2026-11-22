@@ -2,6 +2,9 @@
 // lives on its own subdomain of the same site, set at build time.
 const baseUrl = import.meta.env.VITE_API_URL ?? '/api'
 
+/** Full address of an API path, for links the browser opens itself (downloads). */
+export const apiUrl = (path: string): string => `${baseUrl}${path}`
+
 /** RFC 9457 problem details as the API sends them. */
 export interface Problem {
   status: number
