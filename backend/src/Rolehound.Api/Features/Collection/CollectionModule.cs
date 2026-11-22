@@ -45,6 +45,11 @@ public static class CollectionModule
         services.AddTransient<IJobConnector>(sp => sp.GetRequiredService<InHireConnector>());
         services.AddTransient<IJobConnector>(sp => sp.GetRequiredService<GupyConnector>());
 
+        services.AddTransient<IJobLinkReader>(sp => sp.GetRequiredService<GreenhouseConnector>());
+        services.AddTransient<IJobLinkReader>(sp => sp.GetRequiredService<LeverConnector>());
+        services.AddTransient<IJobLinkReader>(sp => sp.GetRequiredService<GitHubConnector>());
+        services.AddTransient<IJobLinkReader>(sp => sp.GetRequiredService<InHireConnector>());
+
         services.AddScoped<JobScoring>();
         services.AddScoped<CollectionRunner>();
         return services;

@@ -4,7 +4,7 @@ using Rolehound.Connectors;
 namespace Rolehound.Api.Tests.Infrastructure;
 
 /// <summary>A source stand-in: each target answers what the test set, or fails.</summary>
-public sealed class FakeJobSource(JobSource source, bool authoritative = true) : IJobConnector
+public sealed class FakeJobSource(JobSource source, bool authoritative = true) : IJobConnector, IJobLinkReader
 {
     private readonly ConcurrentDictionary<string, Func<Snapshot>> _answers = new(StringComparer.Ordinal);
 
@@ -33,6 +33,20 @@ public sealed class FakeJobSource(JobSource source, bool authoritative = true) :
         }
 
         return Task.FromResult(_answers.TryGetValue(target, out var answer) ? answer() : new Snapshot([], authoritative));
+    }
+
+    /// <summary>Links look like https://example.test/{target}/jobs/{id}.</summary>
+    public JobLink? Parse(Uri url)
+    {
+        var parts = url.AbsolutePath.Trim('/').Split('/');
+        return url.Host == "example.test" && parts is [var target, "jobs", var id] ? new JobLink(target, id) : null;
+    }
+
+    public async Task<CollectedJob> FetchOneAsync(JobLink link, Uri url, CancellationToken ct)
+    {
+        var snapshot = await FetchAsync(link.Target, new HashSet<string>(), ct);
+        return snapshot.Jobs.FirstOrDefault(j => j.ExternalId == link.ExternalId)
+            ?? throw new ConnectorException("target_not_found", "Vaga não encontrada.");
     }
 
     public static CollectedJob Job(string id, string title, string description = "", DateTimeOffset? published = null) =>

@@ -4,7 +4,6 @@ using Rolehound.Api.Features.Jobs;
 using Rolehound.Api.Features.ScoreProfiles;
 using Rolehound.Api.Infrastructure.Persistence;
 using Rolehound.Connectors;
-using Rolehound.Scoring;
 
 namespace Rolehound.Api.Features.Collection;
 
@@ -29,7 +28,7 @@ public sealed partial class CollectionRunner(
     /// <summary>Sources whose items expire by age (previous tool: Gupy and GitHub).</summary>
     public static readonly TimeSpan MaxAge = TimeSpan.FromDays(30);
 
-    private static readonly HashSet<JobSource> ExpiringSources = [JobSource.GitHub, JobSource.Gupy];
+    private static readonly HashSet<JobSource> ExpiringSources = [JobSource.GitHub, JobSource.Gupy, JobSource.Link, JobSource.EmailAlert];
 
     public async Task<CollectionSummary> RunAsync(CancellationToken ct)
     {
@@ -110,13 +109,19 @@ public sealed partial class CollectionRunner(
         await db.SaveChangesAsync(ct);
     }
 
-    /// <summary>Closes active jobs of sources that expire by age, wherever they came from.</summary>
+    /// <summary>
+    /// Closes active jobs of sources that expire by age, wherever they came from,
+    /// and jobs added by link that no collection target lists (no snapshot will
+    /// ever close them), 30 days after they arrived.
+    /// </summary>
     private async Task<int> CloseAgedAsync(CancellationToken ct)
     {
         var now = time.GetUtcNow();
         var oldest = now - MaxAge;
         return await db.Jobs
-            .Where(j => ExpiringSources.Contains(j.Source) && j.Status == SourceStatus.Active && (j.PublishedAt ?? j.FirstSeenAt) < oldest)
+            .Where(j => j.Status == SourceStatus.Active)
+            .Where(j => (ExpiringSources.Contains(j.Source) && (j.PublishedAt ?? j.FirstSeenAt) < oldest)
+                || (j.TargetId == null && j.OpenedAt < oldest))
             .ExecuteUpdateAsync(s => s.SetProperty(j => j.Status, SourceStatus.Closed).SetProperty(j => j.ClosedAt, now), ct);
     }
 
@@ -155,7 +160,7 @@ public sealed partial class CollectionRunner(
             if (byExternalId.TryGetValue(item.ExternalId, out var job))
             {
                 job.LastSeenAt = now;
-                if (Update(job, item, target))
+                if (JobFields.Apply(job, item, target.Label))
                 {
                     changed.Add(job);
                 }
@@ -164,6 +169,7 @@ public sealed partial class CollectionRunner(
                 {
                     job.Status = SourceStatus.Active;
                     job.ClosedAt = null;
+                    job.OpenedAt = now;
                     run.Reopened++;
                     if (!changed.Contains(job))
                     {
@@ -191,9 +197,10 @@ public sealed partial class CollectionRunner(
                 Url = string.Empty,
                 FirstSeenAt = now,
                 LastSeenAt = now,
+                OpenedAt = now,
                 Status = SourceStatus.Active,
             };
-            Update(job, item, target);
+            JobFields.Apply(job, item, target.Label);
             db.Jobs.Add(job);
             run.Added++;
             changed.Add(job);
@@ -215,35 +222,6 @@ public sealed partial class CollectionRunner(
         return changed;
     }
 
-    /// <summary>
-    /// Copies the source's fields and recomputes work mode and seniority. True when
-    /// something changed. A listing entry without details keeps the stored details.
-    /// </summary>
-    private static bool Update(Job job, CollectedJob item, SourceTarget target)
-    {
-        var company = string.IsNullOrWhiteSpace(target.Label) ? item.Company : target.Label;
-        var keepDetails = !item.HasDetails && job.Description.Length > 0;
-        var changed = job.Title != item.Title || job.Company != company
-            || (!keepDetails && (job.Description != item.Description || job.Location != item.Location || job.SourceWorkMode != item.WorkMode));
-
-        job.Title = Cut(item.Title, 500);
-        job.Company = Cut(company, 200);
-        job.Url = Cut(item.Url, 1000);
-        if (!keepDetails)
-        {
-            job.Location = Cut(item.Location, 300);
-            job.Description = item.Description;
-            job.SourceWorkMode = item.WorkMode;
-            job.PublishedAt = item.PublishedAt;
-        }
-
-        var text = job.ToText();
-        job.WorkMode = JobClassifier.DetectWorkMode(text);
-        job.Seniority = JobClassifier.DetectSeniority(text);
-        return changed;
-    }
-
-    private static string Cut(string value, int max) => value.Length > max ? value[..max] : value;
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Collection failed for {Source} {Target}: {Code}")]
     private static partial void LogTargetFailed(ILogger logger, JobSource source, string target, string code);

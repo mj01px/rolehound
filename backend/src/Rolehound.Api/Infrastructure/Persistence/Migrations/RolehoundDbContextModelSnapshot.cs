@@ -261,6 +261,10 @@ namespace Rolehound.Api.Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("is_active");
 
+                    b.Property<DateTimeOffset?>("LastActivityAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_activity_at");
+
                     b.Property<DateTimeOffset?>("LastLoginAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("last_login_at");
@@ -298,6 +302,10 @@ namespace Rolehound.Api.Infrastructure.Persistence.Migrations
                     b.Property<bool>("PhoneNumberConfirmed")
                         .HasColumnType("boolean")
                         .HasColumnName("phone_number_confirmed");
+
+                    b.Property<DateTimeOffset?>("PreviousVisitEndedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("previous_visit_ended_at");
 
                     b.Property<string>("Role")
                         .IsRequired()
@@ -612,6 +620,10 @@ namespace Rolehound.Api.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(300)")
                         .HasColumnName("location");
 
+                    b.Property<DateTimeOffset>("OpenedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("opened_at");
+
                     b.Property<DateTimeOffset?>("PublishedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("published_at");
@@ -715,6 +727,10 @@ namespace Rolehound.Api.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("JobId")
                         .HasColumnType("uuid")
                         .HasColumnName("job_id");
+
+                    b.Property<bool>("AddedByUser")
+                        .HasColumnType("boolean")
+                        .HasColumnName("added_by_user");
 
                     b.Property<string>("ArchiveNote")
                         .HasMaxLength(500)

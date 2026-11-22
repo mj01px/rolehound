@@ -41,6 +41,12 @@ public sealed class User : IdentityUser<Guid>
     /// <summary>Set when the person finishes onboarding (FR-ONB-01).</summary>
     public DateTimeOffset? OnboardingCompletedAt { get; set; }
 
+    /// <summary>Last time the person used the job views; a gap over 20 minutes ends a visit (BR-VIS-03).</summary>
+    public DateTimeOffset? LastActivityAt { get; set; }
+
+    /// <summary>End of the previous visit: jobs that arrived after it are new.</summary>
+    public DateTimeOffset? PreviousVisitEndedAt { get; set; }
+
     /// <summary>True once the person has set a password through their access link.</summary>
     public bool HasAccess => PasswordHash is not null;
 }

@@ -53,6 +53,8 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
             services.RemoveAll<Rolehound.Connectors.IJobConnector>();
             services.AddSingleton<Rolehound.Connectors.IJobConnector>(JobSource);
             services.AddSingleton<Rolehound.Connectors.IJobConnector>(Gupy);
+            services.RemoveAll<Rolehound.Connectors.IJobLinkReader>();
+            services.AddSingleton<Rolehound.Connectors.IJobLinkReader>(JobSource);
             services.AddHttpClient(Rolehound.Api.Features.Ai.OpenRouterClient.HttpClientName)
                 .ConfigurePrimaryHttpMessageHandler(() => OpenRouter);
         });

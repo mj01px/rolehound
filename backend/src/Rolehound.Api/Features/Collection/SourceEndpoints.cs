@@ -12,6 +12,9 @@ namespace Rolehound.Api.Features.Collection;
 public sealed record SourceTargetResponse(
     Guid Id, string Source, string Key, string? Label, bool Enabled, DateTimeOffset? LastRunAt, int? LastJobCount, string? LastError, int ActiveJobs);
 
+public sealed record CollectionRunResponse(
+    Guid Id, string Source, string Key, DateTimeOffset StartedAt, DateTimeOffset FinishedAt, int Listed, int Added, int Reopened, int Closed, string? Error);
+
 public sealed record AddSourceTargetRequest(string? Source, string? Key, string? Label);
 
 public sealed record UpdateSourceTargetRequest(bool Enabled, string? Label);
@@ -32,8 +35,38 @@ internal static partial class SourceEndpoints
         sources.MapPost(string.Empty, Add);
         sources.MapPut("/{id:guid}", Update);
         sources.MapDelete("/{id:guid}", Remove);
-        sources.MapPost("/run", (CollectionRunner runner, CancellationToken ct) => RunAsync(runner, ct));
+        sources.MapPost("/run", RunNow);
+        sources.MapGet("/runs", Runs);
         return endpoints;
+    }
+
+    /// <summary>FR-JOB-06: a manual run at most once every 15 minutes.</summary>
+    public static readonly TimeSpan ManualRunInterval = TimeSpan.FromMinutes(15);
+
+    private static async Task<Results<Ok<CollectionSummary>, ProblemHttpResult>> RunNow(
+        CollectionRunner runner, RolehoundDbContext db, TimeProvider time, CancellationToken ct)
+    {
+        var last = await db.CollectionRuns.MaxAsync(r => (DateTimeOffset?)r.StartedAt, ct);
+        if (last is not null && time.GetUtcNow() - last < ManualRunInterval)
+        {
+            var wait = (int)Math.Ceiling((ManualRunInterval - (time.GetUtcNow() - last.Value)).TotalMinutes);
+            return Problems.Problem(StatusCodes.Status429TooManyRequests, "run_too_soon", $"A última coleta foi há pouco. Tente de novo em {wait} min.");
+        }
+
+        return await RunAsync(runner, ct);
+    }
+
+    private static async Task<Ok<List<CollectionRunResponse>>> Runs(RolehoundDbContext db, CancellationToken ct)
+    {
+        var runs = await db.CollectionRuns.AsNoTracking()
+            .OrderByDescending(r => r.StartedAt)
+            .Take(100)
+            .Join(db.SourceTargets.AsNoTracking(), r => r.TargetId, t => t.Id, (r, t) => new { Run = r, t.Source, t.Key })
+            .ToListAsync(ct);
+
+        return TypedResults.Ok(runs.Select(x => new CollectionRunResponse(
+            x.Run.Id, x.Source.ToString().ToLowerInvariant(), x.Key, x.Run.StartedAt, x.Run.FinishedAt,
+            x.Run.Listed, x.Run.Added, x.Run.Reopened, x.Run.Closed, x.Run.Error)).ToList());
     }
 
     internal static async Task<Ok<CollectionSummary>> RunAsync(CollectionRunner runner, CancellationToken ct) =>

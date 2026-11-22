@@ -19,8 +19,8 @@ public static class Problems
 
     public static ProblemHttpResult BadRequest(string code, string detail) => Problem(StatusCodes.Status400BadRequest, code, detail);
 
-    public static ValidationProblem Validation(IDictionary<string, string[]> errors) =>
-        TypedResults.ValidationProblem(errors, detail: "Revise os campos.", extensions: new Dictionary<string, object?> { ["code"] = "validation" });
+    public static ValidationProblem Validation(IDictionary<string, string[]> errors, string code = "validation") =>
+        TypedResults.ValidationProblem(errors, detail: "Revise os campos.", extensions: new Dictionary<string, object?> { ["code"] = code });
 
     public static ValidationProblem Validation(string field, string message) =>
         Validation(new Dictionary<string, string[]> { [field] = [message] });

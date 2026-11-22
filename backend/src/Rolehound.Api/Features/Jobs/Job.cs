@@ -49,6 +49,9 @@ public sealed class Job
 
     public DateTimeOffset FirstSeenAt { get; init; }
 
+    /// <summary>When the job arrived or last reopened; drives "new" (BR-VIS-03).</summary>
+    public DateTimeOffset OpenedAt { get; set; }
+
     public DateTimeOffset LastSeenAt { get; set; }
 
     public SourceStatus Status { get; set; }
@@ -90,6 +93,9 @@ public sealed class UserJob
     public List<string> Tags { get; set; } = [];
 
     public List<string> MatchedGroups { get; set; } = [];
+
+    /// <summary>The person added it by link: visible even when no positive group matched (BR-VIS-01).</summary>
+    public bool AddedByUser { get; set; }
 
     public DateTimeOffset FirstScoredAt { get; init; }
 
