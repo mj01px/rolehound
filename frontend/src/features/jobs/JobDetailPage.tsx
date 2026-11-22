@@ -4,6 +4,7 @@ import { errorMessage } from '../../lib/api'
 import { Alert } from '../../ui/Alert'
 import { Button } from '../../ui/Button'
 import { useEnterFunnel } from '../funnel/api'
+import { AtsPanel } from '../ats/AtsPanel'
 import { PitchPanel } from '../pitch/PitchPanel'
 import { useArchive, useJob, useRestore } from './api'
 import { ago, archiveReasonLabel, archiveReasons, seniorityLabels, sourceLabels, workModeLabels, type ArchiveReason } from './labels'
@@ -121,6 +122,8 @@ export function JobDetailPage() {
       </section>
 
       <PitchPanel jobId={id} />
+
+      <AtsPanel jobId={id} />
 
       <section aria-labelledby="description-title" className={styles.section}>
         <h2 id="description-title" className={styles.sectionTitle}>

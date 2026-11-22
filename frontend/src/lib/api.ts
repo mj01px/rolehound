@@ -37,7 +37,10 @@ type Method = 'GET' | 'POST' | 'PUT' | 'DELETE'
 
 async function request<T>(method: Method, path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
   const init: RequestInit = { method, credentials: 'include', signal: signal ?? null }
-  if (body !== undefined) {
+  if (body instanceof FormData) {
+    // The browser sets the multipart boundary itself.
+    init.body = body
+  } else if (body !== undefined) {
     init.headers = { 'Content-Type': 'application/json' }
     init.body = JSON.stringify(body)
   }
@@ -71,6 +74,7 @@ export const api = {
   post: <T = void>(path: string, body?: unknown) => request<T>('POST', path, body ?? {}),
   put: <T = void>(path: string, body?: unknown) => request<T>('PUT', path, body ?? {}),
   delete: <T = void>(path: string) => request<T>('DELETE', path),
+  upload: <T = void>(path: string, form: FormData) => request<T>('PUT', path, form),
 }
 
 /** A message a person can read, for any error thrown by the API client. */

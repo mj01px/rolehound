@@ -1,0 +1,162 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sectionTitle {
+  margin: 0;
+  font: 500 12px/16px var(--font-sans);
+  color: var(--faint);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.muted {
+  margin: 0;
+  font-size: 13px;
+  color: var(--faint);
+}
+
+.dim {
+  font-size: 12px;
+  color: var(--faint);
+}
+
+.hiddenInput {
+  display: none;
+}
+
+.resume {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.resumeLine {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.resumeActions {
+  display: flex;
+  gap: 14px;
+}
+
+.resumeEmpty {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px;
+  border: 1px dashed var(--border-control);
+  border-radius: var(--radius-md);
+}
+
+.report {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+
+.reportHead {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.score {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  border-radius: var(--radius-md);
+  font: 600 20px var(--font-mono);
+  background: var(--surface-raised);
+}
+
+.strong {
+  background: var(--signal-wash);
+  color: var(--signal-bright);
+}
+
+.moderate {
+  color: var(--amber);
+}
+
+.weak {
+  background: var(--danger-wash);
+  color: var(--danger);
+}
+
+.reportTitle {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 14px;
+}
+
+.summary {
+  color: var(--muted);
+  line-height: 20px;
+}
+
+.keywords {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.keywordGroup {
+  flex: 1 1 220px;
+}
+
+.listTitle {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--faint);
+}
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tag {
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  line-height: 20px;
+}
+
+.tagOk {
+  background: var(--signal-wash);
+  color: var(--signal-bright);
+}
+
+.tagMiss {
+  background: var(--danger-wash);
+  color: var(--danger);
+}
+
+.list {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 14px;
+  line-height: 21px;
+}
