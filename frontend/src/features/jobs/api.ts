@@ -43,6 +43,7 @@ export interface JobDetail {
   url: string
   matchedGroups: string[]
   addedByUser: boolean
+  applicationId: string | null
   closedAt: string | null
   archivedAt: string | null
   archiveNote: string | null

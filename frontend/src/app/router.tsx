@@ -7,6 +7,8 @@ import { LoginPage } from '../features/auth/LoginPage'
 import { ForgotPasswordPage, ForgotPasswordSentPage, ResetPasswordPage } from '../features/auth/PasswordResetPages'
 import { TwoFactorPage } from '../features/auth/TwoFactorPage'
 import { AdminSourcesPage } from '../features/admin/AdminSourcesPage'
+import { ApplicationPage } from '../features/funnel/ApplicationPage'
+import { FunnelPage } from '../features/funnel/FunnelPage'
 import { JobDetailPage } from '../features/jobs/JobDetailPage'
 import { JobsPage } from '../features/jobs/JobsPage'
 import { OnboardingPage } from '../features/onboarding/OnboardingPage'
@@ -37,6 +39,8 @@ export const router = createBrowserRouter([
         children: [
           { path: '/', element: <JobsPage /> },
           { path: '/vagas/:id', element: <JobDetailPage /> },
+          { path: '/funil', element: <FunnelPage /> },
+          { path: '/funil/:id', element: <ApplicationPage /> },
           { path: '/configuracoes', element: <SettingsPage /> },
           {
             element: <RequireAuth admin />,

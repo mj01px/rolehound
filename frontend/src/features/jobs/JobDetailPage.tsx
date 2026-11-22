@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import { Link, useParams } from 'react-router'
+import { Link, useNavigate, useParams } from 'react-router'
 import { errorMessage } from '../../lib/api'
 import { Alert } from '../../ui/Alert'
 import { Button } from '../../ui/Button'
+import { useEnterFunnel } from '../funnel/api'
 import { useArchive, useJob, useRestore } from './api'
 import { ago, archiveReasonLabel, archiveReasons, seniorityLabels, sourceLabels, workModeLabels, type ArchiveReason } from './labels'
 import styles from './jobs.module.css'
@@ -11,6 +12,8 @@ export function JobDetailPage() {
   const { id = '' } = useParams()
   const detail = useJob(id)
   const restore = useRestore(id)
+  const enter = useEnterFunnel(id)
+  const navigate = useNavigate()
   const [archiving, setArchiving] = useState(false)
 
   if (detail.isError) {
@@ -30,7 +33,7 @@ export function JobDetailPage() {
     )
   }
 
-  const { job, description, url, matchedGroups, archivedAt, archiveNote, addedByUser } = detail.data
+  const { job, description, url, matchedGroups, archivedAt, archiveNote, addedByUser, applicationId } = detail.data
   const meta = [job.company, job.location].filter(Boolean).join(' · ')
 
   return (
@@ -59,17 +62,28 @@ export function JobDetailPage() {
         <a className={styles.external} href={url} target="_blank" rel="noopener noreferrer">
           Abrir vaga original
         </a>
-        {archivedAt ? (
-          <Button variant="secondary" onClick={() => restore.mutate()} disabled={restore.isPending}>
-            Restaurar
-          </Button>
+        {applicationId ? (
+          <Link to={`/funil/${applicationId}`} className={styles.secondaryLink}>
+            Ver no funil
+          </Link>
         ) : (
-          <Button variant="secondary" onClick={() => setArchiving(true)}>
-            Arquivar
+          <Button variant="secondary" onClick={() => enter.mutate('applied', { onSuccess: (card) => navigate(`/funil/${card.id}`) })} disabled={enter.isPending}>
+            Mover para o funil
           </Button>
         )}
+        {!applicationId &&
+          (archivedAt ? (
+            <Button variant="ghost" onClick={() => restore.mutate()} disabled={restore.isPending}>
+              Restaurar
+            </Button>
+          ) : (
+            <Button variant="ghost" onClick={() => setArchiving(true)}>
+              Arquivar
+            </Button>
+          ))}
       </div>
       {restore.isError && <Alert>{errorMessage(restore.error)}</Alert>}
+      {enter.isError && <Alert>{errorMessage(enter.error)}</Alert>}
 
       {(archivedAt || job.closedAtSource) && (
         <div className={styles.statusBox}>

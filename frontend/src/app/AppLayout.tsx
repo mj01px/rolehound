@@ -33,6 +33,9 @@ export function AppLayout() {
             <NavLink to="/" className={() => navClass({ isActive: location.pathname === '/' || location.pathname.startsWith('/vagas/') })}>
               Vagas
             </NavLink>
+            <NavLink to="/funil" className={navClass}>
+              Funil
+            </NavLink>
           </div>
           {me?.role === 'admin' && (
             <div className={styles.group}>

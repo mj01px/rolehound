@@ -276,6 +276,22 @@
   text-decoration: none;
 }
 
+.secondaryLink {
+  display: inline-flex;
+  align-items: center;
+  height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius-md);
+  color: var(--ink);
+  font: 500 14px var(--font-sans);
+  text-decoration: none;
+}
+
+.secondaryLink:hover {
+  background: var(--surface-raised);
+}
+
 .external:hover {
   background: var(--action-hover);
 }
