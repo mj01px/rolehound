@@ -433,6 +433,134 @@ namespace Rolehound.Api.Infrastructure.Persistence.Migrations
                     b.ToTable("ai_usage", (string)null);
                 });
 
+            modelBuilder.Entity("Rolehound.Api.Features.Ats.AtsReport", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("CompletionTokens")
+                        .HasColumnType("integer")
+                        .HasColumnName("completion_tokens");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.PrimitiveCollection<string>("Gaps")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("gaps");
+
+                    b.Property<Guid>("JobId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("job_id");
+
+                    b.PrimitiveCollection<string>("MatchedKeywords")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("matched_keywords");
+
+                    b.PrimitiveCollection<string>("MissingKeywords")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("missing_keywords");
+
+                    b.Property<string>("Model")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("model");
+
+                    b.Property<int>("PromptTokens")
+                        .HasColumnType("integer")
+                        .HasColumnName("prompt_tokens");
+
+                    b.Property<string>("ResumeFileName")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("resume_file_name");
+
+                    b.Property<int>("Score")
+                        .HasColumnType("integer")
+                        .HasColumnName("score");
+
+                    b.PrimitiveCollection<string>("Strengths")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("strengths");
+
+                    b.PrimitiveCollection<string>("Suggestions")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("suggestions");
+
+                    b.Property<string>("Summary")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("summary");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.Property<string>("Verdict")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("verdict");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ats_reports");
+
+                    b.HasIndex("JobId")
+                        .HasDatabaseName("ix_ats_reports_job_id");
+
+                    b.HasIndex("UserId", "JobId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_ats_reports_user_id_job_id");
+
+                    b.ToTable("ats_reports", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_ats_reports_score", "score BETWEEN 0 AND 100");
+                        });
+                });
+
+            modelBuilder.Entity("Rolehound.Api.Features.Ats.ResumeText", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("file_name");
+
+                    b.Property<int>("Pages")
+                        .HasColumnType("integer")
+                        .HasColumnName("pages");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasMaxLength(60000)
+                        .HasColumnType("character varying(60000)")
+                        .HasColumnName("text");
+
+                    b.Property<DateTimeOffset>("UploadedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("uploaded_at");
+
+                    b.HasKey("UserId")
+                        .HasName("pk_resume_texts");
+
+                    b.ToTable("resume_texts", (string)null);
+                });
+
             modelBuilder.Entity("Rolehound.Api.Features.Collection.CollectionRun", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1073,6 +1201,33 @@ namespace Rolehound.Api.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_ai_usage_users_user_id");
+                });
+
+            modelBuilder.Entity("Rolehound.Api.Features.Ats.AtsReport", b =>
+                {
+                    b.HasOne("Rolehound.Api.Features.Jobs.Job", null)
+                        .WithMany()
+                        .HasForeignKey("JobId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_ats_reports_jobs_job_id");
+
+                    b.HasOne("Rolehound.Api.Features.Accounts.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_ats_reports_users_user_id");
+                });
+
+            modelBuilder.Entity("Rolehound.Api.Features.Ats.ResumeText", b =>
+                {
+                    b.HasOne("Rolehound.Api.Features.Accounts.User", null)
+                        .WithOne()
+                        .HasForeignKey("Rolehound.Api.Features.Ats.ResumeText", "UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_resume_texts_users_user_id");
                 });
 
             modelBuilder.Entity("Rolehound.Api.Features.Collection.CollectionRun", b =>

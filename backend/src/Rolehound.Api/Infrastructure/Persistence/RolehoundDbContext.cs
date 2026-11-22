@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Rolehound.Api.Features.Accounts;
 using Rolehound.Api.Features.Ai;
+using Rolehound.Api.Features.Ats;
 using Rolehound.Api.Features.Collection;
 using Rolehound.Api.Features.Dossier;
 using Rolehound.Api.Features.Funnel;
@@ -53,6 +54,10 @@ public sealed class RolehoundDbContext(DbContextOptions<RolehoundDbContext> opti
     public DbSet<Interaction> Interactions => Set<Interaction>();
 
     public DbSet<PitchVersion> PitchVersions => Set<PitchVersion>();
+
+    public DbSet<ResumeText> ResumeTexts => Set<ResumeText>();
+
+    public DbSet<AtsReport> AtsReports => Set<AtsReport>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
