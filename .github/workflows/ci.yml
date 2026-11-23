@@ -66,3 +66,28 @@ jobs:
       - run: npm audit --audit-level=high
       - run: npm run lint
       - run: npm run build
+
+  image:
+    name: API image
+    # The production image is built here so the 1 GB VM only pulls it.
+    needs: backend
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Build
+        run: docker build --tag rolehound-api backend
+      - name: Push to GitHub Container Registry
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          IMAGE: ghcr.io/${{ github.repository_owner }}/rolehound-api
+        run: |
+          echo "$REGISTRY_TOKEN" | docker login ghcr.io --username "${{ github.actor }}" --password-stdin
+          docker tag rolehound-api "$IMAGE:${{ github.sha }}"
+          docker tag rolehound-api "$IMAGE:main"
+          docker push "$IMAGE:${{ github.sha }}"
+          docker push "$IMAGE:main"
