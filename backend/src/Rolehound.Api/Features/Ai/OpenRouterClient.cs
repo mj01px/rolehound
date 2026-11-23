@@ -49,6 +49,26 @@ public sealed class OpenRouterClient(HttpClient http)
         return true;
     }
 
+    /// <summary>GET /models: OpenRouter's public model list. Needs no key.</summary>
+    public async Task<JsonDocument> ListModelsAsync(CancellationToken ct)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, "models");
+        using var response = await SendAsync(request, ct);
+        if (!response.IsSuccessStatusCode)
+        {
+            throw new AiException("ai_unavailable", "O OpenRouter não devolveu a lista de modelos.");
+        }
+
+        try
+        {
+            return await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(ct), cancellationToken: ct);
+        }
+        catch (JsonException)
+        {
+            throw new AiException("ai_unavailable", "O OpenRouter devolveu uma lista de modelos inválida.");
+        }
+    }
+
     /// <summary>POST /chat/completions. With a schema, the answer is JSON matching it.</summary>
     public async Task<ChatResult> ChatAsync(
         string apiKey, string model, IReadOnlyList<ChatMessage> messages, string? schemaName, JsonNode? schema, int maxTokens, CancellationToken ct)

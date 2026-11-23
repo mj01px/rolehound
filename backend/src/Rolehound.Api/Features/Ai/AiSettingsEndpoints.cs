@@ -18,7 +18,7 @@ public sealed record SaveKeyRequest(string? Key);
 public sealed record SaveModelsRequest(string? PitchAndAts, string? Resume, string? ProfileAndFix);
 
 /// <summary>
-/// GET /ai/settings, PUT /ai/key and PUT /ai/models. The key is tested before
+/// GET /ai/settings, PUT /ai/key, PUT /ai/models and GET /ai/models (the catalog). The key is tested before
 /// saving and never comes back; each model is tested when saved (PRD 10.1).
 /// </summary>
 internal static class AiSettingsEndpoints
@@ -33,6 +33,7 @@ internal static class AiSettingsEndpoints
         ai.MapGet("/settings", Get);
         ai.MapPut("/key", SaveKey);
         ai.MapPut("/models", SaveModels);
+        ai.MapGet("/models", ModelCatalog.Handle);
         return endpoints;
     }
 

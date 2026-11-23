@@ -1,9 +1,10 @@
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { useState, type FormEvent } from 'react'
 import { ApiError, api, errorMessage } from '../../lib/api'
-import { Alert } from '../../ui/Alert'
+import { Alert, Notice } from '../../ui/Alert'
 import { Button } from '../../ui/Button'
-import { Field } from '../../ui/Field'
+import { ModelPicker } from '../../ui/ModelPicker'
+import { MODEL_USAGE } from '../../ui/modelUsage'
 import uiStyles from '../../ui/ui.module.css'
 import type { AiSettings, Models } from './api'
 import styles from './onboarding.module.css'
@@ -34,7 +35,7 @@ function ModelsForm({ initial, suggested, onDone, onBack }: { initial: Models; s
   }
 
   const error = save.error instanceof ApiError ? save.error : null
-  const changedToFree = Object.values(models).some((m) => m.endsWith(':free'))
+  const usesFree = Object.values(models).some((m) => m.endsWith(':free'))
 
   return (
     <form className={styles.column} onSubmit={submit} noValidate>
@@ -45,22 +46,25 @@ function ModelsForm({ initial, suggested, onDone, onBack }: { initial: Models; s
       {error && !SLOTS.some((s) => error.field(s.key)) && <Alert>{errorMessage(save.error)}</Alert>}
       <div className={styles.stack}>
         {SLOTS.map((slot) => (
-          <Field
+          <ModelPicker
             key={slot.key}
             label={slot.label}
-            className={styles.mono}
             value={models[slot.key]}
-            onChange={(e) => setModels({ ...models, [slot.key]: e.target.value })}
+            usage={MODEL_USAGE[slot.key]}
+            suggested={suggested[slot.key]}
+            onChange={(id) => setModels((current) => ({ ...current, [slot.key]: id }))}
             error={error?.field(slot.key)}
             aside={models[slot.key] === suggested[slot.key] ? <span className={styles.tag}>Sugerido</span> : undefined}
           />
         ))}
       </div>
-      <p className={styles.hint}>
-        {changedToFree
-          ? 'Modelos gratuitos podem usar o que você envia para treino.'
-          : 'Se trocar por um modelo gratuito: ele pode usar o que você envia para treino. A lista completa está em openrouter.ai/models.'}
-      </p>
+      {usesFree ? (
+        <Notice>
+          Modelos gratuitos não pedem cartão no OpenRouter, mas podem usar o que você envia para treino, e o OpenRouter limita a quantidade de pedidos por dia. Se preferir mais privacidade, escolha um modelo pago: ele precisa de créditos comprados no OpenRouter.
+        </Notice>
+      ) : (
+        <p className={styles.hint}>Modelos pagos usam créditos comprados no OpenRouter, com cartão ou cripto.</p>
+      )}
       <div className={styles.actions}>
         <Button type="submit" size="large" block disabled={save.isPending}>
           {save.isPending ? 'Testando os modelos…' : 'Testar e continuar'}

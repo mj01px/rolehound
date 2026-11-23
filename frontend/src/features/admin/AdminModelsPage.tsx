@@ -3,7 +3,8 @@ import { useState, type FormEvent } from 'react'
 import { ApiError, api, errorMessage } from '../../lib/api'
 import { Alert, Notice } from '../../ui/Alert'
 import { Button } from '../../ui/Button'
-import { Field } from '../../ui/Field'
+import { ModelPicker } from '../../ui/ModelPicker'
+import { MODEL_USAGE } from '../../ui/modelUsage'
 import type { Models } from '../onboarding/api'
 import styles from './admin.module.css'
 
@@ -38,14 +39,7 @@ function ModelsForm({ initial }: { initial: Models }) {
   }
 
   const field = (key: keyof Models, label: string) => (
-    <Field
-      label={label}
-      value={models[key]}
-      onChange={(event) => setModels((current) => ({ ...current, [key]: event.target.value }))}
-      error={error?.field(key)}
-      spellCheck={false}
-      autoComplete="off"
-    />
+    <ModelPicker label={label} usage={MODEL_USAGE[key]} value={models[key]} onChange={(id) => setModels((current) => ({ ...current, [key]: id }))} error={error?.field(key)} />
   )
 
   return (
@@ -55,7 +49,6 @@ function ModelsForm({ initial }: { initial: Models }) {
       {field('profileAndFix', 'Perfil de score e correção do Dossier')}
       {save.isSuccess && <Notice>Sugestões salvas.</Notice>}
       {save.isError && !error?.problem.errors && <Alert>{errorMessage(save.error)}</Alert>}
-      <p className={styles.muted}>Use o identificador do OpenRouter, como deepseek/deepseek-chat. A lista completa está em openrouter.ai/models.</p>
       <div>
         <Button type="submit" disabled={save.isPending}>
           Salvar

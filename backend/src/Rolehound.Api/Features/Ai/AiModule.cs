@@ -16,6 +16,8 @@ public static class AiModule
             client.Timeout = TimeSpan.FromSeconds(120);
         });
 
+        services.AddMemoryCache();
+        services.AddScoped<ModelCatalog>();
         services.AddScoped<AiGateway>();
         return services;
     }
