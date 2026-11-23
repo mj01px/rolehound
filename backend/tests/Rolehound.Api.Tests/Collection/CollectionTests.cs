@@ -211,6 +211,24 @@ public sealed class CollectionTests(ApiFactory factory) : ApiTest(factory)
         }
     }
 
+    [Fact]
+    public async Task The_due_task_collects_once_per_slot()
+    {
+        await AddTargetAsync("exemplo");
+        Factory.JobSource.Lists("exemplo", FakeJobSource.Job("1", "Dev"));
+
+        Assert.True((await DueAsync()).Ran);
+        Assert.False((await DueAsync()).Ran);
+    }
+
+    private async Task<DueCollectionResponse> DueAsync()
+    {
+        using var client = Factory.CreateClient();
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/tasks/collect-due");
+        request.Headers.Add("X-Task-Key", ApiFactory.TaskKey);
+        return await ReadAsync<DueCollectionResponse>(await client.SendAsync(request, Ct));
+    }
+
     private async Task AddTargetAsync(string key)
     {
         Factory.JobSource.Clear();
@@ -249,5 +267,17 @@ public sealed class CollectionTests(ApiFactory factory) : ApiTest(factory)
     {
         await using var scope = Factory.Services.CreateAsyncScope();
         return await scope.ServiceProvider.GetRequiredService<RolehoundDbContext>().Jobs.Where(j => j.ExternalId == externalId).Select(j => j.Status).SingleAsync(Ct);
+    }
+}
+
+public sealed class CollectionScheduleTests
+{
+    [Theory]
+    [InlineData("2026-11-22T13:30:00Z", "2026-11-22T12:00:00Z")] // 10:30 in Brazil: the 09:00 slot
+    [InlineData("2026-11-22T21:00:00Z", "2026-11-22T21:00:00Z")] // 18:00 sharp
+    [InlineData("2026-11-22T10:00:00Z", "2026-11-21T21:00:00Z")] // 07:00: yesterday's 18:00
+    public void The_latest_slot_follows_brazil_time(string now, string slot)
+    {
+        Assert.Equal(DateTimeOffset.Parse(slot, System.Globalization.CultureInfo.InvariantCulture), Rolehound.Api.Features.Collection.CollectionSchedule.LatestSlot(DateTimeOffset.Parse(now, System.Globalization.CultureInfo.InvariantCulture)));
     }
 }

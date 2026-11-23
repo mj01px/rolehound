@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.HttpOverrides;
 using System.Globalization;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
@@ -48,12 +49,30 @@ internal static class HttpExtensions
         services.AddOptions<RateLimiterOptions>()
             .Configure<RateLimits>((options, limits) => options.GlobalLimiter = limits.Limiter);
 
+        // Behind the reverse proxy (deploy/compose.yaml) the API port is reachable only
+        // from the proxy, so its X-Forwarded-For and X-Forwarded-Proto are trusted.
+        if (configuration.GetValue<bool>("Proxy:Trusted"))
+        {
+            services.Configure<ForwardedHeadersOptions>(options =>
+            {
+                options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+                options.ForwardLimit = 1;
+                options.KnownIPNetworks.Clear();
+                options.KnownProxies.Clear();
+            });
+        }
+
         services.AddSingleton(TimeProvider.System);
         return services;
     }
 
     public static WebApplication UseHttpDefaults(this WebApplication app)
     {
+        if (app.Configuration.GetValue<bool>("Proxy:Trusted"))
+        {
+            app.UseForwardedHeaders();
+        }
+
         app.UseExceptionHandler();
         app.UseStatusCodePages();
 

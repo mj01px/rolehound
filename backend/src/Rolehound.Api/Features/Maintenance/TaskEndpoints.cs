@@ -43,6 +43,7 @@ internal static class TaskEndpoints
         tasks.MapPost("/cleanup", Cleanup.Handle);
         tasks.MapPost("/collect", (CollectionRunner runner, CancellationToken ct) => SourceEndpoints.RunAsync(runner, ct));
         tasks.MapPost("/notify-overdue", TelegramNotifier.HandleOverdue);
+        tasks.MapPost("/collect-due", CollectionSchedule.RunIfDue);
         return endpoints;
     }
 }
