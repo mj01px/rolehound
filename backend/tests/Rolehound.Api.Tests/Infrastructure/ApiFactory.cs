@@ -31,6 +31,10 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
 
     public FakeJobSource JobSource { get; } = new(Rolehound.Connectors.JobSource.Greenhouse);
 
+    public const string TelegramSecret = "test-webhook-secret-0001";
+
+    public FakeTelegram Telegram { get; } = new();
+
     public FakeJobSource Gupy { get; } = new(Rolehound.Connectors.JobSource.Gupy, authoritative: false);
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -41,6 +45,9 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
         builder.UseSetting("Web:BaseUrl", "http://app.test");
         builder.UseSetting("Tasks:Key", TaskKey);
         builder.UseSetting("TailoredResume:WorkerEnabled", "false");
+        builder.UseSetting("Telegram:BotToken", "123:test-token");
+        builder.UseSetting("Telegram:BotUsername", "rolehound_test_bot");
+        builder.UseSetting("Telegram:WebhookSecret", TelegramSecret);
         builder.UseSetting("RateLimits:AnonymousPerMinute", "100000");
         builder.UseSetting("RateLimits:ReadsPerMinute", "100000");
         builder.UseSetting("RateLimits:WritesPerMinute", "100000");
@@ -54,6 +61,8 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
             services.RemoveAll<Rolehound.Connectors.IJobConnector>();
             services.AddSingleton<Rolehound.Connectors.IJobConnector>(JobSource);
             services.AddSingleton<Rolehound.Connectors.IJobConnector>(Gupy);
+            services.RemoveAll<Rolehound.Api.Features.Telegram.TelegramClient>();
+            services.AddSingleton<Rolehound.Api.Features.Telegram.TelegramClient>(Telegram);
             services.RemoveAll<Rolehound.Connectors.IJobLinkReader>();
             services.AddSingleton<Rolehound.Connectors.IJobLinkReader>(JobSource);
             services.AddHttpClient(Rolehound.Api.Features.Ai.OpenRouterClient.HttpClientName)

@@ -12,6 +12,7 @@ using Rolehound.Api.Features.Funnel;
 using Rolehound.Api.Features.Jobs;
 using Rolehound.Api.Features.Pitch;
 using Rolehound.Api.Features.TailoredResume;
+using Rolehound.Api.Features.Telegram;
 using Rolehound.Api.Features.ScoreProfiles;
 
 namespace Rolehound.Api.Infrastructure.Persistence;
@@ -64,6 +65,12 @@ public sealed class RolehoundDbContext(DbContextOptions<RolehoundDbContext> opti
     public DbSet<ResumeGeneration> ResumeGenerations => Set<ResumeGeneration>();
 
     public DbSet<SampleItem> SampleItems => Set<SampleItem>();
+
+    public DbSet<TelegramLink> TelegramLinks => Set<TelegramLink>();
+
+    public DbSet<TelegramLinkCode> TelegramLinkCodes => Set<TelegramLinkCode>();
+
+    public DbSet<SuggestedModelsRow> SuggestedModels => Set<SuggestedModelsRow>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {

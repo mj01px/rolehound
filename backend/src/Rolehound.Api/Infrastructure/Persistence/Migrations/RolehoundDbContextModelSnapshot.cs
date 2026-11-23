@@ -511,6 +511,43 @@ namespace Rolehound.Api.Infrastructure.Persistence.Migrations
                     b.ToTable("ai_usage", (string)null);
                 });
 
+            modelBuilder.Entity("Rolehound.Api.Features.Ai.SuggestedModelsRow", b =>
+                {
+                    b.Property<int>("Id")
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    b.Property<string>("PitchAndAts")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("pitch_and_ats");
+
+                    b.Property<string>("ProfileAndFix")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("profile_and_fix");
+
+                    b.Property<string>("Resume")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("resume");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_suggested_models");
+
+                    b.ToTable("suggested_models", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_suggested_models_single_row", "id = 1");
+                        });
+                });
+
             modelBuilder.Entity("Rolehound.Api.Features.Ats.AtsReport", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1313,6 +1350,58 @@ namespace Rolehound.Api.Infrastructure.Persistence.Migrations
                     b.ToTable("resume_generations", (string)null);
                 });
 
+            modelBuilder.Entity("Rolehound.Api.Features.Telegram.TelegramLink", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.Property<long>("ChatId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("chat_id");
+
+                    b.Property<DateOnly?>("LastOverdueDigestOn")
+                        .HasColumnType("date")
+                        .HasColumnName("last_overdue_digest_on");
+
+                    b.Property<DateTimeOffset>("LinkedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("linked_at");
+
+                    b.HasKey("UserId")
+                        .HasName("pk_telegram_links");
+
+                    b.HasIndex("ChatId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_telegram_links_chat_id");
+
+                    b.ToTable("telegram_links", (string)null);
+                });
+
+            modelBuilder.Entity("Rolehound.Api.Features.Telegram.TelegramLinkCode", b =>
+                {
+                    b.Property<string>("CodeHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("code_hash");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("CodeHash")
+                        .HasName("pk_telegram_link_codes");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_telegram_link_codes_user_id");
+
+                    b.ToTable("telegram_link_codes", (string)null);
+                });
+
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserClaim<System.Guid>", b =>
                 {
                     b.HasOne("Rolehound.Api.Features.Accounts.User", null)
@@ -1531,6 +1620,26 @@ namespace Rolehound.Api.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_resume_generations_users_user_id");
+                });
+
+            modelBuilder.Entity("Rolehound.Api.Features.Telegram.TelegramLink", b =>
+                {
+                    b.HasOne("Rolehound.Api.Features.Accounts.User", null)
+                        .WithOne()
+                        .HasForeignKey("Rolehound.Api.Features.Telegram.TelegramLink", "UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_telegram_links_users_user_id");
+                });
+
+            modelBuilder.Entity("Rolehound.Api.Features.Telegram.TelegramLinkCode", b =>
+                {
+                    b.HasOne("Rolehound.Api.Features.Accounts.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_telegram_link_codes_users_user_id");
                 });
 #pragma warning restore 612, 618
         }

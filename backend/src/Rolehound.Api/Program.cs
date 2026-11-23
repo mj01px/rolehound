@@ -9,6 +9,7 @@ using Rolehound.Api.Features.Funnel;
 using Rolehound.Api.Features.Jobs;
 using Rolehound.Api.Features.Pitch;
 using Rolehound.Api.Features.TailoredResume;
+using Rolehound.Api.Features.Telegram;
 using Rolehound.Api.Features.Dossier;
 using Rolehound.Api.Features.Maintenance;
 using Rolehound.Api.Features.Onboarding;
@@ -28,6 +29,7 @@ builder.Services.AddAccounts(builder.Environment);
 builder.Services.AddAi(builder.Configuration);
 builder.Services.AddCollection(builder.Configuration);
 builder.Services.AddTailoredResume(builder.Configuration);
+builder.Services.AddTelegram(builder.Configuration);
 
 var app = builder.Build();
 
@@ -47,9 +49,12 @@ app.MapResumeEndpoints();
 app.MapAtsEndpoints();
 app.MapTailoredResumeEndpoints();
 app.MapAccuracyEndpoints();
+app.MapTelegramEndpoints();
+app.MapSuggestedModelsEndpoints();
 app.MapTaskEndpoints(app.Configuration);
 
 await PrepareDatabaseAsync(app);
+await TelegramModule.RegisterWebhookAsync(app.Services, CancellationToken.None);
 
 await app.RunAsync();
 

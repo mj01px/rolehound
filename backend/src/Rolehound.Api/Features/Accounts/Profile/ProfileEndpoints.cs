@@ -12,6 +12,8 @@ internal static class ProfileEndpoints
         account.MapPost("/reauthenticate/code", Reauthenticate.SendCode);
         account.MapGet("/security", AccountSecurity.Get);
         account.MapPost("/sessions/revoke", AccountSecurity.RevokeSessions);
+        account.MapGet("/export", AccountData.Export);
+        account.MapGet("/ai-usage", AccountData.Usage);
 
         // Sensitive actions (FR-ACC-12).
         var sensitive = account.MapGroup(string.Empty).RequireRecentReauthentication();
@@ -23,6 +25,7 @@ internal static class ProfileEndpoints
         sensitive.MapPost("/two-factor/email/enable", TwoFactor.EnableEmail);
         sensitive.MapPost("/two-factor/disable", TwoFactor.Disable);
         sensitive.MapPost("/two-factor/recovery-codes", TwoFactor.RegenerateRecoveryCodes);
+        sensitive.MapDelete(string.Empty, AccountData.Delete);
 
         return endpoints;
     }

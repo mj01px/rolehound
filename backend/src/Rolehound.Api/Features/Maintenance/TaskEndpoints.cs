@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using Rolehound.Api.Features.Collection;
+using Rolehound.Api.Features.Telegram;
 using Rolehound.Api.Infrastructure.Http;
 
 namespace Rolehound.Api.Features.Maintenance;
@@ -41,6 +42,7 @@ internal static class TaskEndpoints
 
         tasks.MapPost("/cleanup", Cleanup.Handle);
         tasks.MapPost("/collect", (CollectionRunner runner, CancellationToken ct) => SourceEndpoints.RunAsync(runner, ct));
+        tasks.MapPost("/notify-overdue", TelegramNotifier.HandleOverdue);
         return endpoints;
     }
 }

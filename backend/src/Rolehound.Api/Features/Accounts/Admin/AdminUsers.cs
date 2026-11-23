@@ -188,7 +188,7 @@ internal static partial class AdminUsers
         return TypedResults.NoContent();
     }
 
-    private static async Task<bool> IsLastActiveAdminAsync(User user, RolehoundDbContext db, CancellationToken ct) =>
+    internal static async Task<bool> IsLastActiveAdminAsync(User user, RolehoundDbContext db, CancellationToken ct) =>
         user is { Role: UserRole.Admin, IsActive: true }
         && !await db.Users.AnyAsync(u => u.Id != user.Id && u.Role == UserRole.Admin && u.IsActive, ct);
 

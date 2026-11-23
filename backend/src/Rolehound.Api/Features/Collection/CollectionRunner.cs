@@ -2,6 +2,7 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Rolehound.Api.Features.Jobs;
 using Rolehound.Api.Features.ScoreProfiles;
+using Rolehound.Api.Features.Telegram;
 using Rolehound.Api.Infrastructure.Persistence;
 using Rolehound.Connectors;
 
@@ -22,11 +23,15 @@ public sealed partial class CollectionRunner(
     RolehoundDbContext db,
     IEnumerable<IJobConnector> connectors,
     JobScoring scoring,
+    TelegramNotifier notifier,
     TimeProvider time,
     ILogger<CollectionRunner> logger)
 {
     /// <summary>Sources whose items expire by age (previous tool: Gupy and GitHub).</summary>
     public static readonly TimeSpan MaxAge = TimeSpan.FromDays(30);
+
+    // Jobs that arrived or reopened in this run: what the highlight message is about.
+    private readonly List<Guid> _opened = [];
 
     private static readonly HashSet<JobSource> ExpiringSources = [JobSource.GitHub, JobSource.Gupy, JobSource.Link, JobSource.EmailAlert];
 
@@ -73,6 +78,7 @@ public sealed partial class CollectionRunner(
         }
 
         closed += await CloseAgedAsync(ct);
+        await notifier.NotifyHighlightsAsync(_opened, ct);
         return new CollectionSummary(targets.Count, failed, added, reopened, closed);
     }
 
@@ -173,6 +179,7 @@ public sealed partial class CollectionRunner(
                     job.ClosedAt = null;
                     job.OpenedAt = now;
                     run.Reopened++;
+                    _opened.Add(job.Id);
                     if (!changed.Contains(job))
                     {
                         changed.Add(job);
@@ -205,6 +212,7 @@ public sealed partial class CollectionRunner(
             JobFields.Apply(job, item, target.Label);
             db.Jobs.Add(job);
             run.Added++;
+            _opened.Add(job.Id);
             changed.Add(job);
         }
 

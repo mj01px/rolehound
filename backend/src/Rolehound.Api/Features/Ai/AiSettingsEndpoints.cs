@@ -39,12 +39,12 @@ internal static class AiSettingsEndpoints
     private static async Task<Ok<AiSettingsResponse>> Get(ClaimsPrincipal principal, RolehoundDbContext db, IOptions<AiOptions> options, CancellationToken ct)
     {
         var settings = await db.AiSettings.AsNoTracking().SingleOrDefaultAsync(s => s.UserId == principal.GetUserId(), ct);
-        var suggested = options.Value.Suggested;
+        var suggested = await SuggestedModels.CurrentAsync(db, options, ct);
         return TypedResults.Ok(new AiSettingsResponse(
             settings?.HasKey ?? false,
             settings?.KeyHint,
             settings is { HasModels: true } ? new ModelsDto(settings.PitchAndAtsModel!, settings.ResumeModel!, settings.ProfileAndFixModel!) : null,
-            new ModelsDto(suggested.PitchAndAts, suggested.Resume, suggested.ProfileAndFix)));
+            suggested));
     }
 
     private static async Task<Results<NoContent, ProblemHttpResult, ValidationProblem>> SaveKey(
