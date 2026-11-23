@@ -36,6 +36,9 @@ export function AppLayout() {
             <NavLink to="/funil" className={navClass}>
               Funil
             </NavLink>
+            <NavLink to="/qualidade" className={navClass}>
+              Qualidade
+            </NavLink>
           </div>
           {me?.role === 'admin' && (
             <div className={styles.group}>
@@ -45,6 +48,9 @@ export function AppLayout() {
               </NavLink>
               <NavLink to="/admin/fontes" className={navClass}>
                 Fontes
+              </NavLink>
+              <NavLink to="/admin/qualidade" className={navClass}>
+                Qualidade
               </NavLink>
             </div>
           )}

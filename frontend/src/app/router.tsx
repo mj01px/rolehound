@@ -6,6 +6,8 @@ import { ConfirmEmailPage } from '../features/auth/ConfirmEmailPage'
 import { LoginPage } from '../features/auth/LoginPage'
 import { ForgotPasswordPage, ForgotPasswordSentPage, ResetPasswordPage } from '../features/auth/PasswordResetPages'
 import { TwoFactorPage } from '../features/auth/TwoFactorPage'
+import { AccuracyPage } from '../features/accuracy/AccuracyPage'
+import { AdminAccuracyPage } from '../features/admin/AdminAccuracyPage'
 import { AdminSourcesPage } from '../features/admin/AdminSourcesPage'
 import { ApplicationPage } from '../features/funnel/ApplicationPage'
 import { FunnelPage } from '../features/funnel/FunnelPage'
@@ -41,12 +43,14 @@ export const router = createBrowserRouter([
           { path: '/vagas/:id', element: <JobDetailPage /> },
           { path: '/funil', element: <FunnelPage /> },
           { path: '/funil/:id', element: <ApplicationPage /> },
+          { path: '/qualidade', element: <AccuracyPage /> },
           { path: '/configuracoes', element: <SettingsPage /> },
           {
             element: <RequireAuth admin />,
             children: [
               { path: '/admin/usuarios', element: <AdminUsersPage /> },
               { path: '/admin/fontes', element: <AdminSourcesPage /> },
+              { path: '/admin/qualidade', element: <AdminAccuracyPage /> },
             ],
           },
         ],

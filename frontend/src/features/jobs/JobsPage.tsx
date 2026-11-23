@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router'
 import { errorMessage } from '../../lib/api'
 import { Alert } from '../../ui/Alert'
 import { Button } from '../../ui/Button'
+import { monthName, useSample } from '../accuracy/api'
 import { AddLinkDialog } from './AddLinkDialog'
 import { useJobs, type JobFilters, type JobListItem, type JobView } from './api'
 import { ago, archiveReasonLabel, seniorityLabels, sourceLabels, workModeLabels } from './labels'
@@ -57,6 +58,8 @@ export function JobsPage() {
           Adicionar por link
         </Button>
       </header>
+
+      <SampleBanner />
 
       <nav aria-label="Visões" className={styles.tabs}>
         {views.map((view) => (
@@ -157,5 +160,20 @@ function Select({ label, value, options, onChange }: { label: string; value: str
           </option>
         ))}
     </select>
+  )
+}
+
+/** The monthly sample is waiting (FR-ACU-01). Quiet otherwise. */
+function SampleBanner() {
+  const sample = useSample()
+  const pending = sample.data?.pending ?? 0
+  if (pending === 0) return null
+  return (
+    <Link to="/qualidade" className={styles.banner}>
+      <span>
+        Amostra de {monthName(sample.data!.month)}: {pending} destaques para rotular, uns dois minutos.
+      </span>
+      <span aria-hidden="true">→</span>
+    </Link>
   )
 }
