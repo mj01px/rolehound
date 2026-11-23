@@ -1,4 +1,6 @@
-<h1 align="center">Rolehound</h1>
+<p align="center">
+  <img src=".github/readme/banner.png" alt="Rolehound, invite only: jobs ranked for you, resumes that never invent. Next to it, the jobs screen with postings scored 58, 51, 44 and 39." width="100%">
+</p>
 
 <p align="center">
   A <b>private job hunting app</b> for the Brazilian market:<br>
@@ -24,6 +26,8 @@ gave it.
 
 ## How it works
 
+<img src=".github/readme/steps.png" alt="How it works in 4 steps: 1, bring your key: invited by the admin, you add your OpenRouter key and pick your models. 2, import your Dossier: one JSON about you, written with any AI chat. 3, review your profile: AI proposes the terms and weights that rank jobs for you, and you choose. 4, jobs arrive ranked from Gupy, InHire, Greenhouse, Lever and GitHub. The house rule: the AI picks and rewords; companies, titles, dates and education are copied from your Dossier by code." width="100%">
+
 1. **The admin invites you.** There is no public sign-up. You get an email
    with a single use link to set your password.
 2. **You bring your OpenRouter key.** Every AI call runs on your own key and
@@ -39,6 +43,8 @@ gave it.
    gets your score, with the best ones highlighted.
 
 ## Features
+
+<img src=".github/readme/showcase.png" alt="Every job, scored for you: the jobs screen with the All, Highlights and Archived tabs, search and filters, and each posting with its score, company, location, work mode, level and source." width="100%">
 
 - **Collection:** clean connectors for **Gupy, InHire, Greenhouse, Lever** and
   job repositories on **GitHub**. A posting missing from a source's latest
@@ -61,6 +67,8 @@ gave it.
 - **Accuracy:** label a sample of jobs and see how precise your highlights are,
   instead of judging the ranking by feel.
 - **Telegram:** optional bot for new highlights and overdue follow ups.
+
+<img src=".github/readme/review.png" alt="Nothing reworded goes unseen: the tailored resume review, with each rewritten sentence next to the original from the Dossier, the items left out, and the PDF download unlocked after the review." width="100%">
 
 ## Built to protect the people using it
 
