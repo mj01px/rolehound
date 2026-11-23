@@ -1,19 +1,27 @@
-# API image. Build context: backend/. Versions are pinned; update them on purpose.
+# API image. Build context: the repository root, as in
+#   docker build -f backend/Dockerfile .
+# Versions are pinned; update them on purpose.
 FROM mcr.microsoft.com/dotnet/sdk:10.0.404-noble AS build
-WORKDIR /src
+
+# Same layout as the repository, so the analyzers find .editorconfig and its
+# "backend/src/**/Migrations" section (EF migrations are generated code).
+WORKDIR /repo
+COPY .editorconfig ./
+COPY backend/global.json backend/Directory.Build.props backend/Directory.Packages.props backend/
+COPY backend/src/Rolehound.Scoring/Rolehound.Scoring.csproj backend/src/Rolehound.Scoring/
+COPY backend/src/Rolehound.Connectors/Rolehound.Connectors.csproj backend/src/Rolehound.Connectors/
+COPY backend/src/Rolehound.Api/Rolehound.Api.csproj backend/src/Rolehound.Api/
 
 # Restore first, so code changes reuse the package layer.
-COPY global.json Directory.Build.props Directory.Packages.props ./
-COPY src/Rolehound.Scoring/Rolehound.Scoring.csproj src/Rolehound.Scoring/
-COPY src/Rolehound.Connectors/Rolehound.Connectors.csproj src/Rolehound.Connectors/
-COPY src/Rolehound.Api/Rolehound.Api.csproj src/Rolehound.Api/
+WORKDIR /repo/backend
 RUN dotnet restore src/Rolehound.Api/Rolehound.Api.csproj -r linux-x64
 
-COPY src/ src/
+COPY backend/src/ src/
 RUN dotnet publish src/Rolehound.Api/Rolehound.Api.csproj -c Release -r linux-x64 --self-contained false --no-restore -o /app
 
 # Full Ubuntu runtime, not chiseled: it carries ICU (pt-BR formatting), tzdata
-# (America/Sao_Paulo) and the libraries QuestPDF's native Skia build links to.
+# (America/Sao_Paulo), bash for the health check, and zlib and libstdc++ for
+# QuestPDF's native libraries.
 FROM mcr.microsoft.com/dotnet/aspnet:10.0.15-noble
 WORKDIR /app
 COPY --from=build /app ./

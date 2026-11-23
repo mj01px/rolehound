@@ -1,0 +1,8 @@
+# Docker build context is the repository root; only .editorconfig and backend/ are used.
+*
+!.editorconfig
+!backend/
+backend/**/bin/
+backend/**/obj/
+backend/tests/
+backend/tools/
