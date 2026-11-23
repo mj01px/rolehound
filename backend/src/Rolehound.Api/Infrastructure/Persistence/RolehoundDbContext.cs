@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Rolehound.Api.Features.Accounts;
+using Rolehound.Api.Features.Accuracy;
 using Rolehound.Api.Features.Ai;
 using Rolehound.Api.Features.Ats;
 using Rolehound.Api.Features.Collection;
@@ -61,6 +62,8 @@ public sealed class RolehoundDbContext(DbContextOptions<RolehoundDbContext> opti
     public DbSet<AtsReport> AtsReports => Set<AtsReport>();
 
     public DbSet<ResumeGeneration> ResumeGenerations => Set<ResumeGeneration>();
+
+    public DbSet<SampleItem> SampleItems => Set<SampleItem>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {

@@ -345,6 +345,84 @@ namespace Rolehound.Api.Infrastructure.Persistence.Migrations
                     b.ToTable("users", (string)null);
                 });
 
+            modelBuilder.Entity("Rolehound.Api.Features.Accuracy.SampleItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Company")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("company");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("JobId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("job_id");
+
+                    b.Property<DateTimeOffset?>("LabelledAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("labelled_at");
+
+                    b.Property<DateOnly>("Month")
+                        .HasColumnType("date")
+                        .HasColumnName("month");
+
+                    b.Property<bool?>("Relevant")
+                        .HasColumnType("boolean")
+                        .HasColumnName("relevant");
+
+                    b.Property<int>("Score")
+                        .HasColumnType("integer")
+                        .HasColumnName("score");
+
+                    b.Property<string>("ShownWorkMode")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("shown_work_mode");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("status");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("title");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.Property<bool?>("WorkModeRight")
+                        .HasColumnType("boolean")
+                        .HasColumnName("work_mode_right");
+
+                    b.HasKey("Id")
+                        .HasName("pk_sample_items");
+
+                    b.HasIndex("JobId")
+                        .HasDatabaseName("ix_sample_items_job_id");
+
+                    b.HasIndex("UserId", "JobId")
+                        .HasDatabaseName("ix_sample_items_user_id_job_id");
+
+                    b.HasIndex("UserId", "Month")
+                        .HasDatabaseName("ix_sample_items_user_id_month");
+
+                    b.ToTable("sample_items", (string)null);
+                });
+
             modelBuilder.Entity("Rolehound.Api.Features.Ai.AiSettings", b =>
                 {
                     b.Property<Guid>("UserId")
@@ -1001,6 +1079,10 @@ namespace Rolehound.Api.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("archived_at");
 
+                    b.Property<bool>("ArrivedAsHighlight")
+                        .HasColumnType("boolean")
+                        .HasColumnName("arrived_as_highlight");
+
                     b.Property<DateTimeOffset>("FirstScoredAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("first_scored_at");
@@ -1269,6 +1351,22 @@ namespace Rolehound.Api.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_account_tokens_asp_net_users_user_id");
+                });
+
+            modelBuilder.Entity("Rolehound.Api.Features.Accuracy.SampleItem", b =>
+                {
+                    b.HasOne("Rolehound.Api.Features.Jobs.Job", null)
+                        .WithMany()
+                        .HasForeignKey("JobId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_sample_items_jobs_job_id");
+
+                    b.HasOne("Rolehound.Api.Features.Accounts.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_sample_items_users_user_id");
                 });
 
             modelBuilder.Entity("Rolehound.Api.Features.Ai.AiSettings", b =>

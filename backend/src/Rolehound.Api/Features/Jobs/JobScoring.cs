@@ -59,7 +59,7 @@ public sealed class JobScoring(RolehoundDbContext db, TimeProvider time)
             var score = scorer.Score(job.ToText());
             if (!existing.TryGetValue(job.Id, out var userJob))
             {
-                userJob = new UserJob { UserId = userId, JobId = job.Id, FirstScoredAt = now };
+                userJob = new UserJob { UserId = userId, JobId = job.Id, FirstScoredAt = now, ArrivedAsHighlight = score.IsHighlight };
                 db.UserJobs.Add(userJob);
             }
 

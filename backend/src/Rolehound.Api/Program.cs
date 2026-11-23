@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Rolehound.Api.Features.Accounts;
+using Rolehound.Api.Features.Accuracy;
 using Rolehound.Api.Features.Accounts.Admin;
 using Rolehound.Api.Features.Ai;
 using Rolehound.Api.Features.Ats;
@@ -45,6 +46,7 @@ app.MapPitchEndpoints();
 app.MapResumeEndpoints();
 app.MapAtsEndpoints();
 app.MapTailoredResumeEndpoints();
+app.MapAccuracyEndpoints();
 app.MapTaskEndpoints(app.Configuration);
 
 await PrepareDatabaseAsync(app);

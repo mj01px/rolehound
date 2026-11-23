@@ -87,6 +87,9 @@ public sealed class UserJob
 
     public bool IsHighlight { get; set; }
 
+    /// <summary>Highlight when it first reached the person; never changes after (BR-ACU-05).</summary>
+    public bool ArrivedAsHighlight { get; init; }
+
     /// <summary>At least one positive group matched; only these appear to the person (BR-VIS-01).</summary>
     public bool IsRelevant { get; set; }
 
