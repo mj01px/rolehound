@@ -1,0 +1,8 @@
+# Times are America/Sao_Paulo (TZ in compose.yaml).
+# Collection: the API runs only when the 09:00, 12:00, 15:00 or 18:00 slot has no run yet,
+# so calling every 15 minutes gives the four runs plus catch-up after any downtime.
+*/15 * * * * /usr/local/bin/task.sh collect-due
+# Overdue follow-ups on Telegram, once a day; repeated calls send nothing.
+0 9 * * * /usr/local/bin/task.sh notify-overdue
+# Retention cleanup.
+30 3 * * * /usr/local/bin/task.sh cleanup

@@ -14,7 +14,9 @@ backend/                      .NET 10
   src/Rolehound.Api/          ASP.NET Core host (Minimal APIs)
     Features/                 one folder per module, one subfolder per use case
     Infrastructure/           persistence, HTTP defaults, email, security
+  src/Rolehound.Connectors/   job sources (Greenhouse, Lever, GitHub, InHire, Gupy)
   src/Rolehound.Scoring/      pure scoring rules, no I/O
+  Dockerfile                  production image of the API (built by CI)
   tests/                      one test project per source project
   tools/parity/               exports the parity dataset from the previous tool
 frontend/                     React + TypeScript (Vite)
@@ -22,6 +24,8 @@ frontend/                     React + TypeScript (Vite)
   src/features/               one folder per module, mirroring the API
   src/lib/                    shared client code (HTTP)
   src/styles/                 design tokens and base styles
+deploy/                       production: compose, Caddy, scheduler, backups
+  README.md                   step-by-step deployment guide
 compose.yaml                  local PostgreSQL and Mailpit
 ```
 

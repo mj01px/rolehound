@@ -1,0 +1,11 @@
+# HTTPS certificates are issued and renewed by Caddy (Let's Encrypt).
+{$API_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy api:8080 {
+		health_uri /health/live
+	}
+	log {
+		output stdout
+		format json
+	}
+}
