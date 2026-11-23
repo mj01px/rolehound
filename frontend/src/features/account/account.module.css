@@ -136,3 +136,152 @@
   justify-content: flex-end;
   gap: 8px;
 }
+
+.profileForm {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding-top: 14px;
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.groupHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.groupHead > .input:first-child {
+  flex: 1 1 180px;
+}
+
+.input {
+  height: 36px;
+  padding: 0 10px;
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  border: 1px solid var(--border-control);
+  color: var(--ink);
+  font: 400 14px var(--font-sans);
+  min-width: 0;
+}
+
+.input:focus-visible,
+.textarea:focus-visible {
+  outline: 2px solid var(--signal-bright);
+  outline-offset: 2px;
+}
+
+.weight {
+  width: 80px;
+  font-family: var(--font-mono);
+}
+
+.textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  border: 1px solid var(--border-control);
+  color: var(--ink);
+  font: 400 13px/19px var(--font-mono);
+  resize: vertical;
+}
+
+.checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.checks input {
+  accent-color: var(--signal);
+}
+
+.linkButton {
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: 500 13px var(--font-sans);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.inline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tableWrap {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  min-width: 560px;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.table th {
+  padding: 8px 12px 8px 0;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  font-weight: 500;
+  color: var(--faint);
+}
+
+.table td {
+  padding: 10px 12px 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.mono {
+  font-family: var(--font-mono);
+}
+
+.buttonLink {
+  display: inline-flex;
+  align-items: center;
+  height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius-md);
+  color: var(--ink);
+  font: 500 14px var(--font-sans);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.buttonLink:hover {
+  background: var(--surface-raised);
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}

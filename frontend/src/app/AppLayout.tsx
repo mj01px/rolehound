@@ -52,6 +52,9 @@ export function AppLayout() {
               <NavLink to="/admin/qualidade" className={navClass}>
                 Qualidade
               </NavLink>
+              <NavLink to="/admin/modelos" className={navClass}>
+                Modelos
+              </NavLink>
             </div>
           )}
           <div className={styles.spacer} />

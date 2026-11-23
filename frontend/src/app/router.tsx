@@ -8,6 +8,7 @@ import { ForgotPasswordPage, ForgotPasswordSentPage, ResetPasswordPage } from '.
 import { TwoFactorPage } from '../features/auth/TwoFactorPage'
 import { AccuracyPage } from '../features/accuracy/AccuracyPage'
 import { AdminAccuracyPage } from '../features/admin/AdminAccuracyPage'
+import { AdminModelsPage } from '../features/admin/AdminModelsPage'
 import { AdminSourcesPage } from '../features/admin/AdminSourcesPage'
 import { ApplicationPage } from '../features/funnel/ApplicationPage'
 import { FunnelPage } from '../features/funnel/FunnelPage'
@@ -51,6 +52,7 @@ export const router = createBrowserRouter([
               { path: '/admin/usuarios', element: <AdminUsersPage /> },
               { path: '/admin/fontes', element: <AdminSourcesPage /> },
               { path: '/admin/qualidade', element: <AdminAccuracyPage /> },
+              { path: '/admin/modelos', element: <AdminModelsPage /> },
             ],
           },
         ],

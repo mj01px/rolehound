@@ -8,6 +8,7 @@ import { Button } from '../../ui/Button'
 import { Field } from '../../ui/Field'
 import { PASSWORD_HELP, usePasswordForm } from '../auth/passwordForm'
 import { meKey, type TwoFactorMethod } from '../auth/api'
+import { AiSection, DataSection, DossierSection, TelegramSection, UsageSection } from './SettingsSections'
 import { useSensitive } from './sensitive'
 import styles from './account.module.css'
 
@@ -43,6 +44,11 @@ export function SettingsPage() {
           Trocar e-mail, senha ou verificação pede sua senha de novo.
         </p>
       </section>
+      <AiSection />
+      <DossierSection />
+      <TelegramSection />
+      <UsageSection />
+      <DataSection />
     </div>
   )
 }
