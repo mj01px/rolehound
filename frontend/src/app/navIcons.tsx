@@ -61,6 +61,12 @@ export const icons = {
       <path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l-5-5 5-5M5 12h11" />
     </>,
   ),
+  bell: icon(
+    <>
+      <path d="M6 9a6 6 0 0 1 12 0c0 6 2.5 8 2.5 8h-17S6 15 6 9Z" />
+      <path d="M10.3 20a1.9 1.9 0 0 0 3.4 0" />
+    </>,
+  ),
   menu: icon(
     <>
       <path d="M4 6h16M4 12h16M4 18h16" />

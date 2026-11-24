@@ -265,6 +265,23 @@ internal static class JobEndpoints
         return counts is null ? new JobCounts(0, 0, 0, 0) : new JobCounts(counts.All, counts.Highlights, counts.Archived, counts.New);
     }
 
+    /// <summary>
+    /// Open highlights that arrived since the person's previous visit (BR-VIS-03), without
+    /// recording a visit: a visit not recorded yet counts from the end of the last one.
+    /// </summary>
+    internal static async Task<int> NewHighlightsAsync(RolehoundDbContext db, Guid userId, TimeProvider time, CancellationToken ct)
+    {
+        var user = await db.Users.AsNoTracking().SingleAsync(u => u.Id == userId, ct);
+        var since = user.LastActivityAt is null || time.GetUtcNow() - user.LastActivityAt > VisitGap ? user.LastActivityAt : user.PreviousVisitEndedAt;
+        if (since is null)
+        {
+            return 0;
+        }
+
+        return await Open(Listed(Visible(db, userId)))
+            .CountAsync(r => r.User.IsHighlight && (r.Job.OpenedAt > r.User.FirstScoredAt ? r.Job.OpenedAt : r.User.FirstScoredAt) > since, ct);
+    }
+
     /// <summary>Records activity and returns the end of the previous visit (BR-VIS-03).</summary>
     private static async Task<DateTimeOffset?> TouchVisitAsync(RolehoundDbContext db, Guid userId, TimeProvider time, CancellationToken ct)
     {

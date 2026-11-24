@@ -85,6 +85,18 @@ internal static class AccuracyEndpoints
             items.Select(ToResponse).ToList()));
     }
 
+    /// <summary>This month's pending items, drawing the sample first if needed, as the sample page does.</summary>
+    internal static async Task<(DateOnly Month, int Pending)> PendingAsync(RolehoundDbContext db, Guid userId, TimeProvider time, CancellationToken ct)
+    {
+        var month = MonthOf(time);
+        if (!await db.SampleItems.AnyAsync(s => s.UserId == userId && s.Month == month, ct))
+        {
+            await DrawAsync(db, userId, month, time, ct);
+        }
+
+        return (month, await db.SampleItems.CountAsync(s => s.UserId == userId && s.Month == month && s.Status == SampleItemStatus.Pending, ct));
+    }
+
     /// <summary>BR-ACU-01: highlights from the last 30 days, never labelled before, drawn at random.</summary>
     private static async Task DrawAsync(RolehoundDbContext db, Guid userId, DateOnly month, TimeProvider time, CancellationToken ct)
     {

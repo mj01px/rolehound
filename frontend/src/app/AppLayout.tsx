@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { Link, Outlet, useLocation, useNavigate } from 'react-router'
 import { ReauthProvider } from '../features/account/ReauthProvider'
 import { useMe } from '../features/auth/api'
+import { NotificationBell } from '../features/notifications/NotificationBell'
 import { api } from '../lib/api'
 import { Logo } from '../ui/Logo'
 import { icons } from './navIcons'
@@ -58,6 +59,7 @@ export function AppLayout() {
               </span>
             </div>
             <div className={styles.account}>
+              <NotificationBell />
               <Link
                 to="/configuracoes"
                 className={inSettings ? `${styles.iconButton} ${styles.current}` : styles.iconButton}
