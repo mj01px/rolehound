@@ -61,9 +61,8 @@ public sealed partial class InHireConnector(HttpClient http) : IJobConnector, IJ
             var title = record.String("displayName")?.Trim();
             if (!string.IsNullOrEmpty(id) && !string.IsNullOrEmpty(title))
             {
-                var link = record.String("link");
-                var url = Uri.TryCreate(link, UriKind.Absolute, out var parsed) && parsed.Scheme == Uri.UriSchemeHttps ? PublicUrl(parsed) : JobUrl(tenant, page, id, title);
-                listed[id] = (title, url);
+                // The API "link" points at tenant.inhire.com.br without a slug, and neither opens.
+                listed[id] = (title, JobUrl(tenant, page, id, title));
             }
         }
 
@@ -119,7 +118,8 @@ public sealed partial class InHireConnector(HttpClient http) : IJobConnector, IJ
             throw new ConnectorException("source_invalid", $"InHire {tenant}: vaga fora do formato esperado.");
         }
 
-        return ParseDetail(link.ExternalId, title, PublicUrl(new Uri(url.GetLeftPart(UriPartial.Path))), detail.RootElement.String("tenantName")?.Trim() is { Length: > 0 } name ? name : tenant, detail.RootElement);
+        var page = link.Target.Contains('/') ? link.Target.Split('/')[1] : DefaultPage;
+        return ParseDetail(link.ExternalId, title, JobUrl(tenant, page, link.ExternalId, title), detail.RootElement.String("tenantName")?.Trim() is { Length: > 0 } name ? name : tenant, detail.RootElement);
     }
 
     internal static CollectedJob ParseDetail(string id, string title, string url, string tenant, JsonElement detail)
@@ -169,23 +169,7 @@ public sealed partial class InHireConnector(HttpClient http) : IJobConnector, IJ
         return pages;
     }
 
-    /// <summary>
-    /// The API lists links on tenant.inhire.com.br, a domain that does not resolve;
-    /// the same path works on tenant.inhire.app.
-    /// </summary>
-    internal static string PublicUrl(Uri url)
-    {
-        var host = url.Host.ToLowerInvariant();
-        if (!host.EndsWith(".inhire.com.br", StringComparison.Ordinal))
-        {
-            return url.ToString();
-        }
-
-        var builder = new UriBuilder(url) { Host = host[..^".inhire.com.br".Length] + ".inhire.app", Port = -1 };
-        return builder.Uri.ToString();
-    }
-
-    /// <summary>The public job page: tenant.inhire.app[/page]/vagas/{id}/{slug}.</summary>
+    /// <summary>The public job page: tenant.inhire.app[/page]/vagas/{id}/{slug}. Any slug opens the page, but one is required.</summary>
     internal static string JobUrl(string tenant, string page, string id, string title)
     {
         var prefix = page == DefaultPage ? string.Empty : $"/{page}";
