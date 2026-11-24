@@ -134,6 +134,10 @@
   background: var(--signal-bright);
 }
 
+.company {
+  background: var(--status-screening);
+}
+
 .text {
   display: flex;
   flex-direction: column;

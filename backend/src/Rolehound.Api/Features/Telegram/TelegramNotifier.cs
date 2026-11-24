@@ -61,6 +61,53 @@ public sealed class TelegramNotifier(RolehoundDbContext db, TelegramClient teleg
         }
     }
 
+    /// <summary>After a run, one message per person listing the followed companies with new jobs that match them.</summary>
+    public async Task NotifyCompaniesAsync(IReadOnlyCollection<Guid> jobIds, CancellationToken ct)
+    {
+        if (!options.Value.Enabled || jobIds.Count == 0)
+        {
+            return;
+        }
+
+        var links = await db.TelegramLinks.AsNoTracking().ToListAsync(ct);
+        foreach (var link in links)
+        {
+            var followed = db.CompanyAlerts.Where(a => a.UserId == link.UserId).Select(a => a.TargetId);
+            var rows = await db.UserJobs.AsNoTracking()
+                .Where(u => u.UserId == link.UserId && jobIds.Contains(u.JobId) && u.IsRelevant && u.Score > 0 && u.ArchivedAt == null)
+                .Where(u => !db.Applications.Any(a => a.UserId == link.UserId && a.JobId == u.JobId))
+                .Join(db.Jobs.AsNoTracking(), u => u.JobId, j => j.Id, (u, j) => j)
+                .Where(j => j.TargetId != null && followed.Contains(j.TargetId.Value))
+                .Select(j => new { TargetId = j.TargetId!.Value, j.Company })
+                .ToListAsync(ct);
+            if (rows.Count == 0)
+            {
+                continue;
+            }
+
+            var ids = rows.Select(r => r.TargetId).Distinct().ToList();
+            var labels = await db.SourceTargets.AsNoTracking().Where(t => ids.Contains(t.Id)).ToDictionaryAsync(t => t.Id, t => t.Label, ct);
+            var companies = rows.GroupBy(r => r.TargetId)
+                .Select(g =>
+                {
+                    var search = g.GroupBy(r => r.Company).OrderByDescending(c => c.Count()).First().Key;
+                    return (Name: labels.GetValueOrDefault(g.Key) ?? search, Search: search, Count: g.Count());
+                })
+                .OrderByDescending(c => c.Count)
+                .ToList();
+
+            var text = new StringBuilder("<b>Empresas que você segue</b>\n");
+            var buttons = new List<IReadOnlyList<TelegramButton>>();
+            foreach (var company in companies.Take(MaxJobsPerMessage))
+            {
+                text.Append(Br, $"\n<b>{TelegramEndpoints.Html(company.Name)}</b>: {(company.Count == 1 ? "1 vaga nova" : $"{company.Count} vagas novas")} para você");
+                buttons.Add([new TelegramButton($"Ver {Short(company.Name)}", Url: $"{BaseUrl}/?busca={Uri.EscapeDataString(company.Search)}")]);
+            }
+
+            await telegram.SendAsync(link.ChatId, text.ToString(), buttons, ct);
+        }
+    }
+
     /// <summary>FR-NOT-03: once a day, the person's overdue applications. Safe to call more than once a day.</summary>
     public async Task<int> NotifyOverdueAsync(CancellationToken ct)
     {

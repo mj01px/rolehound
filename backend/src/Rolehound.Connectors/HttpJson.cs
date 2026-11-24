@@ -57,6 +57,11 @@ internal static class HttpJson
                     throw new ConnectorException("target_not_found", $"{subject}: não encontrado na fonte.");
                 }
 
+                if (response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
+                {
+                    throw new ConnectorException("target_closed", $"{subject}: a fonte pede login para mostrar as vagas.");
+                }
+
                 var transient = response.StatusCode == HttpStatusCode.TooManyRequests || (int)response.StatusCode >= 500;
                 if (transient && attempt < Attempts)
                 {

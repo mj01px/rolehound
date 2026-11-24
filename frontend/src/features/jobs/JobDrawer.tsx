@@ -3,6 +3,8 @@ import { Link, useLocation, useNavigate, useParams } from 'react-router'
 import { errorMessage } from '../../lib/api'
 import { Alert } from '../../ui/Alert'
 import { Button } from '../../ui/Button'
+import { MoreMenu } from '../../ui/MoreMenu'
+import { useFollow } from '../companies/api'
 import { useEnterFunnel } from '../funnel/api'
 import { AtsPanel } from '../ats/AtsPanel'
 import { PitchPanel } from '../pitch/PitchPanel'
@@ -109,7 +111,7 @@ function JobDetail({ id }: { id: string }) {
     return <p className={styles.muted}>Carregando…</p>
   }
 
-  const { job, description, url, matchedGroups, archivedAt, archiveNote, addedByUser, applicationId } = detail.data
+  const { job, description, url, matchedGroups, archivedAt, archiveNote, addedByUser, applicationId, company } = detail.data
   const meta = [
     job.company,
     job.location,
@@ -167,6 +169,7 @@ function JobDetail({ id }: { id: string }) {
               Arquivar
             </Button>
           ))}
+        {company && <FollowCompanyMenu company={company} />}
       </div>
       {restore.isError && <Alert>{errorMessage(restore.error)}</Alert>}
       {enter.isError && <Alert>{errorMessage(enter.error)}</Alert>}
@@ -307,5 +310,23 @@ function ArchiveDialog({ id, onClose }: { id: string; onClose: () => void }) {
         </div>
       </form>
     </dialog>
+  )
+}
+
+/** The ⋯ next to the job actions: follow (or stop following) the company behind it. */
+function FollowCompanyMenu({ company }: { company: { targetId: string; name: string; following: boolean } }) {
+  const follow = useFollow(company.targetId)
+  return (
+    <MoreMenu
+      label="Mais ações"
+      disabled={follow.isPending}
+      items={[
+        {
+          key: 'follow',
+          label: company.following ? `Parar de avisar vagas da ${company.name}` : `Avisar vagas novas da ${company.name}`,
+          run: () => follow.mutate(!company.following),
+        },
+      ]}
+    />
   )
 }

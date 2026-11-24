@@ -80,6 +80,7 @@ public sealed partial class CollectionRunner(
 
         closed += await CloseAgedAsync(ct);
         await notifier.NotifyHighlightsAsync(_opened, ct);
+        await notifier.NotifyCompaniesAsync(_opened, ct);
         return new CollectionSummary(targets.Count, failed, added, reopened, closed);
     }
 

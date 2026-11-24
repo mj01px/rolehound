@@ -11,6 +11,7 @@ import { AccuracyPage } from '../features/accuracy/AccuracyPage'
 import { AdminAccuracyPage } from '../features/admin/AdminAccuracyPage'
 import { AdminModelsPage } from '../features/admin/AdminModelsPage'
 import { CollectionsPage } from '../features/admin/sources/CollectionsPage'
+import { CompaniesPage } from '../features/companies/CompaniesPage'
 import { SourcesPage } from '../features/admin/sources/SourcesPage'
 import { ApplicationPage } from '../features/funnel/ApplicationPage'
 import { FunnelPage } from '../features/funnel/FunnelPage'
@@ -46,6 +47,7 @@ export const router = createBrowserRouter([
           { path: '/', element: <JobsPage />, children: [{ path: 'vagas/:id', element: <JobDrawer /> }] },
           { path: '/funil', element: <FunnelPage /> },
           { path: '/funil/:id', element: <ApplicationPage /> },
+          { path: '/empresas', element: <CompaniesPage /> },
           { path: '/qualidade', element: <AccuracyPage /> },
           { path: '/configuracoes', element: <SettingsPage /> },
           {

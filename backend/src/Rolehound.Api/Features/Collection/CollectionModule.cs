@@ -50,6 +50,11 @@ public static class CollectionModule
         services.AddTransient<IJobLinkReader>(sp => sp.GetRequiredService<GitHubConnector>());
         services.AddTransient<IJobLinkReader>(sp => sp.GetRequiredService<InHireConnector>());
 
+        services.AddTransient<ICompanyLinkReader>(sp => sp.GetRequiredService<InHireConnector>());
+        services.AddTransient<ICompanyLinkReader>(sp => sp.GetRequiredService<GreenhouseConnector>());
+        services.AddTransient<ICompanyLinkReader>(sp => sp.GetRequiredService<LeverConnector>());
+        services.AddSingleton<Companies.CompanyLinkLimiter>();
+
         services.AddScoped<JobScoring>();
         services.AddScoped<CollectionRunner>();
         return services;

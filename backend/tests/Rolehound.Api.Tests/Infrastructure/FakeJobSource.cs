@@ -4,7 +4,7 @@ using Rolehound.Connectors;
 namespace Rolehound.Api.Tests.Infrastructure;
 
 /// <summary>A source stand-in: each target answers what the test set, or fails.</summary>
-public sealed class FakeJobSource(JobSource source, bool authoritative = true) : IJobConnector, IJobLinkReader
+public sealed class FakeJobSource(JobSource source, bool authoritative = true) : IJobConnector, IJobLinkReader, ICompanyLinkReader
 {
     private readonly ConcurrentDictionary<string, Func<Snapshot>> _answers = new(StringComparer.Ordinal);
 
@@ -15,6 +15,9 @@ public sealed class FakeJobSource(JobSource source, bool authoritative = true) :
     public void Lists(string target, params CollectedJob[] jobs) => _answers[target] = () => new Snapshot(jobs, authoritative);
 
     public void Fails(string target) => _answers[target] = () => throw new ConnectorException("source_unreachable", $"{source} {target}: sem resposta da fonte.");
+
+    /// <summary>The source answers with an error of the given code, such as target_not_found or target_closed.</summary>
+    public void Rejects(string target, string code) => _answers[target] = () => throw new ConnectorException(code, $"{source} {target}: {code}.");
 
     public void Clear()
     {
@@ -40,6 +43,23 @@ public sealed class FakeJobSource(JobSource source, bool authoritative = true) :
     {
         var parts = url.AbsolutePath.Trim('/').Split('/');
         return url.Host == "example.test" && parts is [var target, "jobs", var id] ? new JobLink(target, id) : null;
+    }
+
+    /// <summary>Company pages look like https://example.test/{target}, job links like https://example.test/{target}/jobs/{id}.</summary>
+    public string? CompanyOf(Uri url)
+    {
+        var parts = url.AbsolutePath.Trim('/').Split('/', StringSplitOptions.RemoveEmptyEntries);
+        if (url.Host != "example.test")
+        {
+            return null;
+        }
+
+        return parts switch
+        {
+            [var target] => target,
+            [var target, "jobs", _] => target,
+            _ => null,
+        };
     }
 
     public async Task<CollectedJob> FetchOneAsync(JobLink link, Uri url, CancellationToken ct)

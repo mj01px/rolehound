@@ -47,6 +47,8 @@ export interface JobDetail {
   closedAt: string | null
   archivedAt: string | null
   archiveNote: string | null
+  /** The company behind the job, when people can follow it. */
+  company: { targetId: string; name: string; following: boolean } | null
 }
 
 export interface JobFilters {

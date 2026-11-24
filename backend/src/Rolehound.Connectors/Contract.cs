@@ -62,6 +62,18 @@ public interface IJobLinkReader
 }
 
 /// <summary>
+/// Sources whose targets are companies (a board, a site, a careers page): reads
+/// which company a careers page or job link belongs to, without fetching it.
+/// </summary>
+public interface ICompanyLinkReader
+{
+    JobSource Source { get; }
+
+    /// <summary>The target (company) the link belongs to, or null when it is not one of this source's pages.</summary>
+    string? CompanyOf(Uri url);
+}
+
+/// <summary>
 /// The common contract. A target is what the source is asked for: a
 /// Greenhouse board token, a Lever site name, a GitHub repository, an InHire
 /// company or a Gupy search term. <c>detailed</c> holds the external ids

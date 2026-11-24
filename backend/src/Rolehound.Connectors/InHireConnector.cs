@@ -17,7 +17,7 @@ namespace Rolehound.Connectors;
 /// Details are fetched only for jobs not stored with details yet. The job link
 /// is the one the listing gives; it is built from the title only when missing.
 /// </summary>
-public sealed partial class InHireConnector(HttpClient http) : IJobConnector, IJobLinkReader
+public sealed partial class InHireConnector(HttpClient http) : IJobConnector, IJobLinkReader, ICompanyLinkReader
 {
     public const string ListUrl = "https://api.inhire.app/job-posts/public/pages/lean";
     public const string DetailUrl = "https://api.inhire.app/job-posts/public/pages/";
@@ -88,6 +88,37 @@ public sealed partial class InHireConnector(HttpClient http) : IJobConnector, IJ
 
         var warning = failures > 0 ? $"InHire {target}: {failures} vaga(s) sem detalhes; tenta de novo na próxima coleta." : null;
         return new Snapshot(jobs, Authoritative: true, warning);
+    }
+
+    /// <summary>
+    /// The company behind a careers page (tenant.inhire.app, tenant.inhire.app/vagas,
+    /// tenant.inhire.app/page/vagas) or a job link: "tenant" or "tenant/page".
+    /// </summary>
+    public string? CompanyOf(Uri url)
+    {
+        if (Parse(url) is { } job)
+        {
+            return job.Target;
+        }
+
+        var host = url.Host.ToLowerInvariant();
+        var tenant = host.EndsWith(".inhire.app", StringComparison.Ordinal) ? host[..^".inhire.app".Length]
+            : host.EndsWith(".inhire.com.br", StringComparison.Ordinal) ? host[..^".inhire.com.br".Length]
+            : null;
+        if (tenant is null || !TargetPattern().IsMatch(tenant) || tenant is "www" or "api")
+        {
+            return null;
+        }
+
+        var segments = url.AbsolutePath.ToLowerInvariant().Trim('/').Split('/', StringSplitOptions.RemoveEmptyEntries);
+        var target = segments switch
+        {
+            [] or ["vagas"] => tenant,
+            [var page] => $"{tenant}/{page}",
+            [var page, "vagas"] => $"{tenant}/{page}",
+            _ => null,
+        };
+        return target is not null && TargetPattern().IsMatch(target) ? target : null;
     }
 
     /// <summary>tenant.inhire.app[/page]/vagas/{id}[/slug]; the API links use inhire.com.br.</summary>

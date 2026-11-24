@@ -24,6 +24,7 @@ const searchGroup: Group = {
   items: [
     { to: '/', label: 'Vagas', icon: icons.jobs, also: '/vagas/' },
     { to: '/funil', label: 'Funil', icon: icons.funnel },
+    { to: '/empresas', label: 'Empresas', icon: icons.companies },
     { to: '/qualidade', label: 'Qualidade', icon: icons.quality },
   ],
 }

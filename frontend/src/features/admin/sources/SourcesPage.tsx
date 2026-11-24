@@ -5,7 +5,7 @@ import { Alert, Notice } from '../../../ui/Alert'
 import { Button } from '../../../ui/Button'
 import { Modal, ModalHead } from '../../../ui/Modal'
 import { MoreMenu } from '../../../ui/MoreMenu'
-import { kindLabels, kinds, plural, useCollections, useRemoveSource, useRunNow, useSourcesStatus, useTargets, useToggleSource, when, type SourceKind, type SourceTarget } from './api'
+import { kindLabels, kinds, plural, useCollections, useConnectorRequests, useRemoveSource, useRunNow, useSourcesStatus, useTargets, useToggleSource, when, type SourceKind, type SourceTarget } from './api'
 import { AddSourceDialog } from './AddSourceDialog'
 import styles from './sources.module.css'
 
@@ -179,6 +179,8 @@ export function SourcesPage() {
         )}
       </div>
 
+      <ConnectorRequests />
+
       {adding && (
         <AddSourceDialog
           initial={kind}
@@ -209,9 +211,9 @@ function Row({ target }: { target: SourceTarget }) {
         <span className={styles.name}>
           <span className={styles.nameMain}>{name}</span>
           <span className={styles.nameKey}>
-            {target.label ? target.key : null}
-            {target.label && !target.enabled ? ' · ' : null}
-            {!target.enabled ? (managed ? 'ninguém usa agora' : 'pausada') : null}
+            {[target.label ? target.key : null, !target.enabled ? (managed ? 'ninguém usa agora' : 'pausada') : null, target.addedBy ? `adicionada por ${target.addedBy}` : null]
+              .filter(Boolean)
+              .join(' · ')}
           </span>
           {target.lastError && (
             <span className={styles.rowWarn}>
@@ -267,5 +269,29 @@ function Row({ target }: { target: SourceTarget }) {
         )}
       </td>
     </tr>
+  )
+}
+
+/** Platforms people asked for when following companies Rolehound cannot read yet. */
+function ConnectorRequests() {
+  const requests = useConnectorRequests()
+  if (!requests.data || requests.data.length === 0) return null
+  return (
+    <section aria-labelledby="requests-title" className={styles.panel}>
+      <h2 id="requests-title" className={styles.requestsTitle}>
+        Pedidos de conector
+      </h2>
+      <p className={styles.panelNote}>Quando alguém tenta seguir uma empresa num site que o Rolehound ainda não lê, o pedido fica aqui. Ajuda a decidir o próximo conector.</p>
+      <ul className={styles.requests}>
+        {requests.data.map((item) => (
+          <li key={item.platform} className={styles.request}>
+            <span className={styles.nameMain}>{item.platform}</span>
+            <span className={styles.muted}>
+              {plural(item.requests, 'pedido', 'pedidos')} de {plural(item.people, 'pessoa', 'pessoas')} · último {when(item.lastAt)}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </section>
   )
 }

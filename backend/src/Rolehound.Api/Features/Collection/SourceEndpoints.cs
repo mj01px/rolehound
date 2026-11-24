@@ -9,8 +9,9 @@ using Rolehound.Connectors;
 
 namespace Rolehound.Api.Features.Collection;
 
+/// <summary><see cref="AddedBy"/>: who added it by following a company link; null when the admin added it.</summary>
 public sealed record SourceTargetResponse(
-    Guid Id, string Source, string Key, string? Label, bool Enabled, DateTimeOffset? LastRunAt, int? LastJobCount, string? LastError, int ActiveJobs);
+    Guid Id, string Source, string Key, string? Label, bool Enabled, DateTimeOffset? LastRunAt, int? LastJobCount, string? LastError, int ActiveJobs, string? AddedBy);
 
 public sealed record CollectionRunResponse(
     Guid Id, string Source, string Key, DateTimeOffset StartedAt, DateTimeOffset FinishedAt, int Listed, int Added, int Reopened, int Closed, string? Error);
@@ -139,7 +140,10 @@ internal static partial class SourceEndpoints
             .ToDictionaryAsync(x => x.Key, x => x.Count, ct);
 
         var targets = await db.SourceTargets.AsNoTracking().OrderBy(t => t.Source).ThenBy(t => t.Key).ToListAsync(ct);
-        return TypedResults.Ok(targets.Select(t => ToResponse(t, counts.GetValueOrDefault(t.Id))).ToList());
+        var adders = targets.Where(t => t.AddedByUserId != null).Select(t => t.AddedByUserId!.Value).Distinct().ToList();
+        var names = await db.Users.AsNoTracking().Where(u => adders.Contains(u.Id))
+            .ToDictionaryAsync(u => u.Id, u => u.Name.Length > 0 ? u.Name : u.UserName!, ct);
+        return TypedResults.Ok(targets.Select(t => ToResponse(t, counts.GetValueOrDefault(t.Id), t.AddedByUserId is { } by ? names.GetValueOrDefault(by) : null)).ToList());
     }
 
     private static async Task<Results<Created<SourceTargetResponse>, ValidationProblem, ProblemHttpResult>> Add(
@@ -227,8 +231,8 @@ internal static partial class SourceEndpoints
         return string.IsNullOrEmpty(value) ? null : value.Length > 120 ? value[..120] : value;
     }
 
-    private static SourceTargetResponse ToResponse(SourceTarget t, int activeJobs) =>
-        new(t.Id, t.Source.ToString().ToLowerInvariant(), t.Key, t.Label, t.Enabled, t.LastRunAt, t.LastJobCount, t.LastError, activeJobs);
+    private static SourceTargetResponse ToResponse(SourceTarget t, int activeJobs, string? addedBy = null) =>
+        new(t.Id, t.Source.ToString().ToLowerInvariant(), t.Key, t.Label, t.Enabled, t.LastRunAt, t.LastJobCount, t.LastError, activeJobs, addedBy);
 
     [GeneratedRegex("^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")]
     private static partial Regex RepoPattern();

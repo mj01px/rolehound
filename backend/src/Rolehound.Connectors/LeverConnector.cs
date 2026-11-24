@@ -10,7 +10,7 @@ namespace Rolehound.Connectors;
 /// The target is the site name (the name in jobs.lever.co/{site}).
 /// Lever states the work mode, which wins over the text (BR-SCO work mode rules).
 /// </summary>
-public sealed partial class LeverConnector(HttpClient http) : IJobConnector, IJobLinkReader
+public sealed partial class LeverConnector(HttpClient http) : IJobConnector, IJobLinkReader, ICompanyLinkReader
 {
     public const string BaseUrl = "https://api.lever.co/v0/postings/";
 
@@ -36,6 +36,13 @@ public sealed partial class LeverConnector(HttpClient http) : IJobConnector, IJo
         }
 
         return new Snapshot(result);
+    }
+
+    /// <summary>jobs.lever.co/{site}[/{id}].</summary>
+    public string? CompanyOf(Uri url)
+    {
+        var site = url.Host == "jobs.lever.co" ? url.AbsolutePath.Trim('/').Split('/').FirstOrDefault() : null;
+        return site is not null && SitePattern().IsMatch(site) ? site : null;
     }
 
     public JobLink? Parse(Uri url)
@@ -76,6 +83,9 @@ public sealed partial class LeverConnector(HttpClient http) : IJobConnector, IJo
 
     [GeneratedRegex("^/([A-Za-z0-9_.-]+)/([0-9a-fA-F-]{36})(/apply)?/?$")]
     private static partial Regex LinkPath();
+
+    [GeneratedRegex("^[A-Za-z0-9_.-]{1,100}$")]
+    private static partial Regex SitePattern();
 
     private static string Description(JsonElement posting)
     {

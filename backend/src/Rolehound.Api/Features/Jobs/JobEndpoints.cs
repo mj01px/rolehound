@@ -39,7 +39,14 @@ public sealed record JobDetailResponse(
     Guid? ApplicationId,
     DateTimeOffset? ClosedAt,
     DateTimeOffset? ArchivedAt,
-    string? ArchiveNote);
+    string? ArchiveNote,
+    JobCompany? Company);
+
+/// <summary>The company behind a job, when it is one people can follow (InHire, Greenhouse, Lever).</summary>
+public sealed record JobCompany(Guid TargetId, string Name, bool Following);
+
+/// <summary>New jobs from one followed company that match the person's profile.</summary>
+public sealed record FollowedCompanyNews(string Name, string Search, int Count);
 
 public sealed record ArchiveJobRequest(string? Reason, string? Note);
 
@@ -159,6 +166,20 @@ internal static class JobEndpoints
         var (job, user) = (row.Job, row.User);
         var arrived = job.OpenedAt > user.FirstScoredAt ? job.OpenedAt : user.FirstScoredAt;
         var applicationId = await db.Applications.Where(a => a.UserId == userId && a.JobId == id).Select(a => (Guid?)a.Id).SingleOrDefaultAsync(ct);
+        JobCompany? company = null;
+        if (job.TargetId is { } targetId)
+        {
+            var target = await db.SourceTargets.AsNoTracking()
+                .Where(t => t.Id == targetId && Companies.CompanyEndpoints.Kinds.Contains(t.Source))
+                .Select(t => new { t.Label, t.Key })
+                .SingleOrDefaultAsync(ct);
+            if (target is not null)
+            {
+                var following = await db.CompanyAlerts.AnyAsync(a => a.UserId == userId && a.TargetId == targetId, ct);
+                company = new JobCompany(targetId, target.Label ?? (string.IsNullOrWhiteSpace(job.Company) ? target.Key : job.Company), following);
+            }
+        }
+
         return TypedResults.Ok(new JobDetailResponse(
             ToItem(job, user, applicationId is null && since != null && arrived > since),
             job.Description,
@@ -168,7 +189,8 @@ internal static class JobEndpoints
             applicationId,
             job.ClosedAt,
             user.ArchivedAt,
-            user.ArchiveNote));
+            user.ArchiveNote,
+            company));
     }
 
     private static async Task<Results<NoContent, ValidationProblem, ProblemHttpResult>> Archive(
@@ -280,6 +302,39 @@ internal static class JobEndpoints
 
         return await Open(Listed(Visible(db, userId)))
             .CountAsync(r => r.User.IsHighlight && (r.Job.OpenedAt > r.User.FirstScoredAt ? r.Job.OpenedAt : r.User.FirstScoredAt) > since, ct);
+    }
+
+    /// <summary>
+    /// New jobs since the last visit, per followed company, that matched the
+    /// person's profile (score above zero), open and not archived or in the funnel.
+    /// </summary>
+    internal static async Task<List<FollowedCompanyNews>> NewFromFollowedAsync(RolehoundDbContext db, Guid userId, TimeProvider time, CancellationToken ct)
+    {
+        var user = await db.Users.AsNoTracking().SingleAsync(u => u.Id == userId, ct);
+        var since = user.LastActivityAt is null || time.GetUtcNow() - user.LastActivityAt > VisitGap ? user.LastActivityAt : user.PreviousVisitEndedAt;
+        if (since is null)
+        {
+            return [];
+        }
+
+        var followed = db.CompanyAlerts.Where(a => a.UserId == userId).Select(a => a.TargetId);
+        var rows = await Open(Listed(Visible(db, userId)))
+            .Where(r => r.User.Score > 0 && r.Job.TargetId != null && followed.Contains(r.Job.TargetId.Value))
+            .Where(r => (r.Job.OpenedAt > r.User.FirstScoredAt ? r.Job.OpenedAt : r.User.FirstScoredAt) > since)
+            .Select(r => new { TargetId = r.Job.TargetId!.Value, r.Job.Company })
+            .ToListAsync(ct);
+        if (rows.Count == 0)
+        {
+            return [];
+        }
+
+        var ids = rows.Select(r => r.TargetId).Distinct().ToList();
+        var labels = await db.SourceTargets.AsNoTracking().Where(t => ids.Contains(t.Id)).ToDictionaryAsync(t => t.Id, t => t.Label, ct);
+        return rows.GroupBy(r => r.TargetId).Select(g =>
+        {
+            var search = g.GroupBy(r => r.Company).OrderByDescending(c => c.Count()).First().Key;
+            return new FollowedCompanyNews(labels.GetValueOrDefault(g.Key) ?? search, search, g.Count());
+        }).OrderByDescending(n => n.Count).ToList();
     }
 
     /// <summary>Records activity and returns the end of the previous visit (BR-VIS-03).</summary>

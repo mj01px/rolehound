@@ -751,6 +751,10 @@ namespace Rolehound.Api.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<Guid?>("AddedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("added_by_user_id");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
@@ -792,11 +796,76 @@ namespace Rolehound.Api.Infrastructure.Persistence.Migrations
                     b.HasKey("Id")
                         .HasName("pk_source_targets");
 
+                    b.HasIndex("AddedByUserId")
+                        .HasDatabaseName("ix_source_targets_added_by_user_id");
+
                     b.HasIndex("Source", "Key")
                         .IsUnique()
                         .HasDatabaseName("ix_source_targets_source_key");
 
                     b.ToTable("source_targets", (string)null);
+                });
+
+            modelBuilder.Entity("Rolehound.Api.Features.Companies.CompanyAlert", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.Property<Guid>("TargetId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("target_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.HasKey("UserId", "TargetId")
+                        .HasName("pk_company_alerts");
+
+                    b.HasIndex("TargetId")
+                        .HasDatabaseName("ix_company_alerts_target_id");
+
+                    b.ToTable("company_alerts", (string)null);
+                });
+
+            modelBuilder.Entity("Rolehound.Api.Features.Companies.ConnectorRequest", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Host")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("host");
+
+                    b.Property<string>("Platform")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("platform");
+
+                    b.Property<DateTimeOffset>("RequestedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("requested_at");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_connector_requests");
+
+                    b.HasIndex("Platform")
+                        .HasDatabaseName("ix_connector_requests_platform");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_connector_requests_user_id");
+
+                    b.ToTable("connector_requests", (string)null);
                 });
 
             modelBuilder.Entity("Rolehound.Api.Features.Dossier.DossierVersion", b =>
@@ -1529,6 +1598,42 @@ namespace Rolehound.Api.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_collection_runs_source_targets_target_id");
+                });
+
+            modelBuilder.Entity("Rolehound.Api.Features.Collection.SourceTarget", b =>
+                {
+                    b.HasOne("Rolehound.Api.Features.Accounts.User", null)
+                        .WithMany()
+                        .HasForeignKey("AddedByUserId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_source_targets_users_added_by_user_id");
+                });
+
+            modelBuilder.Entity("Rolehound.Api.Features.Companies.CompanyAlert", b =>
+                {
+                    b.HasOne("Rolehound.Api.Features.Collection.SourceTarget", null)
+                        .WithMany()
+                        .HasForeignKey("TargetId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_company_alerts_source_targets_target_id");
+
+                    b.HasOne("Rolehound.Api.Features.Accounts.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_company_alerts_users_user_id");
+                });
+
+            modelBuilder.Entity("Rolehound.Api.Features.Companies.ConnectorRequest", b =>
+                {
+                    b.HasOne("Rolehound.Api.Features.Accounts.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_connector_requests_users_user_id");
                 });
 
             modelBuilder.Entity("Rolehound.Api.Features.Dossier.DossierVersion", b =>

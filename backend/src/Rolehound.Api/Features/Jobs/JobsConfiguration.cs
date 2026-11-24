@@ -66,6 +66,7 @@ internal sealed class SourceTargetConfiguration : IEntityTypeConfiguration<Sourc
         builder.Property(t => t.Label).HasMaxLength(120);
         builder.Property(t => t.LastError).HasMaxLength(500);
         builder.HasIndex(t => new { t.Source, t.Key }).IsUnique();
+        builder.HasOne<User>().WithMany().HasForeignKey(t => t.AddedByUserId).OnDelete(DeleteBehavior.SetNull);
     }
 }
 

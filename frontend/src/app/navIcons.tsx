@@ -26,6 +26,12 @@ export const icons = {
       <circle cx="12" cy="12" r="1" />
     </>,
   ),
+  companies: icon(
+    <>
+      <path d="M4 21V5a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v16M15 9h4a1 1 0 0 1 1 1v11M3 21h18" />
+      <path d="M8 8h3M8 12h3M8 16h3" />
+    </>,
+  ),
   users: icon(
     <>
       <circle cx="9" cy="8" r="3.5" />

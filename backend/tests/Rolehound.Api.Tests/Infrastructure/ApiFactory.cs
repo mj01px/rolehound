@@ -65,6 +65,8 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
             services.AddSingleton<Rolehound.Api.Features.Telegram.TelegramClient>(Telegram);
             services.RemoveAll<Rolehound.Connectors.IJobLinkReader>();
             services.AddSingleton<Rolehound.Connectors.IJobLinkReader>(JobSource);
+            services.RemoveAll<Rolehound.Connectors.ICompanyLinkReader>();
+            services.AddSingleton<Rolehound.Connectors.ICompanyLinkReader>(JobSource);
             services.AddHttpClient(Rolehound.Api.Features.Ai.OpenRouterClient.HttpClientName)
                 .ConfigurePrimaryHttpMessageHandler(() => OpenRouter);
         });

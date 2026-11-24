@@ -12,7 +12,7 @@ namespace Rolehound.Api.Features.Notifications;
 
 /// <summary>
 /// Something that needs the person, and where it gets done. <see cref="Kind"/> is one
-/// of model, overdue, sample and highlights; <see cref="Link"/> is a path in the app.
+/// of model, overdue, sample, highlights and company; <see cref="Link"/> is a path in the app.
 /// </summary>
 public sealed record Notification(string Kind, string Title, string Detail, string Link);
 
@@ -71,6 +71,15 @@ internal static class NotificationEndpoints
                 highlights == 1 ? "1 destaque novo desde a sua última visita" : $"{highlights} destaques novos desde a sua última visita",
                 "Vagas que o seu perfil marcou como destaque.",
                 "/?aba=highlights"));
+        }
+
+        foreach (var news in await JobEndpoints.NewFromFollowedAsync(db, userId, time, ct))
+        {
+            result.Add(new Notification(
+                "company",
+                $"{news.Name}: {(news.Count == 1 ? "1 vaga nova" : $"{news.Count} vagas novas")} para você",
+                "Da empresa que você segue, combinando com o seu perfil, desde a sua última visita.",
+                $"/?busca={Uri.EscapeDataString(news.Search)}"));
         }
 
         return TypedResults.Ok<IReadOnlyList<Notification>>(result);

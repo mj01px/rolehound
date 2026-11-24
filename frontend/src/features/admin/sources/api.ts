@@ -13,6 +13,16 @@ export interface SourceTarget {
   lastJobCount: number | null
   lastError: string | null
   activeJobs: number
+  /** Who added it by following a company link; null when the admin added it. */
+  addedBy: string | null
+}
+
+/** People tried to follow companies on a platform Rolehound does not read yet. */
+export interface ConnectorRequestSummary {
+  platform: string
+  requests: number
+  people: number
+  lastAt: string
 }
 
 export interface CollectionRun {
@@ -68,6 +78,13 @@ export function useCollections(limit = 10) {
   return useQuery({
     queryKey: [...sourcesKey, 'collections', limit],
     queryFn: ({ signal }) => api.get<CollectionBatch[]>(`/admin/sources/collections?limit=${limit}`, signal),
+  })
+}
+
+export function useConnectorRequests() {
+  return useQuery({
+    queryKey: [...sourcesKey, 'requests'],
+    queryFn: ({ signal }) => api.get<ConnectorRequestSummary[]>('/admin/sources/requests', signal),
   })
 }
 

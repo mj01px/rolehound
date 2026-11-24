@@ -9,7 +9,7 @@ namespace Rolehound.Connectors;
 /// GET https://boards-api.greenhouse.io/v1/boards/{board}/jobs?content=true.
 /// The target is the board token (the name in job-boards.greenhouse.io/{board}).
 /// </summary>
-public sealed partial class GreenhouseConnector(HttpClient http) : IJobConnector, IJobLinkReader
+public sealed partial class GreenhouseConnector(HttpClient http) : IJobConnector, IJobLinkReader, ICompanyLinkReader
 {
     public const string BaseUrl = "https://boards-api.greenhouse.io/v1/boards/";
 
@@ -35,6 +35,21 @@ public sealed partial class GreenhouseConnector(HttpClient http) : IJobConnector
         }
 
         return new Snapshot(result);
+    }
+
+    /// <summary>job-boards.greenhouse.io/{board}[/jobs/{id}], or the embed form ?for={board}.</summary>
+    public string? CompanyOf(Uri url)
+    {
+        if (url.Host is not ("job-boards.greenhouse.io" or "boards.greenhouse.io"))
+        {
+            return null;
+        }
+
+        var segments = url.AbsolutePath.Trim('/').Split('/', StringSplitOptions.RemoveEmptyEntries);
+        var board = segments is ["embed", ..]
+            ? System.Web.HttpUtility.ParseQueryString(url.Query)["for"]
+            : segments.FirstOrDefault();
+        return board is not null && BoardPattern().IsMatch(board) ? board : null;
     }
 
     public JobLink? Parse(Uri url)
@@ -78,6 +93,9 @@ public sealed partial class GreenhouseConnector(HttpClient http) : IJobConnector
 
     [GeneratedRegex("^/([A-Za-z0-9_.-]+)/jobs/([0-9]+)/?$")]
     private static partial Regex LinkPath();
+
+    [GeneratedRegex("^[A-Za-z0-9_.-]{1,100}$")]
+    private static partial Regex BoardPattern();
 
     private static DateTimeOffset? ParseDate(string? value) =>
         DateTimeOffset.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var date) ? date.ToUniversalTime() : null;

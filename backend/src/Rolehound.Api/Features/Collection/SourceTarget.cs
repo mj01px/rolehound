@@ -20,6 +20,9 @@ public sealed class SourceTarget
 
     public bool Enabled { get; set; } = true;
 
+    /// <summary>The person who added it by following a company link; null when the admin added it.</summary>
+    public Guid? AddedByUserId { get; init; }
+
     public DateTimeOffset CreatedAt { get; init; }
 
     public DateTimeOffset? LastRunAt { get; set; }
