@@ -27,7 +27,7 @@ public sealed class ScrapedSourceTests
         Assert.Equal(WorkMode.Hybrid, detailed.WorkMode);
         Assert.True(detailed.HasDetails);
         Assert.False(snapshot.Jobs[1].HasDetails);
-        Assert.Equal("https://exemplo.inhire.com.br/vagas/bbb-222", snapshot.Jobs[1].Url);
+        Assert.Equal("https://exemplo.inhire.app/vagas/bbb-222", snapshot.Jobs[1].Url);
         Assert.NotNull(snapshot.Warning);
         Assert.All(routes.Requests, r => Assert.Equal("exemplo", r.Headers.GetValues("X-Tenant").Single()));
     }

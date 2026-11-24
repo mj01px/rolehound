@@ -62,7 +62,7 @@ public sealed partial class InHireConnector(HttpClient http) : IJobConnector, IJ
             if (!string.IsNullOrEmpty(id) && !string.IsNullOrEmpty(title))
             {
                 var link = record.String("link");
-                var url = Uri.TryCreate(link, UriKind.Absolute, out var parsed) && parsed.Scheme == Uri.UriSchemeHttps ? link! : JobUrl(tenant, page, id, title);
+                var url = Uri.TryCreate(link, UriKind.Absolute, out var parsed) && parsed.Scheme == Uri.UriSchemeHttps ? PublicUrl(parsed) : JobUrl(tenant, page, id, title);
                 listed[id] = (title, url);
             }
         }
@@ -119,7 +119,7 @@ public sealed partial class InHireConnector(HttpClient http) : IJobConnector, IJ
             throw new ConnectorException("source_invalid", $"InHire {tenant}: vaga fora do formato esperado.");
         }
 
-        return ParseDetail(link.ExternalId, title, url.GetLeftPart(UriPartial.Path), detail.RootElement.String("tenantName")?.Trim() is { Length: > 0 } name ? name : tenant, detail.RootElement);
+        return ParseDetail(link.ExternalId, title, PublicUrl(new Uri(url.GetLeftPart(UriPartial.Path))), detail.RootElement.String("tenantName")?.Trim() is { Length: > 0 } name ? name : tenant, detail.RootElement);
     }
 
     internal static CollectedJob ParseDetail(string id, string title, string url, string tenant, JsonElement detail)
@@ -167,6 +167,22 @@ public sealed partial class InHireConnector(HttpClient http) : IJobConnector, IJ
         }
 
         return pages;
+    }
+
+    /// <summary>
+    /// The API lists links on tenant.inhire.com.br, a domain that does not resolve;
+    /// the same path works on tenant.inhire.app.
+    /// </summary>
+    internal static string PublicUrl(Uri url)
+    {
+        var host = url.Host.ToLowerInvariant();
+        if (!host.EndsWith(".inhire.com.br", StringComparison.Ordinal))
+        {
+            return url.ToString();
+        }
+
+        var builder = new UriBuilder(url) { Host = host[..^".inhire.com.br".Length] + ".inhire.app", Port = -1 };
+        return builder.Uri.ToString();
     }
 
     /// <summary>The public job page: tenant.inhire.app[/page]/vagas/{id}/{slug}.</summary>

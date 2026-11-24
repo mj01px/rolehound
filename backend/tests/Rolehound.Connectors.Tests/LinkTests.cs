@@ -33,6 +33,13 @@ public sealed class LinkTests
     public void InHire_links(string url, string? target, string? id) =>
         Check(new InHireConnector(Http), url, target, id);
 
+    [Theory]
+    [InlineData("https://alice.inhire.com.br/vagas/abc-123", "https://alice.inhire.app/vagas/abc-123")]
+    [InlineData("https://Cielo.inhire.com.br/tecnologia/vagas/abc-123/dev", "https://cielo.inhire.app/tecnologia/vagas/abc-123/dev")]
+    [InlineData("https://alice.inhire.app/vagas/abc-123", "https://alice.inhire.app/vagas/abc-123")]
+    public void InHire_public_url_uses_the_inhire_app_domain(string url, string expected) =>
+        Assert.Equal(expected, InHireConnector.PublicUrl(new Uri(url)));
+
     private static void Check(IJobLinkReader reader, string url, string? target, string? id)
     {
         var link = reader.Parse(new Uri(url));
