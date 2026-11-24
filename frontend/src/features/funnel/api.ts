@@ -143,9 +143,20 @@ export function useSaveApplication(id: string) {
   })
 }
 
+/**
+ * Leaves the funnel. The deleted application's query is dropped, so nothing asks for it
+ * again, and the board and job lists refresh in the background instead of being awaited.
+ */
 export function useLeaveFunnel(id: string) {
+  const queryClient = useQueryClient()
   const invalidate = useInvalidate()
-  return useMutation({ mutationFn: () => api.delete(`/applications/${id}`), onSuccess: invalidate })
+  return useMutation({
+    mutationFn: () => api.delete(`/applications/${id}`),
+    onSuccess: () => {
+      queryClient.removeQueries({ queryKey: [...funnelKey, 'detail', id] })
+      void invalidate()
+    },
+  })
 }
 
 export function useSaveInteraction(applicationId: string) {
