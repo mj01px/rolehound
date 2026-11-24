@@ -40,19 +40,18 @@ const adminGroup: Group = {
 }
 
 interface Prefs {
-  collapsed: boolean
   hidden: string[]
 }
 
 const PREFS_KEY = 'rolehound:sidebar'
 
-// A per-browser convenience: when storage is blocked the sidebar just starts expanded.
+// A per-browser convenience: when storage is blocked every module just starts open.
 function readPrefs(): Prefs {
   try {
     const stored = JSON.parse(localStorage.getItem(PREFS_KEY) ?? '{}') as Partial<Prefs>
-    return { collapsed: stored.collapsed === true, hidden: Array.isArray(stored.hidden) ? stored.hidden : [] }
+    return { hidden: Array.isArray(stored.hidden) ? stored.hidden : [] }
   } catch {
-    return { collapsed: false, hidden: [] }
+    return { hidden: [] }
   }
 }
 
@@ -73,10 +72,7 @@ interface SidebarProps {
   onCloseMobile: () => void
 }
 
-/**
- * Main navigation. On desktop it expands (icons and names) or collapses (icons
- * only); each module can be hidden. On phones it slides over the page.
- */
+/** Main navigation; each module can be hidden. On phones it slides over the page. */
 export function Sidebar({ isAdmin, onLogout, loggingOut, mobileOpen, onCloseMobile }: SidebarProps) {
   const [prefs, setPrefs] = useState(readPrefs)
   const { pathname } = useLocation()
@@ -87,11 +83,9 @@ export function Sidebar({ isAdmin, onLogout, loggingOut, mobileOpen, onCloseMobi
     writePrefs(next)
   }
   const toggleGroup = (id: string) =>
-    update({ ...prefs, hidden: prefs.hidden.includes(id) ? prefs.hidden.filter((g) => g !== id) : [...prefs.hidden, id] })
+    update({ hidden: prefs.hidden.includes(id) ? prefs.hidden.filter((g) => g !== id) : [...prefs.hidden, id] })
 
-  // Phones always show names; collapsing is a desktop choice.
-  const collapsed = prefs.collapsed && !mobileOpen
-  const classes = [styles.sidebar, collapsed && styles.collapsed, mobileOpen && styles.mobileOpen].filter(Boolean).join(' ')
+  const classes = mobileOpen ? `${styles.sidebar} ${styles.mobileOpen}` : styles.sidebar
 
   const link = (item: Item) => {
     const active = item.to === '/' ? pathname === '/' || (item.also !== undefined && pathname.startsWith(item.also)) : pathname.startsWith(item.to)
@@ -100,8 +94,6 @@ export function Sidebar({ isAdmin, onLogout, loggingOut, mobileOpen, onCloseMobi
         key={item.to}
         to={item.to}
         onClick={onCloseMobile}
-        title={collapsed ? item.label : undefined}
-        aria-label={collapsed ? item.label : undefined}
         aria-current={active ? 'page' : undefined}
         className={active ? `${styles.item} ${styles.active}` : styles.item}
       >
@@ -114,15 +106,11 @@ export function Sidebar({ isAdmin, onLogout, loggingOut, mobileOpen, onCloseMobi
   return (
     <nav aria-label="Principal" className={classes}>
       <div className={styles.head}>
-        <button
-          type="button"
-          className={styles.menu}
-          onClick={mobileOpen ? onCloseMobile : () => update({ ...prefs, collapsed: !prefs.collapsed })}
-          aria-label={mobileOpen ? 'Fechar menu' : collapsed ? 'Expandir menu' : 'Recolher menu'}
-          aria-expanded={mobileOpen || !collapsed}
-        >
-          {icons.menu}
-        </button>
+        {mobileOpen && (
+          <button type="button" className={styles.menu} onClick={onCloseMobile} aria-label="Fechar menu">
+            {icons.menu}
+          </button>
+        )}
         <span className={styles.brand}>
           <Logo size={20} label="" />
           <span className={styles.label}>rolehound</span>
@@ -131,18 +119,14 @@ export function Sidebar({ isAdmin, onLogout, loggingOut, mobileOpen, onCloseMobi
 
       <div className={styles.groups}>
         {groups.map((group) => {
-          const open = collapsed || !prefs.hidden.includes(group.id)
+          const open = !prefs.hidden.includes(group.id)
           const listId = `nav-${group.id}`
           return (
             <div key={group.id} className={styles.group}>
-              {collapsed ? (
-                <span className={styles.divider} aria-hidden="true" />
-              ) : (
-                <button type="button" className={styles.groupHead} onClick={() => toggleGroup(group.id)} aria-expanded={open} aria-controls={listId}>
-                  <span>{group.label}</span>
-                  <span className={open ? styles.chevron : `${styles.chevron} ${styles.chevronClosed}`}>{icons.chevron}</span>
-                </button>
-              )}
+              <button type="button" className={styles.groupHead} onClick={() => toggleGroup(group.id)} aria-expanded={open} aria-controls={listId}>
+                <span>{group.label}</span>
+                <span className={open ? styles.chevron : `${styles.chevron} ${styles.chevronClosed}`}>{icons.chevron}</span>
+              </button>
               {open && (
                 <div id={listId} className={styles.items}>
                   {group.items.map(link)}
@@ -159,8 +143,6 @@ export function Sidebar({ isAdmin, onLogout, loggingOut, mobileOpen, onCloseMobi
           className={styles.item}
           onClick={onLogout}
           disabled={loggingOut}
-          title={collapsed ? 'Sair' : undefined}
-          aria-label={collapsed ? 'Sair' : undefined}
         >
           <span className={styles.icon}>{icons.logout}</span>
           <span className={styles.label}>Sair</span>

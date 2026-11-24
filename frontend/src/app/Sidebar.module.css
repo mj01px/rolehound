@@ -14,11 +14,6 @@
   background: var(--bg);
   overflow-x: hidden;
   overflow-y: auto;
-  transition: flex-basis 160ms ease, width 160ms ease;
-}
-
-.collapsed {
-  --width: 60px;
 }
 
 .head {
@@ -26,6 +21,7 @@
   align-items: center;
   gap: 8px;
   height: 40px;
+  padding-left: 10px;
 }
 
 .menu {
@@ -62,10 +58,6 @@
   font-weight: 600;
   letter-spacing: -0.02em;
   white-space: nowrap;
-}
-
-.collapsed .brand {
-  display: none;
 }
 
 .groups {
@@ -121,10 +113,6 @@
   transform: rotate(-90deg);
 }
 
-.divider {
-  height: 4px;
-}
-
 .items {
   display: flex;
   flex-direction: column;
@@ -171,15 +159,6 @@
 .active .icon,
 .active:hover .icon {
   color: var(--ink);
-}
-
-.collapsed .item {
-  justify-content: center;
-  padding: 0;
-}
-
-.collapsed .label {
-  display: none;
 }
 
 .footer {
