@@ -4,6 +4,7 @@ import { ApiError, errorMessage } from '../../lib/api'
 import { Alert } from '../../ui/Alert'
 import { Button } from '../../ui/Button'
 import { Field } from '../../ui/Field'
+import { Select } from '../../ui/Select'
 import uiStyles from '../../ui/ui.module.css'
 import {
   formatDay,
@@ -17,9 +18,44 @@ import {
   useSaveInteraction,
   type ApplicationDetail,
   type ApplicationForm,
+  type ApplicationStatus,
   type Interaction,
 } from './api'
-import styles from './funnel.module.css'
+import styles from './application.module.css'
+
+const priorityLabels: Record<number, string> = { 1: 'Altíssima', 2: 'Alta', 3: 'Média', 4: 'Baixa', 5: 'Baixíssima' }
+
+const priorities = [1, 2, 3, 4, 5].map((value) => ({ value: String(value), label: `${priorityLabels[value]} (${value})` }))
+
+// The stages a process moves through; rejected and withdrawn close it instead.
+const stages = statuses.filter((status) => status.value !== 'rejected' && status.value !== 'withdrawn')
+const closings = statuses.filter((status) => status.value === 'rejected' || status.value === 'withdrawn')
+
+/** "18/11" for this year, "18/11/2025" otherwise. */
+function shortDay(value: string | null): string {
+  if (!value) return ''
+  return value.slice(0, 4) === todayInBrazil().slice(0, 4) ? formatDay(value).slice(0, 5) : formatDay(value)
+}
+
+/** Whole days from a "yyyy-mm-dd" day to today in Brazil. */
+function daysSince(value: string): number {
+  return Math.round((Date.parse(todayInBrazil()) - Date.parse(value)) / 86_400_000)
+}
+
+/** The saved application as a form, the base of every partial save. */
+function formOf(detail: ApplicationDetail): ApplicationForm {
+  const { application } = detail
+  return {
+    status: application.status,
+    priority: application.priority,
+    appliedOn: application.appliedOn,
+    nextStep: application.nextStep,
+    nextStepOn: application.nextStepOn,
+    contact: detail.contact,
+    hasReferral: detail.hasReferral,
+    notes: detail.notes,
+  }
+}
 
 export function ApplicationPage() {
   const { id = '' } = useParams()
@@ -28,10 +64,13 @@ export function ApplicationPage() {
   return (
     <div className={styles.page}>
       <Link to="/funil" className={styles.back}>
-        ← Funil
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="m15 18-6-6 6-6" />
+        </svg>
+        Funil
       </Link>
       {detail.isError && <Alert>{errorMessage(detail.error)}</Alert>}
-      {/* Keyed by update time so the form starts again from saved data after each save. */}
+      {/* Keyed by update time so every block starts again from saved data after each save. */}
       {detail.data && <ApplicationView key={detail.data.application.updatedAt} id={id} detail={detail.data} />}
     </div>
   )
@@ -39,124 +78,275 @@ export function ApplicationPage() {
 
 function ApplicationView({ id, detail }: { id: string; detail: ApplicationDetail }) {
   const { application } = detail
-  const info = statusInfo(application.status)
+  const save = useSaveApplication(id)
+  const saveWith = (changes: Partial<ApplicationForm>, onSuccess?: () => void) => save.mutate({ ...formOf(detail), ...changes }, { onSuccess })
+  const meta = [
+    application.company,
+    application.appliedOn ? `aplicada em ${shortDay(application.appliedOn)}` : null,
+    detail.hasReferral ? 'com indicação' : null,
+  ]
+    .filter(Boolean)
+    .join(' · ')
 
   return (
     <>
-      <header className={styles.detailHeader}>
-        <h1 className={styles.title}>{application.title}</h1>
-        <p className={styles.muted}>
-          {application.company && `${application.company} · `}
-          <Link to={`/vagas/${application.jobId}`} className={uiStyles.link}>
+      <header className={styles.header}>
+        <div className={styles.titles}>
+          <h1 className={styles.title}>{application.title}</h1>
+          {meta && <p className={styles.meta}>{meta}</p>}
+        </div>
+        <div className={styles.headerActions}>
+          <Link to={`/vagas/${application.jobId}`} className={styles.quietLink}>
             Ver a vaga
           </Link>
-          {' · '}
-          <a href={detail.jobUrl} target="_blank" rel="noopener noreferrer" className={uiStyles.link}>
+          <a href={detail.jobUrl} target="_blank" rel="noopener noreferrer" className={styles.outlineLink}>
             Vaga original
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M7 17 17 7M8 7h9v9" />
+            </svg>
           </a>
-        </p>
-        <div className={styles.cardMeta}>
-          <span className={styles.statusTag}>
-            <span className={styles.dot} style={{ background: info.color }} />
-            {info.label}
-          </span>
-          {application.isOverdue && <span className={styles.overdueTag}>Próximo passo atrasado</span>}
-          {application.jobClosedAtSource && <span className={styles.closedTag}>Encerrada na fonte</span>}
         </div>
       </header>
-      <div className={styles.columns2}>
-        <ApplicationEditor id={id} detail={detail} />
+
+      <StageTrack status={application.status} closedAtSource={application.jobClosedAtSource} saving={save.isPending} onChange={(status) => saveWith({ status })} />
+      {save.isError && <Alert>{errorMessage(save.error)}</Alert>}
+
+      <NextStep detail={detail} saving={save.isPending} error={save.error} onSave={saveWith} />
+
+      <div className={styles.columns}>
         <Timeline id={id} interactions={detail.interactions} />
+        <Details id={id} detail={detail} saving={save.isPending} error={save.error} onSave={saveWith} />
       </div>
     </>
   )
 }
 
-function ApplicationEditor({ id, detail }: { id: string; detail: ApplicationDetail }) {
-  const navigate = useNavigate()
-  const save = useSaveApplication(id)
-  const leave = useLeaveFunnel(id)
-  const [confirmLeave, setConfirmLeave] = useState(false)
-  const [form, setForm] = useState<ApplicationForm>({
-    status: detail.application.status,
-    priority: detail.application.priority,
-    appliedOn: detail.application.appliedOn,
-    nextStep: detail.application.nextStep,
-    nextStepOn: detail.application.nextStepOn,
-    contact: detail.contact,
-    hasReferral: detail.hasReferral,
-    notes: detail.notes,
-  })
-  const error = save.error instanceof ApiError ? save.error : null
-  const set = <K extends keyof ApplicationForm>(key: K, value: ApplicationForm[K]) => setForm((current) => ({ ...current, [key]: value }))
+/** The funnel as a colored ribbon: filled up to the current stage. Clicking a stage moves there. */
+function StageTrack({ status, closedAtSource, saving, onChange }: { status: ApplicationStatus; closedAtSource: boolean; saving: boolean; onChange: (status: ApplicationStatus) => void }) {
+  const current = stages.findIndex((stage) => stage.value === status)
+  const closed = current === -1
+
+  return (
+    <section aria-label="Etapa" className={styles.stages}>
+      <div className={styles.track} role="group" aria-label="Etapas do processo">
+        {stages.map((stage, index) => {
+          const reached = !closed && index <= current
+          return (
+            <button
+              key={stage.value}
+              type="button"
+              className={styles.stage}
+              aria-current={index === current ? 'step' : undefined}
+              onClick={() => index !== current && onChange(stage.value)}
+              disabled={saving}
+            >
+              <span className={styles.bar} style={reached ? { background: stage.color } : undefined} />
+              <span className={index === current ? `${styles.stageLabel} ${styles.stageCurrent}` : styles.stageLabel}>
+                {index === current && <span className={styles.dot} style={{ background: stage.color }} aria-hidden="true" />}
+                {stage.label}
+              </span>
+            </button>
+          )
+        })}
+      </div>
+      {!closed && (
+        <p className={styles.currentMobile}>
+          <span className={styles.dot} style={{ background: stages[current]?.color }} aria-hidden="true" />
+          {stages[current]?.label}
+          <span className={styles.stepCount}>
+            etapa {current + 1} de {stages.length}
+          </span>
+        </p>
+      )}
+      <p className={styles.hint}>
+        {closed ? (
+          <>
+            Encerrada como <strong className={styles.closedAs}>{statusInfo(status).label}</strong>. Clique numa etapa para reabrir.
+          </>
+        ) : (
+          <>
+            Clique numa etapa para mudar. Acabou?{' '}
+            {closings.map((closing, index) => (
+              <span key={closing.value}>
+                {index > 0 && ' · '}
+                <button type="button" className={styles.inlineButton} onClick={() => onChange(closing.value)} disabled={saving}>
+                  {closing.value === 'rejected' ? 'Rejeitada' : 'Desisti'}
+                </button>
+              </span>
+            ))}
+          </>
+        )}
+        {closedAtSource && <span className={styles.warn}> A fonte não lista mais essa vaga.</span>}
+      </p>
+    </section>
+  )
+}
+
+interface BlockProps {
+  detail: ApplicationDetail
+  saving: boolean
+  error: Error | null
+  onSave: (changes: Partial<ApplicationForm>, onSuccess?: () => void) => void
+}
+
+function NextStep({ detail, saving, error, onSave }: BlockProps) {
+  const { application } = detail
+  const [editing, setEditing] = useState(false)
+  const [text, setText] = useState(application.nextStep)
+  const [day, setDay] = useState(application.nextStepOn ?? '')
+  const fieldError = error instanceof ApiError ? error.field('nextStep') : undefined
+  const late = application.isOverdue && application.nextStepOn ? daysSince(application.nextStepOn) : 0
 
   const submit = (event: FormEvent) => {
     event.preventDefault()
-    save.mutate(form)
+    onSave({ nextStep: text, nextStepOn: day || null }, () => setEditing(false))
   }
 
-  return (
-    <section aria-labelledby="application-title" className={styles.panel}>
-      <h2 id="application-title" className={styles.sectionTitle}>
-        Candidatura
-      </h2>
-      <form className={styles.form} onSubmit={submit} noValidate>
-        <div className={styles.row2}>
-          <label className={styles.selectField}>
-            <span className={uiStyles.label}>Status</span>
-            <select className={uiStyles.input} value={form.status} onChange={(event) => set('status', event.target.value as ApplicationForm['status'])}>
-              {statuses.map((status) => (
-                <option key={status.value} value={status.value}>
-                  {status.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className={styles.selectField}>
-            <span className={uiStyles.label}>Prioridade</span>
-            <select className={uiStyles.input} value={form.priority} onChange={(event) => set('priority', Number(event.target.value))}>
-              {[1, 2, 3, 4, 5].map((value) => (
-                <option key={value} value={value}>
-                  {value === 1 ? '1 (mais alta)' : value === 5 ? '5 (mais baixa)' : value}
-                </option>
-              ))}
-            </select>
-          </label>
+  if (editing) {
+    return (
+      <form className={`${styles.next} ${styles.nextEditing}`} onSubmit={submit} noValidate>
+        <div className={styles.fields}>
+          <Field label="Próximo passo" value={text} onChange={(event) => setText(event.target.value)} maxLength={300} error={fieldError} autoFocus />
+          <Field label="Data" type="date" value={day} onChange={(event) => setDay(event.target.value)} />
         </div>
-        <div className={styles.row2}>
-          <Field label="Próximo passo" value={form.nextStep} onChange={(event) => set('nextStep', event.target.value)} maxLength={300} error={error?.field('nextStep')} />
-          <Field label="Data do próximo passo" type="date" value={form.nextStepOn ?? ''} onChange={(event) => set('nextStepOn', event.target.value || null)} />
-        </div>
-        <div className={styles.row2}>
-          <Field label="Contato" value={form.contact} onChange={(event) => set('contact', event.target.value)} maxLength={200} error={error?.field('contact')} />
-          <Field label="Aplicada em" type="date" value={form.appliedOn ?? ''} onChange={(event) => set('appliedOn', event.target.value || null)} />
-        </div>
-        <label className={styles.check}>
-          <input type="checkbox" checked={form.hasReferral} onChange={(event) => set('hasReferral', event.target.checked)} />
-          Tenho indicação
-        </label>
-        <label className={styles.textareaField}>
-          <span className={uiStyles.label}>Notas</span>
-          <textarea className={styles.textarea} value={form.notes} onChange={(event) => set('notes', event.target.value)} maxLength={5000} rows={5} />
-        </label>
-        {save.isError && !error?.problem.errors && <Alert>{errorMessage(save.error)}</Alert>}
         <div className={styles.formActions}>
-          {confirmLeave ? (
-            <Button variant="danger" onClick={() => leave.mutate(undefined, { onSuccess: () => navigate('/funil') })} disabled={leave.isPending}>
-              Confirmar: tirar do funil e apagar o histórico
-            </Button>
-          ) : (
-            <Button variant="ghost" onClick={() => setConfirmLeave(true)}>
-              Tirar do funil
-            </Button>
-          )}
-          <Button type="submit" disabled={save.isPending}>
+          <Button variant="ghost" onClick={() => setEditing(false)}>
+            Cancelar
+          </Button>
+          <Button type="submit" disabled={saving}>
             Salvar
           </Button>
         </div>
-        {leave.isError && <Alert>{errorMessage(leave.error)}</Alert>}
       </form>
+    )
+  }
+
+  return (
+    <section aria-label="Próximo passo" className={styles.next}>
+      <div className={styles.nextText}>
+        <span className={styles.label}>Próximo passo</span>
+        <span className={application.nextStep ? styles.nextTitle : `${styles.nextTitle} ${styles.empty}`}>{application.nextStep || 'Nenhum definido'}</span>
+      </div>
+      {application.nextStepOn && (
+        <div className={styles.nextWhen}>
+          <span className={styles.data}>{shortDay(application.nextStepOn)}</span>
+          {late > 0 && <span className={styles.late}>{late === 1 ? 'atrasado há 1 dia' : `atrasado há ${late} dias`}</span>}
+        </div>
+      )}
+      <Button variant="secondary" onClick={() => setEditing(true)}>
+        {application.nextStep ? 'Editar' : 'Definir'}
+      </Button>
     </section>
+  )
+}
+
+function Details({ id, detail, saving, error, onSave }: BlockProps & { id: string }) {
+  const navigate = useNavigate()
+  const leave = useLeaveFunnel(id)
+  const { application } = detail
+  const [editing, setEditing] = useState(false)
+  const [confirmLeave, setConfirmLeave] = useState(false)
+  const [form, setForm] = useState({
+    priority: application.priority,
+    contact: detail.contact,
+    appliedOn: application.appliedOn ?? '',
+    hasReferral: detail.hasReferral,
+    notes: detail.notes,
+  })
+  const apiError = error instanceof ApiError ? error : null
+  const set = <K extends keyof typeof form>(key: K, value: (typeof form)[K]) => setForm((current) => ({ ...current, [key]: value }))
+
+  const submit = (event: FormEvent) => {
+    event.preventDefault()
+    onSave({ ...form, appliedOn: form.appliedOn || null }, () => setEditing(false))
+  }
+
+  return (
+    <aside aria-labelledby="details-title" className={styles.details}>
+      <h2 id="details-title" className={styles.heading}>
+        Detalhes
+      </h2>
+
+      {editing ? (
+        <form className={styles.detailsForm} onSubmit={submit} noValidate>
+          <div className={uiStyles.field}>
+            <label htmlFor="application-priority" className={uiStyles.label}>
+              Prioridade
+            </label>
+            <Select id="application-priority" value={String(form.priority)} options={priorities} onChange={(value) => set('priority', Number(value))} />
+          </div>
+          <Field label="Contato" value={form.contact} onChange={(event) => set('contact', event.target.value)} maxLength={200} error={apiError?.field('contact')} />
+          <Field label="Aplicada em" type="date" value={form.appliedOn} onChange={(event) => set('appliedOn', event.target.value)} />
+          <label className={styles.check}>
+            <input type="checkbox" checked={form.hasReferral} onChange={(event) => set('hasReferral', event.target.checked)} />
+            Tenho indicação
+          </label>
+          <label className={uiStyles.field}>
+            <span className={uiStyles.label}>Notas</span>
+            <textarea className={styles.textarea} value={form.notes} onChange={(event) => set('notes', event.target.value)} maxLength={5000} rows={5} />
+          </label>
+          <div className={styles.formActions}>
+            <Button variant="ghost" onClick={() => setEditing(false)}>
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={saving}>
+              Salvar
+            </Button>
+          </div>
+        </form>
+      ) : (
+        <>
+          <dl className={styles.facts}>
+            <div className={styles.fact}>
+              <dt>Prioridade</dt>
+              <dd>
+                {priorityLabels[application.priority]} <span className={styles.dim}>{application.priority} de 5</span>
+              </dd>
+            </div>
+            <div className={styles.fact}>
+              <dt>Contato</dt>
+              <dd>{detail.contact || <span className={styles.dim}>Nenhum</span>}</dd>
+            </div>
+            <div className={styles.fact}>
+              <dt>Aplicada em</dt>
+              <dd className={styles.data}>{application.appliedOn ? formatDay(application.appliedOn) : <span className={styles.dim}>Não informado</span>}</dd>
+            </div>
+            <div className={styles.fact}>
+              <dt>Indicação</dt>
+              <dd>{detail.hasReferral ? 'Sim' : 'Não'}</dd>
+            </div>
+          </dl>
+          <div className={styles.notes}>
+            <span className={styles.label}>Notas</span>
+            {detail.notes ? <p className={styles.notesText}>{detail.notes}</p> : <p className={styles.dim}>Nenhuma nota.</p>}
+          </div>
+          <button type="button" className={styles.textButton} onClick={() => setEditing(true)}>
+            Editar detalhes
+          </button>
+        </>
+      )}
+
+      <div className={styles.leave}>
+        {confirmLeave ? (
+          <>
+            <p className={styles.dim}>Tira a vaga do funil e apaga o histórico.</p>
+            <div className={styles.formActions}>
+              <Button variant="ghost" onClick={() => setConfirmLeave(false)}>
+                Cancelar
+              </Button>
+              <Button variant="danger" onClick={() => leave.mutate(undefined, { onSuccess: () => navigate('/funil') })} disabled={leave.isPending}>
+                Tirar do funil
+              </Button>
+            </div>
+          </>
+        ) : (
+          <button type="button" className={`${styles.textButton} ${styles.dangerText}`} onClick={() => setConfirmLeave(true)}>
+            Tirar do funil
+          </button>
+        )}
+        {leave.isError && <Alert>{errorMessage(leave.error)}</Alert>}
+      </div>
+    </aside>
   )
 }
 
@@ -164,42 +354,52 @@ function Timeline({ id, interactions }: { id: string; interactions: Interaction[
   const [editing, setEditing] = useState<Interaction | 'new' | null>(null)
 
   return (
-    <section aria-labelledby="timeline-title" className={styles.panel}>
-      <div className={styles.panelHead}>
-        <h2 id="timeline-title" className={styles.sectionTitle}>
+    <section aria-labelledby="timeline-title" className={styles.history}>
+      <div className={styles.headingRow}>
+        <h2 id="timeline-title" className={styles.heading}>
           Histórico
         </h2>
         {editing === null && (
-          <Button variant="secondary" onClick={() => setEditing('new')}>
+          <button type="button" className={styles.textButton} onClick={() => setEditing('new')}>
             Registrar
-          </Button>
+          </button>
         )}
       </div>
       {editing === 'new' && <InteractionEditor applicationId={id} onDone={() => setEditing(null)} />}
       <ol className={styles.timeline}>
-        {interactions.map((interaction) =>
+        {interactions.map((interaction, index) =>
           editing !== 'new' && editing?.id === interaction.id ? (
             <li key={interaction.id}>
               <InteractionEditor applicationId={id} interaction={interaction} onDone={() => setEditing(null)} />
             </li>
           ) : (
-            <li key={interaction.id} className={interaction.isSystem ? `${styles.entry} ${styles.entrySystem}` : styles.entry}>
-              <span className={styles.entryDate}>{formatDay(interaction.date)}</span>
-              <span className={styles.entryBody}>
-                <span className={styles.entryTitle}>{interaction.title}</span>
-                {interaction.detail && <span className={styles.entryDetail}>{interaction.detail}</span>}
+            <li key={interaction.id} className={styles.entry}>
+              <span className={styles.entryDate}>{shortDay(interaction.date)}</span>
+              <span className={styles.rail} aria-hidden="true">
+                <span className={interaction.isSystem ? styles.node : `${styles.node} ${styles.nodeOpen}`} style={interaction.isSystem ? { background: systemColor(interaction.title) } : undefined} />
+                {index < interactions.length - 1 && <span className={styles.line} />}
               </span>
-              {!interaction.isSystem && editing === null && (
-                <button type="button" className={uiStyles.link} onClick={() => setEditing(interaction)}>
-                  Editar
-                </button>
-              )}
+              <span className={styles.entryBody}>
+                <span className={interaction.isSystem ? `${styles.entryTitle} ${styles.entrySystem}` : styles.entryTitle}>{interaction.title}</span>
+                {interaction.detail && <span className={styles.entryDetail}>{interaction.detail}</span>}
+                {!interaction.isSystem && editing === null && (
+                  <button type="button" className={styles.entryEdit} onClick={() => setEditing(interaction)}>
+                    Editar
+                  </button>
+                )}
+              </span>
             </li>
           ),
         )}
       </ol>
     </section>
   )
+}
+
+/** Stage changes read "Aplicada → Entrevista"; their node takes the color of the stage reached. */
+function systemColor(title: string): string {
+  const reached = title.split('→').pop()?.trim() ?? ''
+  return statuses.find((status) => status.label === reached)?.color ?? 'var(--faint)'
 }
 
 function InteractionEditor({ applicationId, interaction, onDone }: { applicationId: string; interaction?: Interaction; onDone: () => void }) {
@@ -216,12 +416,12 @@ function InteractionEditor({ applicationId, interaction, onDone }: { application
   }
 
   return (
-    <form className={`${styles.form} ${styles.inlineForm}`} onSubmit={submit} noValidate>
-      <div className={styles.row2}>
+    <form className={styles.entryForm} onSubmit={submit} noValidate>
+      <div className={styles.fields}>
         <Field label="O que aconteceu" value={title} onChange={(event) => setTitle(event.target.value)} maxLength={200} error={error?.field('title')} autoFocus />
         <Field label="Data" type="date" value={date} onChange={(event) => setDate(event.target.value)} error={error?.field('date')} />
       </div>
-      <label className={styles.textareaField}>
+      <label className={uiStyles.field}>
         <span className={uiStyles.label}>Detalhe (opcional)</span>
         <textarea className={styles.textarea} value={detail} onChange={(event) => setDetail(event.target.value)} maxLength={5000} rows={3} />
       </label>
@@ -232,6 +432,7 @@ function InteractionEditor({ applicationId, interaction, onDone }: { application
             Apagar
           </Button>
         )}
+        <span className={styles.spacer} />
         <Button variant="ghost" onClick={onDone}>
           Cancelar
         </Button>
