@@ -5,8 +5,8 @@ import { icons } from '../../app/navIcons'
 import { api } from '../../lib/api'
 import styles from './NotificationBell.module.css'
 
-const PANEL_WIDTH = 360
-const EDGE = 12
+const PANEL_WIDTH = 340
+const EDGE = 24
 
 interface Notification {
   kind: 'model' | 'overdue' | 'sample' | 'highlights'
@@ -55,15 +55,17 @@ export function NotificationBell() {
     }
   }, [open])
 
-  // Centered under the bell, kept 12px inside the window.
+  // A speech bubble: centered under the bell when it fits, kept clear of the window's edge, its tip on the bell.
   useLayoutEffect(() => {
     if (!open) return
     const measure = () => {
       const rect = bell.current?.getBoundingClientRect()
       if (!rect) return
-      const width = Math.min(PANEL_WIDTH, window.innerWidth - 2 * EDGE)
-      const left = Math.min(Math.max(rect.left + rect.width / 2 - width / 2, EDGE), window.innerWidth - width - EDGE)
-      setPlace({ top: rect.bottom + 8, left, width })
+      const edge = window.innerWidth < 480 ? 12 : EDGE
+      const width = Math.min(PANEL_WIDTH, window.innerWidth - 2 * edge)
+      const center = rect.left + rect.width / 2
+      const left = Math.min(Math.max(center - width / 2, edge), window.innerWidth - width - edge)
+      setPlace({ top: rect.bottom + 12, left, width, ['--tip' as string]: `${center - left}px` })
     }
     measure()
     window.addEventListener('resize', measure)

@@ -53,9 +53,23 @@
   padding: 8px;
   box-sizing: border-box;
   border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
+  border-radius: 14px;
   background: var(--surface-raised);
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+}
+
+/* The bubble's tip, pointing at the bell. --tip is set from the bell's position. */
+.panel::before {
+  content: "";
+  position: absolute;
+  top: -6px;
+  left: calc(var(--tip, 50%) - 6px);
+  width: 11px;
+  height: 11px;
+  background: var(--surface-raised);
+  border-top: 1px solid var(--border);
+  border-left: 1px solid var(--border);
+  transform: rotate(45deg);
 }
 
 .heading {
