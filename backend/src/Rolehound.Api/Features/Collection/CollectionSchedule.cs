@@ -33,6 +33,22 @@ internal static class CollectionSchedule
         return new DateTimeOffset(slotLocal, FunnelEndpoints.Zone.GetUtcOffset(slotLocal)).ToUniversalTime();
     }
 
+    /// <summary>The first slot after <paramref name="now"/>, as a UTC instant.</summary>
+    public static DateTimeOffset NextSlot(DateTimeOffset now)
+    {
+        var local = TimeZoneInfo.ConvertTime(now, FunnelEndpoints.Zone);
+        var day = local.Date;
+        var hour = Hours.FirstOrDefault(h => day.AddHours(h) > local.DateTime, -1);
+        if (hour < 0)
+        {
+            day = day.AddDays(1);
+            hour = Hours[0];
+        }
+
+        var slotLocal = day.AddHours(hour);
+        return new DateTimeOffset(slotLocal, FunnelEndpoints.Zone.GetUtcOffset(slotLocal)).ToUniversalTime();
+    }
+
     public static async Task<Ok<DueCollectionResponse>> RunIfDue(RolehoundDbContext db, CollectionRunner runner, TimeProvider time, CancellationToken ct)
     {
         var slot = LatestSlot(time.GetUtcNow());

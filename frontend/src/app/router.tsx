@@ -10,7 +10,8 @@ import { TwoFactorPage } from '../features/auth/TwoFactorPage'
 import { AccuracyPage } from '../features/accuracy/AccuracyPage'
 import { AdminAccuracyPage } from '../features/admin/AdminAccuracyPage'
 import { AdminModelsPage } from '../features/admin/AdminModelsPage'
-import { AdminSourcesPage } from '../features/admin/AdminSourcesPage'
+import { CollectionsPage } from '../features/admin/sources/CollectionsPage'
+import { SourcesPage } from '../features/admin/sources/SourcesPage'
 import { ApplicationPage } from '../features/funnel/ApplicationPage'
 import { FunnelPage } from '../features/funnel/FunnelPage'
 import { JobDrawer } from '../features/jobs/JobDrawer'
@@ -52,7 +53,8 @@ export const router = createBrowserRouter([
             children: [
               { path: '/admin/usuarios', element: <UsersPage /> },
               { path: '/admin/usuarios/:id', element: <UserPage /> },
-              { path: '/admin/fontes', element: <AdminSourcesPage /> },
+              { path: '/admin/fontes', element: <SourcesPage /> },
+              { path: '/admin/fontes/leituras', element: <CollectionsPage /> },
               { path: '/admin/qualidade', element: <AdminAccuracyPage /> },
               { path: '/admin/modelos', element: <AdminModelsPage /> },
             ],

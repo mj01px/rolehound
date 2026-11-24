@@ -41,6 +41,7 @@ public sealed partial class CollectionRunner(
         await SyncSearchTermsAsync(ct);
         var targets = await db.SourceTargets.Where(t => t.Enabled).OrderBy(t => t.Source).ThenBy(t => t.Key).ToListAsync(ct);
         int failed = 0, added = 0, reopened = 0, closed = 0;
+        var batch = Guid.CreateVersion7();
 
         foreach (var target in targets)
         {
@@ -49,7 +50,7 @@ public sealed partial class CollectionRunner(
                 continue;
             }
 
-            var run = new CollectionRun { TargetId = target.Id, StartedAt = time.GetUtcNow() };
+            var run = new CollectionRun { TargetId = target.Id, BatchId = batch, StartedAt = time.GetUtcNow() };
             db.CollectionRuns.Add(run);
             try
             {

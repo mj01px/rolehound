@@ -280,4 +280,13 @@ public sealed class CollectionScheduleTests
     {
         Assert.Equal(DateTimeOffset.Parse(slot, System.Globalization.CultureInfo.InvariantCulture), Rolehound.Api.Features.Collection.CollectionSchedule.LatestSlot(DateTimeOffset.Parse(now, System.Globalization.CultureInfo.InvariantCulture)));
     }
+
+    [Theory]
+    [InlineData("2026-11-22T13:30:00Z", "2026-11-22T15:00:00Z")] // 10:30 in Brazil: the 12:00 slot
+    [InlineData("2026-11-22T15:00:00Z", "2026-11-22T18:00:00Z")] // 12:00 sharp: the next one is 15:00
+    [InlineData("2026-11-22T22:00:00Z", "2026-11-23T12:00:00Z")] // 19:00: tomorrow's 09:00
+    public void The_next_slot_follows_brazil_time(string now, string slot)
+    {
+        Assert.Equal(DateTimeOffset.Parse(slot, System.Globalization.CultureInfo.InvariantCulture), Rolehound.Api.Features.Collection.CollectionSchedule.NextSlot(DateTimeOffset.Parse(now, System.Globalization.CultureInfo.InvariantCulture)));
+    }
 }

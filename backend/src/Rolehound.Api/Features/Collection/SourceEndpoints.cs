@@ -15,6 +15,13 @@ public sealed record SourceTargetResponse(
 public sealed record CollectionRunResponse(
     Guid Id, string Source, string Key, DateTimeOffset StartedAt, DateTimeOffset FinishedAt, int Listed, int Added, int Reopened, int Closed, string? Error);
 
+/// <summary>One collection: every source read in the same run, summed, with only the reads that changed something or failed.</summary>
+public sealed record CollectionBatchResponse(
+    Guid Id, DateTimeOffset StartedAt, DateTimeOffset FinishedAt, int Targets, int Listed, int Added, int Reopened, int Closed, int Failed,
+    IReadOnlyList<CollectionRunResponse> Changes, int Unchanged);
+
+public sealed record SourcesStatusResponse(DateTimeOffset NextScheduledAt, DateTimeOffset? ManualAvailableAt);
+
 public sealed record AddSourceTargetRequest(string? Source, string? Key, string? Label);
 
 public sealed record UpdateSourceTargetRequest(bool Enabled, string? Label);
@@ -36,7 +43,8 @@ internal static partial class SourceEndpoints
         sources.MapPut("/{id:guid}", Update);
         sources.MapDelete("/{id:guid}", Remove);
         sources.MapPost("/run", RunNow);
-        sources.MapGet("/runs", Runs);
+        sources.MapGet("/collections", Collections);
+        sources.MapGet("/status", Status);
         return endpoints;
     }
 
@@ -56,17 +64,68 @@ internal static partial class SourceEndpoints
         return await RunAsync(runner, ct);
     }
 
-    private static async Task<Ok<List<CollectionRunResponse>>> Runs(RolehoundDbContext db, CancellationToken ct)
+    public const int CollectionsDefaultLimit = 10;
+    public const int CollectionsMaxLimit = 50;
+
+    /// <summary>The latest collections, newest first, each with its reads summed.</summary>
+    private static async Task<Results<Ok<List<CollectionBatchResponse>>, ValidationProblem>> Collections(int? limit, RolehoundDbContext db, CancellationToken ct)
     {
-        var runs = await db.CollectionRuns.AsNoTracking()
-            .OrderByDescending(r => r.StartedAt)
-            .Take(100)
-            .Join(db.SourceTargets.AsNoTracking(), r => r.TargetId, t => t.Id, (r, t) => new { Run = r, t.Source, t.Key })
+        var take = limit ?? CollectionsDefaultLimit;
+        if (take is < 1 or > CollectionsMaxLimit)
+        {
+            return Problems.Validation("limit", $"Use de 1 a {CollectionsMaxLimit}.");
+        }
+
+        var batches = await db.CollectionRuns.AsNoTracking()
+            .GroupBy(r => r.BatchId)
+            .Select(g => new { Id = g.Key, StartedAt = g.Min(r => r.StartedAt) })
+            .OrderByDescending(b => b.StartedAt)
+            .Take(take)
+            .Select(b => b.Id)
             .ToListAsync(ct);
 
-        return TypedResults.Ok(runs.Select(x => new CollectionRunResponse(
-            x.Run.Id, x.Source.ToString().ToLowerInvariant(), x.Key, x.Run.StartedAt, x.Run.FinishedAt,
-            x.Run.Listed, x.Run.Added, x.Run.Reopened, x.Run.Closed, x.Run.Error)).ToList());
+        var runs = await db.CollectionRuns.AsNoTracking()
+            .Where(r => batches.Contains(r.BatchId))
+            .Join(db.SourceTargets.AsNoTracking(), r => r.TargetId, t => t.Id, (r, t) => new { Run = r, t.Source, t.Key, t.Label })
+            .ToListAsync(ct);
+
+        var result = runs
+            .GroupBy(x => x.Run.BatchId)
+            .Select(g =>
+            {
+                var changes = g
+                    .Where(x => x.Run.Error is not null || x.Run.Added + x.Run.Reopened + x.Run.Closed > 0)
+                    .OrderByDescending(x => x.Run.Error is not null).ThenByDescending(x => x.Run.Added + x.Run.Reopened + x.Run.Closed)
+                    .Select(x => new CollectionRunResponse(
+                        x.Run.Id, x.Source.ToString().ToLowerInvariant(), x.Label ?? x.Key, x.Run.StartedAt, x.Run.FinishedAt,
+                        x.Run.Listed, x.Run.Added, x.Run.Reopened, x.Run.Closed, x.Run.Error))
+                    .ToList();
+                return new CollectionBatchResponse(
+                    g.Key,
+                    g.Min(x => x.Run.StartedAt),
+                    g.Max(x => x.Run.FinishedAt),
+                    g.Count(),
+                    g.Sum(x => x.Run.Listed),
+                    g.Sum(x => x.Run.Added),
+                    g.Sum(x => x.Run.Reopened),
+                    g.Sum(x => x.Run.Closed),
+                    g.Count(x => x.Run.Error is not null),
+                    changes,
+                    g.Count() - changes.Count);
+            })
+            .OrderByDescending(b => b.StartedAt)
+            .ToList();
+
+        return TypedResults.Ok(result);
+    }
+
+    /// <summary>When the next scheduled collection runs, and when a manual one is allowed again (null: now).</summary>
+    private static async Task<Ok<SourcesStatusResponse>> Status(RolehoundDbContext db, TimeProvider time, CancellationToken ct)
+    {
+        var now = time.GetUtcNow();
+        var last = await db.CollectionRuns.MaxAsync(r => (DateTimeOffset?)r.StartedAt, ct);
+        DateTimeOffset? manual = last is not null && now - last < ManualRunInterval ? last + ManualRunInterval : null;
+        return TypedResults.Ok(new SourcesStatusResponse(CollectionSchedule.NextSlot(now), manual));
     }
 
     internal static async Task<Ok<CollectionSummary>> RunAsync(CollectionRunner runner, CancellationToken ct) =>

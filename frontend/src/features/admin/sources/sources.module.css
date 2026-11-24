@@ -1,0 +1,527 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  min-width: 0;
+}
+
+.header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 16px;
+}
+
+.heading {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.title {
+  margin: 0;
+  font-size: 26px;
+  line-height: 32px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.lead {
+  margin: 0;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--muted);
+}
+
+.headActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.backButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 14px;
+  box-sizing: border-box;
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius-md);
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.backButton:hover {
+  background: var(--surface);
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.goodText {
+  color: var(--signal-bright);
+}
+
+.warnText {
+  color: var(--amber);
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* Collection at a glance. */
+.strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.stripCell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px 20px;
+  min-width: 0;
+}
+
+.stripCell + .stripCell {
+  border-left: 1px solid var(--border);
+}
+
+.stripLabel {
+  font-size: 12px;
+  color: var(--faint);
+}
+
+.stripValue {
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.stripHint {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.stripLink {
+  align-self: flex-start;
+  font-size: 12px;
+  color: var(--muted);
+  text-decoration: underline;
+  text-decoration-color: var(--border-control);
+  text-underline-offset: 3px;
+}
+
+.stripLink:hover {
+  color: var(--signal-bright);
+}
+
+/* Tabs and search. */
+.tabsRow {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.tabs {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+}
+
+.tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 40px;
+  padding: 0 12px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: var(--muted);
+  font: 500 14px var(--font-sans);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.tab:hover {
+  color: var(--ink);
+}
+
+.tabOn {
+  border-bottom-color: var(--ink);
+  color: var(--ink);
+}
+
+.tabCount {
+  font: 500 12px var(--font-mono);
+  color: var(--faint);
+}
+
+.tabOn .tabCount {
+  color: var(--muted);
+}
+
+.search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: min(280px, 100%);
+  height: 34px;
+  margin-bottom: 6px;
+  padding: 0 10px;
+  box-sizing: border-box;
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius-md);
+  color: var(--faint);
+}
+
+.search:focus-within {
+  outline: 2px solid var(--signal-bright);
+  outline-offset: 1px;
+}
+
+.search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: none;
+  color: var(--ink);
+  font: 400 13px var(--font-sans);
+}
+
+/* Panels and tables. */
+.panel {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.panelNote {
+  margin: 0;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+  line-height: 19px;
+  color: var(--muted);
+}
+
+.panelFoot {
+  padding: 12px 20px;
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--faint);
+}
+
+.tableWrap {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  min-width: 640px;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.table th {
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--border);
+  color: var(--faint);
+  font-size: 12px;
+  font-weight: 500;
+  text-align: left;
+}
+
+.table td {
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+
+.table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.number {
+  font: 400 13px var(--font-mono);
+}
+
+.table .right {
+  text-align: right;
+}
+
+.rowOff .nameMain,
+.rowOff .number {
+  color: var(--faint);
+}
+
+.name {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.nameMain {
+  font-weight: 500;
+}
+
+.nameKey {
+  font: 400 12px var(--font-mono);
+  color: var(--faint);
+}
+
+.nameKey:empty {
+  display: none;
+}
+
+.rowWarn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  line-height: 17px;
+  color: var(--amber);
+}
+
+.rowError {
+  font-size: 12px;
+  color: var(--danger);
+}
+
+.actions {
+  text-align: right;
+}
+
+.actions > * {
+  display: inline-flex;
+}
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 32px 20px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.empty p,
+.emptyRow {
+  margin: 0;
+}
+
+.emptyRow {
+  padding: 20px;
+  font-size: 13px;
+  color: var(--muted);
+  text-align: center;
+}
+
+/* The on/off switch for a source. */
+.switch {
+  position: relative;
+  width: 36px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: var(--border-control);
+  cursor: pointer;
+}
+
+.switchOn {
+  background: var(--ink);
+}
+
+.switchKnob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--muted);
+  transition: left 150ms ease;
+}
+
+.switchOn .switchKnob {
+  left: 18px;
+  background: var(--bg);
+}
+
+.switch:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.switch:focus-visible,
+.tab:focus-visible,
+.backButton:focus-visible,
+.stripLink:focus-visible,
+.batchToggle:focus-visible {
+  outline: 2px solid var(--signal-bright);
+  outline-offset: 2px;
+}
+
+/* Collections. */
+.batchHeading {
+  margin: 0;
+}
+
+.batchToggle {
+  width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 16px;
+  padding: 16px 20px;
+  border: 0;
+  border-radius: 12px;
+  background: none;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.batchToggle[aria-expanded='true'] {
+  border-bottom: 1px solid var(--border);
+  border-radius: 12px 12px 0 0;
+}
+
+.batchTitle {
+  flex: 1 1 auto;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.batchSummary {
+  font: 500 12px var(--font-mono);
+  color: var(--muted);
+}
+
+.chevron,
+.chevronOpen {
+  flex: none;
+  color: var(--muted);
+  transition: rotate 150ms ease;
+}
+
+.chevronOpen {
+  rotate: 180deg;
+}
+
+/* Add dialog. */
+.dialogForm {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 24px;
+}
+
+.dialogActions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.kinds {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.legend {
+  padding: 0;
+  margin-bottom: 8px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.kindGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.kind {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 38px;
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius-md);
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.kindOn {
+  border-color: var(--ink);
+  background: var(--surface-raised);
+  color: var(--ink);
+}
+
+.kind:focus-within {
+  outline: 2px solid var(--signal-bright);
+  outline-offset: 2px;
+}
+
+.kindInput {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.monoInput {
+  font-family: var(--font-mono);
+}
+
+@media (max-width: 768px) {
+  .strip {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .stripCell + .stripCell {
+    border-left: 0;
+    border-top: 1px solid var(--border);
+  }
+
+  .kindGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .switchKnob,
+  .chevron,
+  .chevronOpen {
+    transition: none;
+  }
+}

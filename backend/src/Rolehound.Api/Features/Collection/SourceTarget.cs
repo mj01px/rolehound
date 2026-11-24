@@ -36,6 +36,9 @@ public sealed class CollectionRun
 
     public Guid TargetId { get; init; }
 
+    /// <summary>Shared by every read of one collection, so the admin sees them as one run.</summary>
+    public Guid BatchId { get; init; }
+
     public DateTimeOffset StartedAt { get; init; }
 
     public DateTimeOffset FinishedAt { get; set; }

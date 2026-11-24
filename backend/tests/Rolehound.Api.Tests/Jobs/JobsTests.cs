@@ -193,8 +193,14 @@ public sealed class JobsTests(ApiFactory factory) : ApiTest(factory)
         Assert.Equal(HttpStatusCode.TooManyRequests, again.StatusCode);
         Assert.Equal("run_too_soon", await ProblemCodeAsync(again));
 
-        var runs = await ReadAsync<List<CollectionRunResponse>>(await admin.GetAsync(new Uri("/admin/sources/runs", UriKind.Relative), Ct));
-        Assert.Single(runs);
+        var collections = await ReadAsync<List<CollectionBatchResponse>>(await admin.GetAsync(new Uri("/admin/sources/collections", UriKind.Relative), Ct));
+        var collection = Assert.Single(collections);
+        Assert.Equal(1, collection.Targets);
+        Assert.Equal(collection.Targets, collection.Changes.Count + collection.Unchanged);
+
+        var status = await ReadAsync<SourcesStatusResponse>(await admin.GetAsync(new Uri("/admin/sources/status", UriKind.Relative), Ct));
+        Assert.NotNull(status.ManualAvailableAt);
+        Assert.True(status.NextScheduledAt > DateTimeOffset.UtcNow);
     }
 
     private async Task<User> OnboardedAsync(string email)

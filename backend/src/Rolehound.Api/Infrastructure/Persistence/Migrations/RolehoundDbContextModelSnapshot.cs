@@ -696,6 +696,10 @@ namespace Rolehound.Api.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("added");
 
+                    b.Property<Guid>("BatchId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("batch_id");
+
                     b.Property<int>("Closed")
                         .HasColumnType("integer")
                         .HasColumnName("closed");
@@ -727,6 +731,9 @@ namespace Rolehound.Api.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id")
                         .HasName("pk_collection_runs");
+
+                    b.HasIndex("BatchId")
+                        .HasDatabaseName("ix_collection_runs_batch_id");
 
                     b.HasIndex("StartedAt")
                         .HasDatabaseName("ix_collection_runs_started_at");
