@@ -1,6 +1,7 @@
 import { createBrowserRouter } from 'react-router'
 import { SettingsPage } from '../features/account/SettingsPage'
-import { AdminUsersPage } from '../features/admin/AdminUsersPage'
+import { UserPage } from '../features/admin/users/UserPage'
+import { UsersPage } from '../features/admin/users/UsersPage'
 import { AccessPage } from '../features/auth/AccessPage'
 import { ConfirmEmailPage } from '../features/auth/ConfirmEmailPage'
 import { LoginPage } from '../features/auth/LoginPage'
@@ -49,7 +50,8 @@ export const router = createBrowserRouter([
           {
             element: <RequireAuth admin />,
             children: [
-              { path: '/admin/usuarios', element: <AdminUsersPage /> },
+              { path: '/admin/usuarios', element: <UsersPage /> },
+              { path: '/admin/usuarios/:id', element: <UserPage /> },
               { path: '/admin/fontes', element: <AdminSourcesPage /> },
               { path: '/admin/qualidade', element: <AdminAccuracyPage /> },
               { path: '/admin/modelos', element: <AdminModelsPage /> },

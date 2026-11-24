@@ -27,7 +27,7 @@ internal sealed partial class AdminSeeder(
             return;
         }
 
-        var admin = new User { Email = email.Trim(), UserName = username.Trim().ToLowerInvariant(), Role = UserRole.Admin, CreatedAt = time.GetUtcNow() };
+        var admin = new User { Name = username.Trim(), Email = email.Trim(), UserName = username.Trim().ToLowerInvariant(), Role = UserRole.Admin, CreatedAt = time.GetUtcNow() };
         var result = await users.CreateAsync(admin);
         if (!result.Succeeded)
         {

@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Rolehound.Api.Features.Accounts.Admin;
 
 namespace Rolehound.Api.Features.Accounts;
 
@@ -8,6 +9,7 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
     public void Configure(EntityTypeBuilder<User> builder)
     {
         builder.ToTable("users");
+        builder.Property(u => u.Name).HasMaxLength(AdminUsers.NameMaxLength);
         builder.Property(u => u.Role).HasConversion<string>().HasMaxLength(16);
         builder.Property(u => u.TwoFactorMethod).HasConversion<string>().HasMaxLength(16);
         builder.Ignore(u => u.HasAccess);
@@ -37,6 +39,7 @@ internal sealed class SecurityEventConfiguration : IEntityTypeConfiguration<Secu
         builder.Property(e => e.Type).HasConversion<string>().HasMaxLength(48);
         builder.Property(e => e.IpAddress).HasMaxLength(45);
         builder.HasIndex(e => e.OccurredAt);
-        builder.HasIndex(e => e.UserId);
+        builder.HasIndex(e => new { e.UserId, e.OccurredAt });
+        builder.HasIndex(e => new { e.ActorId, e.OccurredAt });
     }
 }

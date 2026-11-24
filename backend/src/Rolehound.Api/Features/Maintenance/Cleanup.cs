@@ -13,8 +13,8 @@ public sealed record CleanupResponse(int SecurityEventsDeleted, int AccountToken
 /// </summary>
 internal static class Cleanup
 {
-    /// <summary>NFR-SEC-10.</summary>
-    public static readonly TimeSpan SecurityEventRetention = TimeSpan.FromDays(15);
+    /// <summary>NFR-SEC-10: long enough for the account history the admin reads.</summary>
+    public static readonly TimeSpan SecurityEventRetention = TimeSpan.FromDays(90);
 
     /// <summary>Spent or expired links and codes are useless after this; kept briefly for support questions.</summary>
     public static readonly TimeSpan SpentTokenRetention = TimeSpan.FromDays(7);

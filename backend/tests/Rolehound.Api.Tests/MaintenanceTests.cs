@@ -32,8 +32,8 @@ public sealed class MaintenanceTests(ApiFactory factory) : ApiTest(factory)
         {
             var db = scope.ServiceProvider.GetRequiredService<RolehoundDbContext>();
             db.SecurityEvents.AddRange(
-                new SecurityEvent { Type = SecurityEventType.LoginSucceeded, UserId = user.Id, OccurredAt = now.AddDays(-16) },
-                new SecurityEvent { Type = SecurityEventType.LoginSucceeded, UserId = user.Id, OccurredAt = now.AddDays(-1) });
+                new SecurityEvent { Type = SecurityEventType.LoginSucceeded, UserId = user.Id, OccurredAt = now.AddDays(-91) },
+                new SecurityEvent { Type = SecurityEventType.LoginSucceeded, UserId = user.Id, OccurredAt = now.AddDays(-89) });
             db.AccountTokens.AddRange(
                 new AccountToken { UserId = user.Id, Purpose = AccountTokenPurpose.PasswordReset, Hash = new byte[32], CreatedAt = now.AddDays(-9), ExpiresAt = now.AddDays(-8) },
                 new AccountToken { UserId = user.Id, Purpose = AccountTokenPurpose.Access, Hash = new byte[32], CreatedAt = now, ExpiresAt = now.AddHours(72) });

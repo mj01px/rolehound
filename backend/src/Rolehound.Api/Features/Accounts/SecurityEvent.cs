@@ -18,10 +18,12 @@ public enum SecurityEventType
     UserDeactivated,
     UserReactivated,
     RoleChanged,
+    UserEdited,
+    AccessLinkSent,
     AiKeyChanged,
 }
 
-/// <summary>Security audit trail, kept for 15 days (NFR-SEC-10).</summary>
+/// <summary>Security audit trail, kept for 90 days (NFR-SEC-10). The admin reads it as each account's history, without the IP.</summary>
 public sealed class SecurityEvent
 {
     public Guid Id { get; init; } = Guid.CreateVersion7();

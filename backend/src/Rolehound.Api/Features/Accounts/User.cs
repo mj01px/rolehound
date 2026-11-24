@@ -28,6 +28,9 @@ public sealed class User : IdentityUser<Guid>
         SecurityStamp = Guid.NewGuid().ToString("N");
     }
 
+    /// <summary>How the admin refers to the person in the user list; set by the admin.</summary>
+    public string Name { get; set; } = string.Empty;
+
     public UserRole Role { get; set; }
 
     public bool IsActive { get; set; } = true;

@@ -222,8 +222,11 @@ namespace Rolehound.Api.Infrastructure.Persistence.Migrations
                     b.HasIndex("OccurredAt")
                         .HasDatabaseName("ix_security_events_occurred_at");
 
-                    b.HasIndex("UserId")
-                        .HasDatabaseName("ix_security_events_user_id");
+                    b.HasIndex("ActorId", "OccurredAt")
+                        .HasDatabaseName("ix_security_events_actor_id_occurred_at");
+
+                    b.HasIndex("UserId", "OccurredAt")
+                        .HasDatabaseName("ix_security_events_user_id_occurred_at");
 
                     b.ToTable("security_events", (string)null);
                 });
@@ -276,6 +279,12 @@ namespace Rolehound.Api.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset?>("LockoutEnd")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("lockout_end");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("name");
 
                     b.Property<string>("NormalizedEmail")
                         .HasMaxLength(256)

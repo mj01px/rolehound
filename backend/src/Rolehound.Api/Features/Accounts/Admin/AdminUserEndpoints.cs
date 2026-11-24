@@ -7,12 +7,15 @@ internal static class AdminUserEndpoints
         var admin = endpoints.MapGroup("/admin/users").WithTags("Admin").RequireAuthorization(AccountsModule.AdminPolicy);
 
         admin.MapGet(string.Empty, AdminUsers.List);
+        admin.MapGet("/{id:guid}", AdminUsers.Get);
+        admin.MapGet("/{id:guid}/history", AdminUsers.History);
         admin.MapPost("/{id:guid}/access-link", AdminUsers.ResendAccessLink);
         admin.MapPost("/{id:guid}/deactivate", AdminUsers.Deactivate);
         admin.MapPost("/{id:guid}/reactivate", AdminUsers.Reactivate);
 
         // Sensitive actions (FR-ACC-12).
         admin.MapPost(string.Empty, AdminUsers.Create).RequireRecentReauthentication();
+        admin.MapPut("/{id:guid}", AdminUsers.Update).RequireRecentReauthentication();
         admin.MapPut("/{id:guid}/role", AdminUsers.ChangeRole).RequireRecentReauthentication();
 
         return endpoints;
