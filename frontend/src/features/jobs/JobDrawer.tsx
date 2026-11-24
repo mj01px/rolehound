@@ -28,7 +28,14 @@ export function JobDrawer() {
   const { search } = useLocation()
   const navigate = useNavigate()
   const heading = useRef<HTMLHeadingElement>(null)
-  const close = useCallback(() => navigate({ pathname: '/', search }), [navigate, search])
+  // The job whose panel is sliding out; the address changes once the slide ends.
+  const [closingId, setClosingId] = useState<string | null>(null)
+  const closing = closingId === id
+  const leave = useCallback(() => navigate({ pathname: '/', search }), [navigate, search])
+  const close = useCallback(() => {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) leave()
+    else setClosingId(id)
+  }, [id, leave])
 
   // Escape closes the panel, unless a dialog inside it is open and takes the key.
   useEffect(() => {
@@ -44,7 +51,13 @@ export function JobDrawer() {
   }, [id])
 
   return (
-    <aside className={styles.drawer} aria-labelledby="job-title">
+    <aside
+      className={closing ? `${styles.drawer} ${styles.drawerClosing}` : styles.drawer}
+      aria-labelledby="job-title"
+      onAnimationEnd={(event) => {
+        if (closing && event.target === event.currentTarget) leave()
+      }}
+    >
       <div className={styles.drawerBar}>
         <h2 id="job-title" ref={heading} tabIndex={-1} className={styles.drawerLabel}>
           Vaga
