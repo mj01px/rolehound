@@ -8,6 +8,8 @@ namespace Rolehound.Api.Features.Jobs;
 
 public sealed record ScoreSummary(int JobsAnalyzed, int JobsMatching, int Highlights);
 
+public sealed record ProfileImpact(int JobsAnalyzed, int MatchingBefore, int MatchingAfter, int HighlightsBefore, int HighlightsAfter);
+
 /// <summary>
 /// Scores jobs for people with the scoring engine and their own profile.
 /// Everyone active, onboarded and with a profile gets a score for every
@@ -48,6 +50,28 @@ public sealed class JobScoring(RolehoundDbContext db, TimeProvider time)
         await db.SaveChangesAsync(ct);
 
         return new ScoreSummary(jobs.Count, scored.Count(u => u.IsRelevant), scored.Count(u => u.IsRelevant && u.IsHighlight));
+    }
+
+    /// <summary>
+    /// What two profiles would do to the active jobs, without saving anything: how many
+    /// match and how many are highlights under each. Answers "did this change help?".
+    /// </summary>
+    public async Task<ProfileImpact> CompareAsync(ScoreProfile before, ScoreProfile after, CancellationToken ct)
+    {
+        var jobs = await db.Jobs.AsNoTracking().Where(j => j.Status == SourceStatus.Active).ToListAsync(ct);
+        var (oldScorer, newScorer) = (new JobScorer(before), new JobScorer(after));
+        int matchingBefore = 0, highlightsBefore = 0, matchingAfter = 0, highlightsAfter = 0;
+        foreach (var job in jobs)
+        {
+            var text = job.ToText();
+            var (old, now) = (oldScorer.Score(text), newScorer.Score(text));
+            matchingBefore += old.IsRelevant ? 1 : 0;
+            highlightsBefore += old.IsRelevant && old.IsHighlight ? 1 : 0;
+            matchingAfter += now.IsRelevant ? 1 : 0;
+            highlightsAfter += now.IsRelevant && now.IsHighlight ? 1 : 0;
+        }
+
+        return new ProfileImpact(jobs.Count, matchingBefore, matchingAfter, highlightsBefore, highlightsAfter);
     }
 
     private List<UserJob> Apply(Guid userId, JobScorer scorer, IEnumerable<Job> jobs, Dictionary<Guid, UserJob> existing)

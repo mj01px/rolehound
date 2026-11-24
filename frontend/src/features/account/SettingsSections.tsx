@@ -7,6 +7,7 @@ import { Button } from '../../ui/Button'
 import { DossierStep } from '../onboarding/DossierStep'
 import { KeyStep } from '../onboarding/KeyStep'
 import { ModelsStep } from '../onboarding/ModelsStep'
+import { ProfileRefiner } from '../onboarding/ProfileRefiner'
 import { ProfileStep } from '../onboarding/ProfileStep'
 import type { AiSettings, ProfileDocument, ProfileGroup } from '../onboarding/api'
 import { useSensitive } from './sensitive'
@@ -145,6 +146,7 @@ export function DossierSection() {
               Gerar opções
             </Button>
           </div>
+          <ProfileRefineRow />
           <ProfileEditor />
         </>
       )}
@@ -181,6 +183,34 @@ function ProfileEditor() {
       </div>
       {stored.isError && <Alert>{errorMessage(stored.error)}</Alert>}
       {open && stored.data && <ProfileForm key={JSON.stringify(stored.data.profile)} initial={stored.data} onSaved={() => setOpen(false)} />}
+    </div>
+  )
+}
+
+/** Changes to the saved profile described in words (FR-SCO-02); accepting saves and rescores every active job. */
+function ProfileRefineRow() {
+  const queryClient = useQueryClient()
+  const stored = useQuery({ queryKey: ['score-profile'], queryFn: ({ signal }) => api.get<StoredProfile>('/score-profile', signal) })
+
+  if (!stored.data) {
+    return null
+  }
+
+  const { dossierVersion } = stored.data
+  return (
+    <div className={styles.row} style={{ flexDirection: 'column', alignItems: 'stretch' }}>
+      <div className={styles.rowText}>
+        <span className={styles.rowTitle}>Ajustar perfil com IA</span>
+        <span className={styles.muted}>Diga o que mudar com suas palavras. Você vê cada mudança e o efeito nas vagas antes de salvar.</span>
+      </div>
+      <ProfileRefiner
+        profile={stored.data.profile}
+        acceptLabel="Aplicar e salvar"
+        onAccept={async (profile) => {
+          await api.put('/score-profile', { profile, dossierVersion })
+          await queryClient.invalidateQueries()
+        }}
+      />
     </div>
   )
 }

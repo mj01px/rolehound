@@ -35,6 +35,7 @@ internal static class ScoreProfileEndpoints
         var profile = endpoints.MapGroup("/score-profile").WithTags("Score profile").AllowBeforeOnboarding();
         profile.MapGet(string.Empty, Get);
         profile.MapPost("/options", GenerateOptions);
+        profile.MapPost("/refine", ProfileRefinement.Refine);
         profile.MapPut(string.Empty, Save);
         return endpoints;
     }
@@ -51,23 +52,13 @@ internal static class ScoreProfileEndpoints
         ClaimsPrincipal principal, RolehoundDbContext db, AiGateway ai, CancellationToken ct)
     {
         var userId = principal.GetUserId();
-        var dossier = await db.DossierVersions.AsNoTracking().Where(d => d.UserId == userId).OrderByDescending(d => d.Number).FirstOrDefaultAsync(ct);
+        var dossier = await LatestDossierAsync(db, userId, ct);
         if (dossier is null)
         {
             return Problems.Conflict("dossier_missing", "Importe seu Dossier primeiro.");
         }
 
-        var full = JsonNode.Parse(dossier.Content)!.AsObject();
-        var excerpt = new JsonObject();
-        foreach (var section in SectionsSent)
-        {
-            if (full[section] is { } node)
-            {
-                excerpt[section] = node.DeepClone();
-            }
-        }
-
-        ChatMessage[] messages = [new("system", Instructions), new("user", $"Dossier (excerpt):\n{excerpt.ToJsonString()}")];
+        ChatMessage[] messages = [new("system", Instructions), new("user", $"Dossier (excerpt):\n{dossier.Value.Excerpt}")];
 
         try
         {
@@ -75,7 +66,7 @@ internal static class ScoreProfileEndpoints
             var options = Parse(answer);
             return options.Count == 0
                 ? Problems.Problem(StatusCodes.Status502BadGateway, "ai_invalid_output", "O modelo não gerou opções válidas. Tente de novo ou troque o modelo.")
-                : TypedResults.Ok(new ProfileOptionsResponse(dossier.Number, options));
+                : TypedResults.Ok(new ProfileOptionsResponse(dossier.Value.Number, options));
         }
         catch (AiException ex)
         {
@@ -152,8 +143,30 @@ internal static class ScoreProfileEndpoints
         }
     }
 
+    /// <summary>The latest Dossier version and the sections the profile features send (BR-AI-02), as JSON.</summary>
+    internal static async Task<(int Number, string Excerpt)?> LatestDossierAsync(RolehoundDbContext db, Guid userId, CancellationToken ct)
+    {
+        var dossier = await db.DossierVersions.AsNoTracking().Where(d => d.UserId == userId).OrderByDescending(d => d.Number).FirstOrDefaultAsync(ct);
+        if (dossier is null)
+        {
+            return null;
+        }
+
+        var full = JsonNode.Parse(dossier.Content)!.AsObject();
+        var excerpt = new JsonObject();
+        foreach (var section in SectionsSent)
+        {
+            if (full[section] is { } node)
+            {
+                excerpt[section] = node.DeepClone();
+            }
+        }
+
+        return (dossier.Number, excerpt.ToJsonString());
+    }
+
     // Trims and de-duplicates terms; the engine normalises case and accents itself.
-    private static ProfileDocument Normalize(ProfileDocument profile) => profile with
+    internal static ProfileDocument Normalize(ProfileDocument profile) => profile with
     {
         Groups = (profile.Groups ?? []).Select(g => g with
         {
@@ -164,9 +177,16 @@ internal static class ScoreProfileEndpoints
         SearchTerms = (profile.SearchTerms ?? []).Select(t => t?.Trim() ?? string.Empty).Where(t => t.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).ToList(),
     };
 
-    private const string Instructions = """
+    private const string Instructions = $"""
         You build job-matching profiles for Brazilian job postings. From the person's Dossier excerpt, propose up to three distinct options for how to score postings for them, written in Brazilian Portuguese where text is shown to people.
 
+        {EngineGuide}
+
+        Rules: use only what the Dossier supports; do not invent skills. Options must differ in focus (for example, narrow core role versus broader adjacent roles). Each option has a short name and a one-sentence description of its focus.
+        """;
+
+    /// <summary>How the scoring engine reads a profile; shared by every prompt that writes one.</summary>
+    internal const string EngineGuide = """
         How the scoring engine works:
         - A profile is a list of term groups. Each group has a name, an integer weight and terms (words or short phrases as they appear in Brazilian job postings, in Portuguese and common English tech terms).
         - A group counts once per posting when any of its terms appears. A hit in the job title counts double.
@@ -176,8 +196,6 @@ internal static class ScoreProfileEndpoints
         - yearsBands penalise postings that demand many years of experience, e.g. {"minYears": 5, "penalty": -25} and {"minYears": 3, "penalty": -12} for a junior person; use none for senior people.
         - minHighlightScore is usually 25.
         - searchTerms are the 5 to 20 queries to run on job boards (role names the person would apply to).
-
-        Rules: use only what the Dossier supports; do not invent skills. Options must differ in focus (for example, narrow core role versus broader adjacent roles). Each option has a short name and a one-sentence description of its focus.
         """;
 
     private static readonly JsonNode OptionsSchema = JsonNode.Parse("""

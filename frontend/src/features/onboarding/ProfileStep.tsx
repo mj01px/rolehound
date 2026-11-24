@@ -4,7 +4,8 @@ import { api, errorMessage } from '../../lib/api'
 import { Alert } from '../../ui/Alert'
 import { Button } from '../../ui/Button'
 import uiStyles from '../../ui/ui.module.css'
-import type { ProfileOption } from './api'
+import type { ProfileDocument, ProfileOption } from './api'
+import { ProfileRefiner } from './ProfileRefiner'
 import styles from './onboarding.module.css'
 
 interface OptionsResponse {
@@ -12,20 +13,30 @@ interface OptionsResponse {
   options: ProfileOption[]
 }
 
-/** AI proposes options only when asked (FR-SCO-01); the person picks one. Full editing lives on the score profile page. */
+/**
+ * AI proposes options only when asked (FR-SCO-01); the person picks one and may
+ * ask the AI for changes before keeping it. Full editing lives on the settings page.
+ */
 export function ProfileStep({ onDone, onBack }: { onDone: () => Promise<void>; onBack?: (() => void) | undefined }) {
   const [selected, setSelected] = useState(0)
+  // Options the person adjusted with the AI, by index; reset with every new batch.
+  const [adjusted, setAdjusted] = useState<Record<number, ProfileDocument>>({})
   const generate = useMutation({
     mutationFn: () => api.post<OptionsResponse>('/score-profile/options'),
-    onSuccess: () => setSelected(0),
+    onSuccess: () => {
+      setSelected(0)
+      setAdjusted({})
+    },
   })
   const save = useMutation({
-    mutationFn: (option: ProfileOption) =>
-      api.put('/score-profile', { profile: option.profile, dossierVersion: generate.data?.dossierVersion }),
+    mutationFn: (profile: ProfileDocument) => api.put('/score-profile', { profile, dossierVersion: generate.data?.dossierVersion }),
     onSuccess: onDone,
   })
 
-  const options = generate.data?.options ?? []
+  const options: ProfileOption[] = (generate.data?.options ?? []).map((option, i) => {
+    const profile = adjusted[i]
+    return profile ? { ...option, profile } : option
+  })
   const chosen = options[selected]
 
   return (
@@ -48,7 +59,10 @@ export function ProfileStep({ onDone, onBack }: { onDone: () => Promise<void>; o
                 <span>
                   <span className={styles.optionName}>{option.name}</span>
                   <br />
-                  <span className={styles.hint}>{option.description}</span>
+                  <span className={styles.hint}>
+                    {option.description}
+                    {adjusted[i] && ' Ajustado por você.'}
+                  </span>
                 </span>
               </span>
               {i === selected && (
@@ -67,9 +81,18 @@ export function ProfileStep({ onDone, onBack }: { onDone: () => Promise<void>; o
         </div>
       )}
 
+      {chosen && (
+        <ProfileRefiner
+          key={selected}
+          profile={chosen.profile}
+          acceptLabel="Usar o ajuste"
+          onAccept={(profile) => setAdjusted((current) => ({ ...current, [selected]: profile }))}
+        />
+      )}
+
       <div className={styles.actions}>
         {chosen ? (
-          <Button size="large" block onClick={() => save.mutate(chosen)} disabled={save.isPending}>
+          <Button size="large" block onClick={() => save.mutate(chosen.profile)} disabled={save.isPending}>
             Usar este perfil
           </Button>
         ) : (
