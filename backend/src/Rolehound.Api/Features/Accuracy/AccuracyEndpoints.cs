@@ -9,7 +9,7 @@ using Rolehound.Scoring;
 
 namespace Rolehound.Api.Features.Accuracy;
 
-public sealed record SampleItemResponse(Guid Id, Guid? JobId, string Title, string Company, int Score, string ShownWorkMode, string Status, bool? Relevant, bool? WorkModeRight);
+public sealed record SampleItemResponse(Guid Id, Guid? JobId, string Title, string Company, int Score, string ShownWorkMode, string Status, bool? Relevant, bool? WorkModeRight, string? Url);
 
 public sealed record SampleResponse(DateOnly Month, int Pending, int Labelled, int Skipped, IReadOnlyList<SampleItemResponse> Items);
 
@@ -76,13 +76,14 @@ internal static class AccuracyEndpoints
             .Where(s => s.UserId == userId && s.Month == month)
             .OrderBy(s => s.CreatedAt).ThenBy(s => s.Id)
             .ToListAsync(ct);
+        var urls = await UrlsAsync(db, items, ct);
 
         return TypedResults.Ok(new SampleResponse(
             month,
             items.Count(i => i.Status == SampleItemStatus.Pending),
             items.Count(i => i.Status == SampleItemStatus.Labelled),
             items.Count(i => i.Status == SampleItemStatus.Skipped),
-            items.Select(ToResponse).ToList()));
+            items.Select(i => ToResponse(i, urls)).ToList()));
     }
 
     /// <summary>This month's pending items, drawing the sample first if needed, as the sample page does.</summary>
@@ -147,7 +148,7 @@ internal static class AccuracyEndpoints
         item.Status = SampleItemStatus.Labelled;
         item.LabelledAt = time.GetUtcNow();
         await db.SaveChangesAsync(ct);
-        return TypedResults.Ok(ToResponse(item));
+        return TypedResults.Ok(ToResponse(item, await UrlsAsync(db, [item], ct)));
     }
 
     // Skipping leaves this month's pending items out of every metric.
@@ -235,6 +236,14 @@ internal static class AccuracyEndpoints
 
     private static Rate RateOf(int hits, int total) => new(total >= MinimumLabels ? Math.Round((double)hits / total, 3) : null, hits, total);
 
-    private static SampleItemResponse ToResponse(SampleItem s) => new(
-        s.Id, s.JobId, s.Title, s.Company, s.Score, s.ShownWorkMode.ToString().ToLowerInvariant(), s.Status.ToString().ToLowerInvariant(), s.Relevant, s.WorkModeRight);
+    /// <summary>The source page of each sampled job, so the labeller can open the original posting.</summary>
+    private static async Task<Dictionary<Guid, string>> UrlsAsync(RolehoundDbContext db, IReadOnlyCollection<SampleItem> items, CancellationToken ct)
+    {
+        var ids = items.Where(i => i.JobId is not null).Select(i => i.JobId!.Value).Distinct().ToList();
+        return await db.Jobs.AsNoTracking().Where(j => ids.Contains(j.Id)).ToDictionaryAsync(j => j.Id, j => j.Url, ct);
+    }
+
+    private static SampleItemResponse ToResponse(SampleItem s, Dictionary<Guid, string> urls) => new(
+        s.Id, s.JobId, s.Title, s.Company, s.Score, s.ShownWorkMode.ToString().ToLowerInvariant(), s.Status.ToString().ToLowerInvariant(), s.Relevant, s.WorkModeRight,
+        s.JobId is { } jobId && urls.TryGetValue(jobId, out var url) && url.Length > 0 ? url : null);
 }

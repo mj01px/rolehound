@@ -11,6 +11,8 @@ export interface SampleItem {
   status: 'pending' | 'labelled' | 'skipped'
   relevant: boolean | null
   workModeRight: boolean | null
+  /** The original posting, when the job still exists. */
+  url: string | null
 }
 
 export interface Sample {

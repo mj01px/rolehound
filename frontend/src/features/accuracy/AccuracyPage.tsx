@@ -283,8 +283,8 @@ function Labeller({ sample, item, onStop }: { sample: Sample; item: SampleItem; 
         </span>
         <h2 className={styles.jobTitle}>{item.title}</h2>
         <p className={styles.jobMeta}>{[item.company, knownMode ? workModeLabels[item.shownWorkMode] : null].filter(Boolean).join(' · ')}</p>
-        {item.jobId && (
-          <a href={`/vagas/${item.jobId}`} target="_blank" rel="noopener noreferrer" className={styles.open}>
+        {item.url && (
+          <a href={item.url} target="_blank" rel="noopener noreferrer" className={styles.open}>
             Abrir a vaga
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M7 17 17 7M8 7h9v9" />
@@ -320,7 +320,7 @@ function Labeller({ sample, item, onStop }: { sample: Sample; item: SampleItem; 
             <Choice onClick={() => send(null)}>Próxima vaga</Choice>
           </div>
         )}
-        <span className={styles.questionHint}>{relevant === null ? 'Responda a primeira pergunta antes.' : 'Responder aqui já passa para a próxima vaga.'}</span>
+        {relevant !== null && <span className={styles.questionHint}>Responder aqui já passa para a próxima vaga.</span>}
       </fieldset>
 
       {label.isError && <Alert>{errorMessage(label.error)}</Alert>}
@@ -329,7 +329,6 @@ function Labeller({ sample, item, onStop }: { sample: Sample; item: SampleItem; 
         <button type="button" className={styles.quietButton} onClick={onStop}>
           Parar por agora
         </button>
-        <span className={styles.sectionHint}>Suas respostas ficam salvas. Dá para continuar depois.</span>
       </div>
     </div>
   )

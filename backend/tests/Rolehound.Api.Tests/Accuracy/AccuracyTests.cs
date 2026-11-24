@@ -26,6 +26,7 @@ public sealed class AccuracyTests(ApiFactory factory) : ApiTest(factory)
 
         var sample = await SampleAsync(browser);
         Assert.Equal(20, sample.Items.Count);
+        Assert.All(sample.Items, i => Assert.StartsWith("https://", i.Url, StringComparison.Ordinal));
         Assert.Equal(20, sample.Pending);
         Assert.Equal(sample.Items.Select(i => i.Id), (await SampleAsync(browser)).Items.Select(i => i.Id));
 
