@@ -4,6 +4,7 @@ import { ApiError, api, errorMessage } from '../../lib/api'
 import { Alert, Notice } from '../../ui/Alert'
 import { Button } from '../../ui/Button'
 import { Field } from '../../ui/Field'
+import { Select } from '../../ui/Select'
 import uiStyles from '../../ui/ui.module.css'
 import { useMe } from '../auth/api'
 import { useSensitive } from '../account/sensitive'
@@ -114,10 +115,15 @@ function GrantAccessForm() {
           <label htmlFor="role" className={uiStyles.label}>
             Papel
           </label>
-          <select id="role" className={uiStyles.input} value={role} onChange={(e) => setRole(e.target.value as 'user' | 'admin')}>
-            <option value="user">Usuário</option>
-            <option value="admin">Admin</option>
-          </select>
+          <Select
+            id="role"
+            value={role}
+            options={[
+              { value: 'user', label: 'Usuário' },
+              { value: 'admin', label: 'Admin' },
+            ]}
+            onChange={setRole}
+          />
         </div>
         <Button type="submit" size="large" disabled={create.isPending || !email || !username}>
           Enviar link de acesso

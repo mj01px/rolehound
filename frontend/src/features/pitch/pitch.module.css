@@ -75,27 +75,6 @@
   gap: 12px;
 }
 
-.controls {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-}
-
-.languageField,
-.instructionField {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.languageField {
-  flex: 0 1 160px;
-}
-
-.instructionField {
-  flex: 1 1 240px;
-}
-
 .select {
   height: 40px;
   padding: 0 12px;
@@ -110,6 +89,32 @@
 }
 
 .select:focus-visible {
+  outline: 2px solid var(--signal-bright);
+  outline-offset: 2px;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.addInstruction {
+  margin-left: 4px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: 400 13px/18px var(--font-sans);
+  cursor: pointer;
+}
+
+.addInstruction:hover {
+  color: var(--signal-bright);
+}
+
+.addInstruction:focus-visible {
   outline: 2px solid var(--signal-bright);
   outline-offset: 2px;
 }

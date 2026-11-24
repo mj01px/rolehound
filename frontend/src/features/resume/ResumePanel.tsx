@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { api, apiUrl, errorMessage } from '../../lib/api'
 import { Alert } from '../../ui/Alert'
 import { Button } from '../../ui/Button'
+import { Select } from '../../ui/Select'
 import styles from './resume.module.css'
 
 interface Change {
@@ -38,6 +39,11 @@ const languageLabel = { pt: 'Português', en: 'Inglês' } as const
  * Tailored resume for one job. Generation runs in a queue; the person reviews
  * every reworded sentence and every cut before downloading the PDF.
  */
+const languages = [
+  { value: 'pt', label: 'Português' },
+  { value: 'en', label: 'Inglês' },
+] as const
+
 export function ResumePanel({ jobId }: { jobId: string }) {
   const queryClient = useQueryClient()
   const listKey = ['resumes', jobId]
@@ -69,11 +75,8 @@ export function ResumePanel({ jobId }: { jobId: string }) {
       <p className={styles.muted}>Feito do seu Dossier para essa vaga. Empresas, cargos, datas e formação são copiados do Dossier; a IA só escolhe o que entra e reescreve frases.</p>
 
       <div className={styles.controls}>
-        <select className={styles.select} value={language} onChange={(event) => setLanguage(event.target.value as 'pt' | 'en')} aria-label="Idioma do currículo">
-          <option value="pt">Português</option>
-          <option value="en">Inglês</option>
-        </select>
-        <Button variant={generations.length ? 'secondary' : 'primary'} onClick={() => generate.mutate()} disabled={generate.isPending || busy}>
+        <Select variant="compact" label="Idioma do currículo" value={language} options={languages} onChange={setLanguage} />
+        <Button variant="secondary" onClick={() => generate.mutate()} disabled={generate.isPending || busy}>
           {busy ? 'Gerando...' : 'Gerar currículo'}
         </Button>
       </div>

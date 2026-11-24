@@ -4,6 +4,7 @@ import { ApiError, api, errorMessage } from '../../lib/api'
 import { Alert, Notice } from '../../ui/Alert'
 import { Button } from '../../ui/Button'
 import { Field } from '../../ui/Field'
+import { Select } from '../../ui/Select'
 import uiStyles from '../../ui/ui.module.css'
 import { sourceLabels } from '../jobs/labels'
 import styles from './admin.module.css'
@@ -248,13 +249,7 @@ function AddSourceForm() {
           <label htmlFor="source-kind" className={uiStyles.label}>
             Tipo
           </label>
-          <select id="source-kind" className={uiStyles.input} value={source} onChange={(event) => setSource(event.target.value as typeof source)}>
-            {addable.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
+          <Select id="source-kind" value={source} options={addable} onChange={setSource} />
         </div>
         <div className={styles.grow2}>
           <Field

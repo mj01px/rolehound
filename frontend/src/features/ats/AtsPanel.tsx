@@ -62,7 +62,7 @@ export function AtsPanel({ jobId }: { jobId: string }) {
       {analyze.isError && <Alert>{errorMessage(analyze.error)}</Alert>}
       {resume.data && (
         <div>
-          <Button variant={report.data ? 'secondary' : 'primary'} onClick={() => analyze.mutate()} disabled={analyze.isPending}>
+          <Button variant="secondary" onClick={() => analyze.mutate()} disabled={analyze.isPending}>
             {analyze.isPending ? 'Analisando...' : report.data ? 'Analisar de novo' : 'Analisar currículo'}
           </Button>
         </div>

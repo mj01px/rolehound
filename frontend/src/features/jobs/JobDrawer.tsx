@@ -15,7 +15,7 @@ type Tool = 'pitch' | 'ats' | 'resume'
 
 const tools: { value: Tool; label: string }[] = [
   { value: 'pitch', label: 'Pitch' },
-  { value: 'ats', label: 'Análise ATS' },
+  { value: 'ats', label: 'ATS' },
   { value: 'resume', label: 'Currículo' },
 ]
 
@@ -60,7 +60,8 @@ export function JobDrawer() {
     >
       <div className={styles.drawerBar}>
         <h2 id="job-title" ref={heading} tabIndex={-1} className={styles.drawerLabel}>
-          Vaga
+          <span className={styles.srOnly}>Vaga</span>
+          <DrawerSource id={id} />
         </h2>
         <button type="button" className={styles.drawerClose} onClick={close} aria-label="Fechar">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
@@ -75,6 +76,22 @@ export function JobDrawer() {
   )
 }
 
+/** "Gupy · hoje" in the panel's top bar. */
+function DrawerSource({ id }: { id: string }) {
+  const job = useJob(id).data?.job
+  if (!job) return null
+  return (
+    <span aria-hidden="true">
+      {sourceLabels[job.source] ?? job.source} · {ago(job.publishedAt ?? job.firstSeenAt)}
+    </span>
+  )
+}
+
+const LONG_DESCRIPTION = 420
+
+/** "Stack principal e Nível". */
+const listed = (items: string[]) => (items.length < 2 ? items.join('') : `${items.slice(0, -1).join(', ')} e ${items[items.length - 1]}`)
+
 function JobDetail({ id }: { id: string }) {
   const detail = useJob(id)
   const restore = useRestore(id)
@@ -82,6 +99,7 @@ function JobDetail({ id }: { id: string }) {
   const navigate = useNavigate()
   const [archiving, setArchiving] = useState(false)
   const [tool, setTool] = useState<Tool>('pitch')
+  const [expanded, setExpanded] = useState(false)
 
   if (detail.isError) {
     return <Alert>{errorMessage(detail.error)}</Alert>
@@ -92,42 +110,53 @@ function JobDetail({ id }: { id: string }) {
   }
 
   const { job, description, url, matchedGroups, archivedAt, archiveNote, addedByUser, applicationId } = detail.data
-  const meta = [job.company, job.location].filter(Boolean).join(' · ')
+  const meta = [
+    job.company,
+    job.location,
+    job.workMode !== 'unknown' ? workModeLabels[job.workMode] : null,
+    job.seniority !== 'unknown' ? seniorityLabels[job.seniority] : null,
+    addedByUser ? 'Adicionada por você' : null,
+  ]
+    .filter(Boolean)
+    .join(' · ')
+  const long = description.length > LONG_DESCRIPTION
 
   return (
     <article className={styles.detail}>
       <header className={styles.detailHeader}>
-        <div className={styles.detailTitleRow}>
-          <h3 className={styles.title}>{job.title}</h3>
-          <span className={job.isHighlight ? `${styles.score} ${styles.scoreHigh} ${styles.scoreLarge}` : `${styles.score} ${styles.scoreLarge}`}>
-            {job.score}
+        <div className={styles.scoreLine}>
+          <span className={job.score < 0 ? `${styles.points} ${styles.pointsNegative}` : styles.points} title="Pontos do seu perfil">
+            {job.score > 0 ? `+${job.score}` : job.score}
           </span>
+          {job.isHighlight && (
+            <span className={styles.marker}>
+              <span className={styles.markerDot} aria-hidden="true" />
+              Destaque
+            </span>
+          )}
+          {job.isNew && <span className={styles.markerQuiet}>Nova</span>}
         </div>
+        <h3 className={styles.drawerTitle}>{job.title}</h3>
         {meta && <p className={styles.rowMeta}>{meta}</p>}
-        <div className={styles.chips}>
-          {job.isHighlight && <span className={`${styles.chip} ${styles.chipSignal}`}>Destaque</span>}
-          {job.isNew && <span className={`${styles.chip} ${styles.chipSignal}`}>Nova</span>}
-          <span className={styles.chip}>{workModeLabels[job.workMode]}</span>
-          <span className={styles.chip}>{seniorityLabels[job.seniority]}</span>
-          <span className={styles.chip}>{sourceLabels[job.source] ?? job.source}</span>
-          {addedByUser && <span className={styles.chip}>Adicionada por você</span>}
-          <span className={styles.chipPlain}>{ago(job.publishedAt ?? job.firstSeenAt)}</span>
-        </div>
       </header>
 
       <div className={styles.actions}>
-        <a className={styles.external} href={url} target="_blank" rel="noopener noreferrer">
-          Abrir vaga original
-        </a>
         {applicationId ? (
-          <Link to={`/funil/${applicationId}`} className={styles.secondaryLink}>
+          <Link to={`/funil/${applicationId}`} className={styles.primaryLink}>
             Ver no funil
           </Link>
         ) : (
-          <Button variant="secondary" onClick={() => enter.mutate('applied', { onSuccess: (card) => navigate(`/funil/${card.id}`) })} disabled={enter.isPending}>
+          <Button onClick={() => enter.mutate('applied', { onSuccess: (card) => navigate(`/funil/${card.id}`) })} disabled={enter.isPending}>
             Mover para o funil
           </Button>
         )}
+        <a className={styles.secondaryLink} href={url} target="_blank" rel="noopener noreferrer">
+          Vaga original
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M7 17 17 7M8 7h9v9" />
+          </svg>
+        </a>
+        <span className={styles.actionsSpacer} />
         {!applicationId &&
           (archivedAt ? (
             <Button variant="ghost" onClick={() => restore.mutate()} disabled={restore.isPending}>
@@ -143,10 +172,10 @@ function JobDetail({ id }: { id: string }) {
       {enter.isError && <Alert>{errorMessage(enter.error)}</Alert>}
 
       {(archivedAt || job.closedAtSource) && (
-        <div className={styles.statusBox}>
+        <div className={styles.statusLine}>
           {archivedAt && (
             <p>
-              Arquivada por você: <strong>{archiveReasonLabel(job.archiveReason)}</strong>
+              Arquivada por você: {archiveReasonLabel(job.archiveReason)}
               {archiveNote && <span className={styles.dim}> · {archiveNote}</span>}
             </p>
           )}
@@ -154,57 +183,73 @@ function JobDetail({ id }: { id: string }) {
         </div>
       )}
 
-      <section aria-labelledby="why-title" className={styles.section}>
-        <h4 id="why-title" className={styles.sectionTitle}>
+      <section aria-labelledby="why-title" className={styles.drawerSection}>
+        <h4 id="why-title" className={styles.drawerHeading}>
           Por que esse score
         </h4>
         {matchedGroups.length === 0 ? (
-          <p className={styles.muted}>Nenhum grupo do seu perfil apareceu na vaga.</p>
+          <p className={styles.rowMeta}>Nenhum grupo do seu perfil apareceu na vaga.</p>
         ) : (
-          <dl className={styles.why}>
-            <dt>Grupos</dt>
-            <dd>{matchedGroups.join(', ')}</dd>
-            <dt>Termos</dt>
-            <dd className={styles.terms}>
-              {job.tags.map((tag) => (
-                <span key={tag} className={styles.term}>
-                  {tag}
-                </span>
-              ))}
-            </dd>
-          </dl>
+          <>
+            {job.tags.length > 0 && (
+              <div className={styles.terms}>
+                {job.tags.map((tag) => (
+                  <span key={tag} className={styles.term}>
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            )}
+            <p className={styles.rowMeta}>Bateu em {listed(matchedGroups)}.</p>
+          </>
         )}
       </section>
 
-      <section aria-label="Ferramentas de IA" className={styles.section}>
-        <div role="tablist" aria-label="Ferramentas de IA" className={styles.toolTabs}>
-          {tools.map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              role="tab"
-              id={`tool-${option.value}`}
-              aria-selected={tool === option.value}
-              aria-controls="tool-panel"
-              className={tool === option.value ? `${styles.toolTab} ${styles.toolTabActive}` : styles.toolTab}
-              onClick={() => setTool(option.value)}
-            >
-              {option.label}
-            </button>
-          ))}
+      <section aria-labelledby="description-title" className={styles.drawerSection}>
+        <h4 id="description-title" className={styles.drawerHeading}>
+          Descrição
+        </h4>
+        {description ? (
+          <>
+            <div className={long && !expanded ? `${styles.description} ${styles.descriptionClamped}` : styles.description}>{description}</div>
+            {long && (
+              <button type="button" className={styles.textButton} onClick={() => setExpanded((value) => !value)} aria-expanded={expanded}>
+                {expanded ? 'Mostrar menos' : 'Mostrar tudo'}
+              </button>
+            )}
+          </>
+        ) : (
+          <p className={styles.rowMeta}>A fonte ainda não mandou a descrição dessa vaga.</p>
+        )}
+      </section>
+
+      <section aria-labelledby="tools-title" className={styles.drawerSection}>
+        <div className={styles.toolsHead}>
+          <h4 id="tools-title" className={styles.drawerHeading}>
+            Com IA
+          </h4>
+          <div role="tablist" aria-label="Ferramentas de IA" className={styles.toolTabs}>
+            {tools.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                role="tab"
+                id={`tool-${option.value}`}
+                aria-selected={tool === option.value}
+                aria-controls="tool-panel"
+                className={tool === option.value ? `${styles.toolTab} ${styles.toolTabActive}` : styles.toolTab}
+                onClick={() => setTool(option.value)}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
         </div>
         <div role="tabpanel" id="tool-panel" aria-labelledby={`tool-${tool}`} className={styles.toolPanel}>
           {tool === 'pitch' && <PitchPanel jobId={id} />}
           {tool === 'ats' && <AtsPanel jobId={id} />}
           {tool === 'resume' && <ResumePanel jobId={id} />}
         </div>
-      </section>
-
-      <section aria-labelledby="description-title" className={styles.section}>
-        <h4 id="description-title" className={styles.sectionTitle}>
-          Descrição
-        </h4>
-        {description ? <div className={styles.description}>{description}</div> : <p className={styles.muted}>A fonte ainda não mandou a descrição dessa vaga.</p>}
       </section>
 
       {archiving && <ArchiveDialog id={id} onClose={() => setArchiving(false)} />}

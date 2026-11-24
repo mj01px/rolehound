@@ -3,6 +3,7 @@ import { useState, type FormEvent } from 'react'
 import { ApiError, api, errorMessage } from '../../lib/api'
 import { Alert } from '../../ui/Alert'
 import { Button } from '../../ui/Button'
+import { Select } from '../../ui/Select'
 import uiStyles from '../../ui/ui.module.css'
 import styles from './pitch.module.css'
 
@@ -21,12 +22,18 @@ interface Pitch {
  * "Tell us about yourself" text for one job, written by the person's own AI
  * model from their Dossier only. Every version stays listed.
  */
+const languages = [
+  { value: 'pt', label: 'Português' },
+  { value: 'en', label: 'Inglês' },
+] as const
+
 export function PitchPanel({ jobId }: { jobId: string }) {
   const queryClient = useQueryClient()
   const key = ['pitches', jobId]
   const versions = useQuery({ queryKey: key, queryFn: ({ signal }) => api.get<Pitch[]>(`/jobs/${jobId}/pitches`, signal) })
   const [language, setLanguage] = useState<'pt' | 'en'>('pt')
   const [instruction, setInstruction] = useState('')
+  const [withInstruction, setWithInstruction] = useState(false)
   const [shown, setShown] = useState(0)
   const generate = useMutation({
     mutationFn: () => api.post<Pitch>(`/jobs/${jobId}/pitches`, { language, instruction }),
@@ -71,35 +78,28 @@ export function PitchPanel({ jobId }: { jobId: string }) {
       )}
 
       <form className={styles.form} onSubmit={submit} noValidate>
-        <div className={styles.controls}>
-          <label className={styles.languageField}>
-            <span className={uiStyles.label}>Idioma</span>
-            <select className={styles.select} value={language} onChange={(event) => setLanguage(event.target.value as 'pt' | 'en')}>
-              <option value="pt">Português</option>
-              <option value="en">Inglês</option>
-            </select>
-          </label>
-          <label className={styles.instructionField}>
-            <span className={uiStyles.label}>Instrução (opcional)</span>
-            <input
-              className={styles.select}
-              value={instruction}
-              onChange={(event) => setInstruction(event.target.value)}
-              maxLength={500}
-              placeholder="Ex.: mais curto, foque em dados"
-            />
-          </label>
-        </div>
-        {error && (
-          <Alert>
-            {error.field('instruction') ?? errorMessage(error)}
-          </Alert>
-        )}
-        <div>
-          <Button type="submit" variant={list.length ? 'secondary' : 'primary'} disabled={generate.isPending}>
+        <div className={styles.row}>
+          <Select variant="compact" label="Idioma" value={language} options={languages} onChange={setLanguage} />
+          <Button type="submit" variant="secondary" disabled={generate.isPending}>
             {generate.isPending ? 'Escrevendo...' : list.length ? 'Gerar outra versão' : 'Gerar pitch'}
           </Button>
+          {!withInstruction && (
+            <button type="button" className={styles.addInstruction} onClick={() => setWithInstruction(true)}>
+              Adicionar instrução
+            </button>
+          )}
         </div>
+        {withInstruction && (
+          <input
+            className={styles.select}
+            aria-label="Instrução (opcional)"
+            value={instruction}
+            onChange={(event) => setInstruction(event.target.value)}
+            maxLength={500}
+            placeholder="Ex.: mais curto, foque em dados"
+          />
+        )}
+        {error && <Alert>{error.field('instruction') ?? errorMessage(error)}</Alert>}
       </form>
     </section>
   )

@@ -3,6 +3,7 @@ import { Link, Outlet, useMatch, useSearchParams } from 'react-router'
 import { errorMessage } from '../../lib/api'
 import { Alert } from '../../ui/Alert'
 import { Button } from '../../ui/Button'
+import { Select } from '../../ui/Select'
 import { icons } from '../../app/navIcons'
 import { AddLinkDialog } from './AddLinkDialog'
 import { useJobs, type JobFilters, type JobListItem, type JobView } from './api'
@@ -28,15 +29,19 @@ export function JobsPage() {
   const [adding, setAdding] = useState(false)
   const jobs = useJobs(filters)
 
+  // Read the address bar, not this render's params: the router applies a change as a
+  // transition, so a second quick change would otherwise start from the old address.
+  const latest = () => new URLSearchParams(window.location.search)
+
   const setParam = (key: string, value: string) => {
-    const next = new URLSearchParams(params)
+    const next = latest()
     if (value) next.set(key, value)
     else next.delete(key)
     setParams(next, { replace: true })
   }
 
   const clearFilters = () => {
-    const next = new URLSearchParams(params)
+    const next = latest()
     for (const key of ['busca', 'fonte', 'modelo', 'nivel']) next.delete(key)
     setSearch('')
     setParams(next, { replace: true })
@@ -184,25 +189,13 @@ function JobRow({ job, open, panelOpen, search }: { job: JobListItem; open: bool
   )
 }
 
-/** A filter as a small pill; the native select sits on top, invisible, so phones get their own picker. */
+/** A filter as a small pill that shows the chosen value. */
 function Pill({ label, value, options, onChange }: { label: string; value: string; options: Record<string, string>; onChange: (value: string) => void }) {
-  const chosen = value ? options[value] : undefined
-  return (
-    <span className={chosen ? `${styles.pill} ${styles.pillOn}` : styles.pill}>
-      <span>{chosen ?? label}</span>
-      <span className={styles.pillChevron} aria-hidden="true">
-        {icons.chevron}
-      </span>
-      <select className={styles.pillSelect} aria-label={label} value={value} onChange={(event) => onChange(event.target.value)}>
-        <option value="">{label}: todos</option>
-        {Object.entries(options)
-          .filter(([key]) => key !== 'unknown')
-          .map(([key, text]) => (
-            <option key={key} value={key}>
-              {text}
-            </option>
-          ))}
-      </select>
-    </span>
-  )
+  const choices = [
+    { value: '', label: `${label}: todos` },
+    ...Object.entries(options)
+      .filter(([key]) => key !== 'unknown')
+      .map(([key, text]) => ({ value: key, label: text })),
+  ]
+  return <Select variant="pill" label={label} value={value} options={choices} empty="" display={value ? options[value] : label} onChange={onChange} />
 }
