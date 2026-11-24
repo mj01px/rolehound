@@ -67,6 +67,22 @@ export const icons = {
       <path d="M10.3 20a1.9 1.9 0 0 0 3.4 0" />
     </>,
   ),
+  search: icon(
+    <>
+      <circle cx="11" cy="11" r="7" />
+      <path d="m20 20-3.5-3.5" />
+    </>,
+  ),
+  plus: icon(
+    <>
+      <path d="M12 5v14M5 12h14" />
+    </>,
+  ),
+  close: icon(
+    <>
+      <path d="M6 6l12 12M18 6 6 18" />
+    </>,
+  ),
   menu: icon(
     <>
       <path d="M4 6h16M4 12h16M4 18h16" />

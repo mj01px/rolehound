@@ -3,6 +3,7 @@ import { Link, Outlet, useMatch, useSearchParams } from 'react-router'
 import { errorMessage } from '../../lib/api'
 import { Alert } from '../../ui/Alert'
 import { Button } from '../../ui/Button'
+import { icons } from '../../app/navIcons'
 import { AddLinkDialog } from './AddLinkDialog'
 import { useJobs, type JobFilters, type JobListItem, type JobView } from './api'
 import { ago, archiveReasonLabel, seniorityLabels, sourceLabels, workModeLabels } from './labels'
@@ -34,6 +35,13 @@ export function JobsPage() {
     setParams(next, { replace: true })
   }
 
+  const clearFilters = () => {
+    const next = new URLSearchParams(params)
+    for (const key of ['busca', 'fonte', 'modelo', 'nivel']) next.delete(key)
+    setSearch('')
+    setParams(next, { replace: true })
+  }
+
   // Search waits for a pause in typing.
   useEffect(() => {
     if (search === filters.q) return
@@ -55,9 +63,6 @@ export function JobsPage() {
           <h1 className={styles.title}>Vagas</h1>
           {counts && counts.new > 0 && <p className={styles.muted}>{counts.new === 1 ? '1 vaga nova' : `${counts.new} vagas novas`} desde a sua última visita</p>}
         </div>
-        <Button variant="secondary" onClick={() => setAdding(true)}>
-          Adicionar por link
-        </Button>
       </header>
 
       <nav aria-label="Visões" className={styles.tabs}>
@@ -75,19 +80,36 @@ export function JobsPage() {
         ))}
       </nav>
 
-      <div className={styles.filters}>
-        <input
-          type="search"
-          className={`${styles.control} ${styles.search}`}
-          placeholder="Buscar por cargo ou empresa"
-          aria-label="Buscar por cargo ou empresa"
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-          maxLength={100}
-        />
-        <Select label="Fonte" value={filters.source} options={sourceLabels} onChange={(value) => setParam('fonte', value)} />
-        <Select label="Modelo" value={filters.workMode} options={workModeLabels} onChange={(value) => setParam('modelo', value)} />
-        <Select label="Nível" value={filters.seniority} options={seniorityLabels} onChange={(value) => setParam('nivel', value)} />
+      <div className={styles.toolbar}>
+        <div className={styles.searchBox}>
+          <span className={styles.searchIcon} aria-hidden="true">
+            {icons.search}
+          </span>
+          <input
+            type="search"
+            className={styles.searchInput}
+            placeholder="Buscar por cargo ou empresa"
+            aria-label="Buscar por cargo ou empresa"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            maxLength={100}
+          />
+          {search && (
+            <button type="button" className={styles.searchClear} onClick={() => setSearch('')} aria-label="Apagar a busca">
+              {icons.close}
+            </button>
+          )}
+        </div>
+        <div className={styles.pills}>
+          <Pill label="Fonte" value={filters.source} options={sourceLabels} onChange={(value) => setParam('fonte', value)} />
+          <Pill label="Modelo" value={filters.workMode} options={workModeLabels} onChange={(value) => setParam('modelo', value)} />
+          <Pill label="Nível" value={filters.seniority} options={seniorityLabels} onChange={(value) => setParam('nivel', value)} />
+          {filtered && (
+            <button type="button" className={styles.clearAll} onClick={clearFilters}>
+              Limpar
+            </button>
+          )}
+        </div>
       </div>
 
       {jobs.isError && <Alert>{errorMessage(jobs.error)}</Alert>}
@@ -114,6 +136,10 @@ export function JobsPage() {
         </Button>
       )}
 
+      <button type="button" className={styles.fab} onClick={() => setAdding(true)} aria-label="Adicionar vaga por link" title="Adicionar vaga por link">
+        {icons.plus}
+      </button>
+
       {adding && <AddLinkDialog onClose={() => setAdding(false)} />}
       <Outlet />
     </div>
@@ -123,6 +149,13 @@ export function JobsPage() {
 /** Opens the job in the side panel, keeping the filters; switching jobs replaces the entry so back still closes the panel. */
 function JobRow({ job, open, panelOpen, search }: { job: JobListItem; open: boolean; panelOpen: boolean; search: string }) {
   const meta = [job.company, job.location].filter(Boolean).join(' · ')
+  const facts = [
+    job.workMode !== 'unknown' ? workModeLabels[job.workMode] : null,
+    job.seniority !== 'unknown' ? seniorityLabels[job.seniority] : null,
+    sourceLabels[job.source] ?? job.source,
+  ].filter(Boolean)
+  const warning = job.archiveReason ? archiveReasonLabel(job.archiveReason) : job.closedAtSource ? 'Encerrada na fonte' : null
+
   return (
     <li>
       <Link
@@ -131,7 +164,7 @@ function JobRow({ job, open, panelOpen, search }: { job: JobListItem; open: bool
         aria-current={open ? 'true' : undefined}
         className={open ? `${styles.row} ${styles.rowOpen}` : styles.row}
       >
-        <span className={job.isHighlight ? `${styles.score} ${styles.scoreHigh}` : styles.score} title="Score">
+        <span className={job.isHighlight ? `${styles.rowScore} ${styles.rowScoreHigh}` : styles.rowScore} title={job.isHighlight ? 'Score, destaque' : 'Score'}>
           {job.score}
         </span>
         <span className={styles.rowMain}>
@@ -140,12 +173,9 @@ function JobRow({ job, open, panelOpen, search }: { job: JobListItem; open: bool
             {job.title}
           </span>
           {meta && <span className={styles.rowMeta}>{meta}</span>}
-          <span className={styles.chips}>
-            {job.workMode !== 'unknown' && <span className={styles.chip}>{workModeLabels[job.workMode]}</span>}
-            {job.seniority !== 'unknown' && <span className={styles.chip}>{seniorityLabels[job.seniority]}</span>}
-            <span className={styles.chip}>{sourceLabels[job.source] ?? job.source}</span>
-            {job.archiveReason && <span className={`${styles.chip} ${styles.chipWarn}`}>{archiveReasonLabel(job.archiveReason)}</span>}
-            {job.closedAtSource && !job.archiveReason && <span className={`${styles.chip} ${styles.chipWarn}`}>Encerrada na fonte</span>}
+          <span className={styles.rowFacts}>
+            {facts.join(' · ')}
+            {warning && <span className={styles.rowWarn}> · {warning}</span>}
           </span>
         </span>
         <span className={styles.rowWhen}>{ago(job.publishedAt ?? job.firstSeenAt)}</span>
@@ -154,17 +184,25 @@ function JobRow({ job, open, panelOpen, search }: { job: JobListItem; open: bool
   )
 }
 
-function Select({ label, value, options, onChange }: { label: string; value: string; options: Record<string, string>; onChange: (value: string) => void }) {
+/** A filter as a small pill; the native select sits on top, invisible, so phones get their own picker. */
+function Pill({ label, value, options, onChange }: { label: string; value: string; options: Record<string, string>; onChange: (value: string) => void }) {
+  const chosen = value ? options[value] : undefined
   return (
-    <select className={styles.control} aria-label={label} value={value} onChange={(event) => onChange(event.target.value)}>
-      <option value="">{label}: todos</option>
-      {Object.entries(options)
-        .filter(([key]) => key !== 'unknown')
-        .map(([key, text]) => (
-          <option key={key} value={key}>
-            {text}
-          </option>
-        ))}
-    </select>
+    <span className={chosen ? `${styles.pill} ${styles.pillOn}` : styles.pill}>
+      <span>{chosen ?? label}</span>
+      <span className={styles.pillChevron} aria-hidden="true">
+        {icons.chevron}
+      </span>
+      <select className={styles.pillSelect} aria-label={label} value={value} onChange={(event) => onChange(event.target.value)}>
+        <option value="">{label}: todos</option>
+        {Object.entries(options)
+          .filter(([key]) => key !== 'unknown')
+          .map(([key, text]) => (
+            <option key={key} value={key}>
+              {text}
+            </option>
+          ))}
+      </select>
+    </span>
   )
 }

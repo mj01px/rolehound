@@ -3,6 +3,8 @@
   flex-direction: column;
   gap: 24px;
   max-width: 880px;
+  /* Room for the floating add button, so it never covers the last job. */
+  padding-bottom: 56px;
 }
 
 .header {
@@ -35,7 +37,6 @@
   display: flex;
   gap: 4px;
   border-bottom: 1px solid var(--border);
-  overflow-x: auto;
 }
 
 .tab {
@@ -68,32 +69,232 @@
   color: var(--faint);
 }
 
-.filters {
+/* Search, filter pills and the add button on one line; two lines on phones. */
+.toolbar {
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+  align-items: center;
+  gap: 10px;
 }
 
-.control {
-  height: 36px;
-  padding: 0 10px;
-  border-radius: var(--radius-md);
-  background: var(--surface);
-  border: 1px solid var(--border-control);
-  color: var(--ink);
-  font: 400 13px var(--font-sans);
-  outline: none;
-  flex: 1 1 140px;
+.searchBox {
+  position: relative;
+  flex: 1 1 auto;
   min-width: 0;
 }
 
-.control:focus-visible {
+.searchIcon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: grid;
+  color: var(--faint);
+  pointer-events: none;
+}
+
+.searchIcon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.searchInput {
+  width: 100%;
+  height: 38px;
+  box-sizing: border-box;
+  padding: 0 36px 0 36px;
+  border-radius: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--ink);
+  font: 400 14px var(--font-sans);
+  outline: none;
+}
+
+.searchInput::placeholder {
+  color: var(--faint);
+}
+
+.searchInput:hover {
+  border-color: var(--border-control);
+}
+
+.searchInput:focus-visible {
+  border-color: var(--border-control);
   outline: 2px solid var(--signal-bright);
   outline-offset: 2px;
 }
 
-.search {
-  flex: 3 1 240px;
+.searchInput::-webkit-search-cancel-button {
+  appearance: none;
+}
+
+.searchClear {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--faint);
+  cursor: pointer;
+}
+
+.searchClear svg {
+  width: 14px;
+  height: 14px;
+}
+
+.searchClear:hover {
+  color: var(--ink);
+}
+
+.pills {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+}
+
+.pill {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 38px;
+  box-sizing: border-box;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--muted);
+  font: 400 13px var(--font-sans);
+  white-space: nowrap;
+}
+
+.pill:hover {
+  color: var(--ink);
+  border-color: var(--border-control);
+}
+
+.pill:focus-within {
+  outline: 2px solid var(--signal-bright);
+  outline-offset: 2px;
+}
+
+.pillOn {
+  border-color: var(--signal);
+  background: var(--signal-wash);
+  color: var(--signal-bright);
+}
+
+.pillOn:hover {
+  color: var(--signal-bright);
+  border-color: var(--signal-bright);
+}
+
+.pillChevron {
+  display: grid;
+  margin-right: -4px;
+  opacity: 0.7;
+}
+
+.pillChevron svg {
+  width: 14px;
+  height: 14px;
+}
+
+.pillSelect {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  opacity: 0;
+  cursor: pointer;
+  font-size: 16px;
+}
+
+.clearAll {
+  height: 38px;
+  padding: 0 8px;
+  border: 0;
+  background: none;
+  color: var(--faint);
+  font: 400 13px var(--font-sans);
+  cursor: pointer;
+}
+
+.clearAll:hover {
+  color: var(--ink);
+}
+
+/* Floating add button, bottom right, under the job panel when that is open. */
+.fab {
+  position: fixed;
+  right: 32px;
+  bottom: 32px;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border: 0;
+  border-radius: 16px;
+  background: var(--signal);
+  color: var(--on-signal);
+  box-shadow: 0 12px 28px rgba(16, 185, 129, 0.28), 0 4px 10px rgba(0, 0, 0, 0.4);
+  cursor: pointer;
+  transition: transform 120ms ease, background 120ms ease;
+}
+
+.fab svg {
+  width: 26px;
+  height: 26px;
+  stroke-width: 2;
+}
+
+.fab:hover {
+  background: var(--signal-bright);
+  transform: translateY(-1px);
+}
+
+.fab:active {
+  transform: none;
+}
+
+.fab:focus-visible,
+.clearAll:focus-visible,
+.searchClear:focus-visible {
+  outline: 2px solid var(--signal-bright);
+  outline-offset: 2px;
+}
+
+@media (max-width: 768px) {
+  .toolbar {
+    display: grid;
+    grid-template-columns: 1fr;
+    grid-template-areas: "search" "pills";
+    row-gap: 10px;
+  }
+
+  .searchBox {
+    grid-area: search;
+  }
+
+  .fab {
+    right: 20px;
+    bottom: 20px;
+  }
+
+  .pills {
+    grid-area: pills;
+    overflow-x: auto;
+    padding: 3px 2px;
+    margin: -3px -2px;
+  }
 }
 
 .empty {
@@ -105,10 +306,12 @@
 }
 
 .list {
-  margin: 0;
+  margin: 0 -12px;
   padding: 0;
   list-style: none;
-  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .list[aria-busy='true'] {
@@ -118,9 +321,9 @@
 .row {
   display: flex;
   align-items: flex-start;
-  gap: 14px;
-  padding: 14px 4px;
-  border-bottom: 1px solid var(--border);
+  gap: 16px;
+  padding: 14px 12px;
+  border-radius: 10px;
   color: inherit;
   text-decoration: none;
 }
@@ -164,7 +367,7 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 3px;
 }
 
 .rowTitle {
@@ -172,6 +375,7 @@
   align-items: center;
   gap: 8px;
   font-size: 15px;
+  line-height: 20px;
   font-weight: 500;
   overflow-wrap: anywhere;
 }
@@ -191,8 +395,32 @@
   overflow-wrap: anywhere;
 }
 
+/* List score: a plain number, green only for highlights. */
+.rowScore {
+  flex: none;
+  width: 36px;
+  padding-top: 1px;
+  font: 600 15px/20px var(--font-mono);
+  color: var(--faint);
+  text-align: right;
+}
+
+.rowScoreHigh {
+  color: var(--signal-bright);
+}
+
+.rowFacts {
+  font-size: 12px;
+  color: var(--faint);
+}
+
+.rowWarn {
+  color: var(--amber);
+}
+
 .rowWhen {
   flex: none;
+  padding-top: 2px;
   font-size: 12px;
   color: var(--faint);
   white-space: nowrap;
