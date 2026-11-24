@@ -72,6 +72,35 @@ public sealed class FunnelTests(ApiFactory factory) : ApiTest(factory)
     }
 
     [Fact]
+    public async Task Dragging_a_card_changes_only_the_stage_and_logs_it()
+    {
+        await OnboardedAsync("ana@exemplo.test");
+        var jobId = await CollectOneAsync();
+        using var browser = await SignedInAsync("ana@exemplo.test");
+        var card = await ReadAsync<ApplicationCard>(await browser.PostAsJsonAsync($"/jobs/{jobId}/application", new { }, Ct));
+        var nextOn = new DateOnly(2026, 12, 1);
+        await browser.PutAsJsonAsync(
+            $"/applications/{card.Id}",
+            new { status = "applied", priority = 2, appliedOn = card.AppliedOn, nextStep = "Cobrar retorno", nextStepOn = nextOn, contact = "Marina", hasReferral = true, notes = "Estudar Celery" },
+            Ct);
+
+        var moved = await browser.PutAsJsonAsync($"/applications/{card.Id}/status", new { status = "interview" }, Ct);
+
+        Assert.Equal(HttpStatusCode.OK, moved.StatusCode);
+        Assert.Equal("interview", (await ReadAsync<ApplicationCard>(moved)).Status);
+        var detail = await ReadAsync<ApplicationDetailResponse>(await browser.GetAsync(new Uri($"/applications/{card.Id}", UriKind.Relative), Ct));
+        Assert.Equal(("Marina", true, "Estudar Celery"), (detail.Contact, detail.HasReferral, detail.Notes));
+        Assert.Equal(("Cobrar retorno", nextOn, 2), (detail.Application.NextStep, detail.Application.NextStepOn, detail.Application.Priority));
+        Assert.Contains(detail.Interactions, i => i.Title == "Aplicada → Entrevista" && i.IsSystem);
+
+        Assert.Equal(HttpStatusCode.BadRequest, (await browser.PutAsJsonAsync($"/applications/{card.Id}/status", new { status = "hired" }, Ct)).StatusCode);
+
+        await CreateUserAsync("bia@exemplo.test");
+        using var other = await SignedInAsync("bia@exemplo.test");
+        Assert.Equal(HttpStatusCode.NotFound, (await other.PutAsJsonAsync($"/applications/{card.Id}/status", new { status = "offer" }, Ct)).StatusCode);
+    }
+
+    [Fact]
     public async Task The_board_groups_by_status_and_lists_overdue_and_closed_apart()
     {
         await OnboardedAsync("ana@exemplo.test");

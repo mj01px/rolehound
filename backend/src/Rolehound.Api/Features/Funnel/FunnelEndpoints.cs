@@ -12,6 +12,8 @@ public sealed record EnterFunnelRequest(string? Status);
 public sealed record ApplicationRequest(
     string? Status, int Priority, DateOnly? AppliedOn, string? NextStep, DateOnly? NextStepOn, string? Contact, bool HasReferral, string? Notes);
 
+public sealed record ApplicationStatusRequest(string? Status);
+
 public sealed record InteractionRequest(DateOnly? Date, string? Title, string? Detail);
 
 public sealed record ApplicationCard(
@@ -70,6 +72,7 @@ internal static class FunnelEndpoints
         applications.MapGet(string.Empty, Board);
         applications.MapGet("/{id:guid}", Detail);
         applications.MapPut("/{id:guid}", Update);
+        applications.MapPut("/{id:guid}/status", UpdateStatus);
         applications.MapDelete("/{id:guid}", Remove);
         applications.MapPost("/{id:guid}/interactions", AddInteraction);
         applications.MapPut("/{id:guid}/interactions/{interactionId:guid}", UpdateInteraction);
@@ -201,8 +204,6 @@ internal static class FunnelEndpoints
 
         var now = time.GetUtcNow();
         var today = Today(time);
-        var previous = application.Status;
-        application.Status = status;
         application.Priority = request.Priority;
         application.AppliedOn = request.AppliedOn;
         application.NextStep = request.NextStep?.Trim() ?? string.Empty;
@@ -210,6 +211,44 @@ internal static class FunnelEndpoints
         application.Contact = request.Contact?.Trim() ?? string.Empty;
         application.HasReferral = request.HasReferral;
         application.Notes = request.Notes?.Trim() ?? string.Empty;
+        ChangeStatus(db, application, status, today, now);
+
+        await TouchAsync(db, application, now, ct);
+        await db.SaveChangesAsync(ct);
+        var job = await db.Jobs.AsNoTracking().SingleAsync(j => j.Id == application.JobId, ct);
+        return TypedResults.Ok(ToCard(application, job, today));
+    }
+
+    /// <summary>Only the stage, as dragging a card across the board does; every other field stays.</summary>
+    private static async Task<Results<Ok<ApplicationCard>, ValidationProblem, ProblemHttpResult>> UpdateStatus(
+        Guid id, ApplicationStatusRequest request, ClaimsPrincipal principal, RolehoundDbContext db, TimeProvider time, CancellationToken ct)
+    {
+        if (!TryStatus(request.Status, out var status))
+        {
+            return Problems.Validation("status", "Status inválido.");
+        }
+
+        var userId = principal.GetUserId();
+        var application = await db.Applications.SingleOrDefaultAsync(a => a.Id == id && a.UserId == userId, ct);
+        if (application is null)
+        {
+            return Problems.NotFound("Candidatura não encontrada.");
+        }
+
+        var now = time.GetUtcNow();
+        var today = Today(time);
+        ChangeStatus(db, application, status, today, now);
+        await TouchAsync(db, application, now, ct);
+        await db.SaveChangesAsync(ct);
+        var job = await db.Jobs.AsNoTracking().SingleAsync(j => j.Id == application.JobId, ct);
+        return TypedResults.Ok(ToCard(application, job, today));
+    }
+
+    // A new stage is written to the timeline; moving to applied dates the application if it had no date.
+    private static void ChangeStatus(RolehoundDbContext db, Application application, ApplicationStatus status, DateOnly today, DateTimeOffset now)
+    {
+        var previous = application.Status;
+        application.Status = status;
         if (status == ApplicationStatus.Applied && application.AppliedOn is null)
         {
             application.AppliedOn = today;
@@ -220,7 +259,7 @@ internal static class FunnelEndpoints
         {
             db.Interactions.Add(new Interaction
             {
-                ApplicationId = id,
+                ApplicationId = application.Id,
                 Date = today,
                 Title = $"{StatusLabels[previous]} → {StatusLabels[status]}",
                 IsSystem = true,
@@ -228,11 +267,6 @@ internal static class FunnelEndpoints
                 UpdatedAt = now,
             });
         }
-
-        await TouchAsync(db, application, now, ct);
-        await db.SaveChangesAsync(ct);
-        var job = await db.Jobs.AsNoTracking().SingleAsync(j => j.Id == application.JobId, ct);
-        return TypedResults.Ok(ToCard(application, job, today));
     }
 
     // Leaving the funnel deletes the timeline too; the job returns to the list views.

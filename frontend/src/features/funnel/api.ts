@@ -84,6 +84,45 @@ export function useBoard() {
   return useQuery({ queryKey: [...funnelKey, 'board'], queryFn: ({ signal }) => api.get<Board>('/applications', signal) })
 }
 
+const closedStatuses: ApplicationStatus[] = ['rejected', 'withdrawn']
+
+/**
+ * Moves a card to another stage (dragging on the board). The board changes at once;
+ * if the API refuses, it goes back as it was.
+ */
+export function useMoveApplication() {
+  const queryClient = useQueryClient()
+  const invalidate = useInvalidate()
+  const boardKey = [...funnelKey, 'board']
+  return useMutation({
+    mutationFn: ({ id, status }: { id: string; status: ApplicationStatus }) => api.put<ApplicationCard>(`/applications/${id}/status`, { status }),
+    onMutate: async ({ id, status }) => {
+      await queryClient.cancelQueries({ queryKey: boardKey })
+      const before = queryClient.getQueryData<Board>(boardKey)
+      if (before) {
+        const card = [...before.columns.flatMap((column) => column.items), ...before.closed].find((item) => item.id === id)
+        if (card) {
+          const moved = { ...card, status }
+          const without = (items: ApplicationCard[]) => items.filter((item) => item.id !== id)
+          queryClient.setQueryData<Board>(boardKey, {
+            columns: before.columns.map((column) => ({
+              ...column,
+              items: column.status === status ? [moved, ...without(column.items)] : without(column.items),
+            })),
+            overdue: before.overdue.map((item) => (item.id === id ? moved : item)),
+            closed: closedStatuses.includes(status) ? [moved, ...without(before.closed)] : without(before.closed),
+          })
+        }
+      }
+      return { before }
+    },
+    onError: (_error, _move, context) => {
+      if (context?.before) queryClient.setQueryData(boardKey, context.before)
+    },
+    onSettled: invalidate,
+  })
+}
+
 export function useApplication(id: string) {
   return useQuery({ queryKey: [...funnelKey, 'detail', id], queryFn: ({ signal }) => api.get<ApplicationDetail>(`/applications/${id}`, signal) })
 }
