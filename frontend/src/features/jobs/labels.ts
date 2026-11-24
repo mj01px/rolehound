@@ -40,11 +40,24 @@ export const archiveReasonLabel = (value: string | null): string =>
   archiveReasons.find((reason) => reason.value === value)?.label ?? 'Arquivada'
 
 /** "há 3 dias", from an ISO date. */
-export function ago(iso: string | null): string {
+const ZONE = 'America/Sao_Paulo'
+const calendarDay = new Intl.DateTimeFormat('en-CA', { timeZone: ZONE, year: 'numeric', month: '2-digit', day: '2-digit' })
+const shortDate = new Intl.DateTimeFormat('pt-BR', { timeZone: ZONE, day: '2-digit', month: '2-digit' })
+const fullDate = new Intl.DateTimeFormat('pt-BR', { timeZone: ZONE, day: '2-digit', month: '2-digit', year: 'numeric' })
+
+// Midnight UTC of the date São Paulo shows, so subtracting two gives whole calendar days.
+const dayNumber = (date: Date) => Date.parse(calendarDay.format(date)) / 86_400_000
+
+/**
+ * When a job was posted, in calendar days in São Paulo: "hoje", "ontem", "há 3 dias"
+ * for a week, then the date, with the year only when it is not this year.
+ */
+export function ago(iso: string | null, now: Date = new Date()): string {
   if (!iso) return ''
-  const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000)
+  const date = new Date(iso)
+  const days = dayNumber(now) - dayNumber(date)
   if (days <= 0) return 'hoje'
   if (days === 1) return 'ontem'
-  if (days < 30) return `há ${days} dias`
-  return new Date(iso).toLocaleDateString('pt-BR')
+  if (days < 7) return `há ${days} dias`
+  return calendarDay.format(date).slice(0, 4) === calendarDay.format(now).slice(0, 4) ? shortDate.format(date) : fullDate.format(date)
 }
