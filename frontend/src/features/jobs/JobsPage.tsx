@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, useSearchParams } from 'react-router'
+import { Link, Outlet, useMatch, useSearchParams } from 'react-router'
 import { errorMessage } from '../../lib/api'
 import { Alert } from '../../ui/Alert'
 import { Button } from '../../ui/Button'
@@ -46,6 +46,8 @@ export function JobsPage() {
   const counts = pages[0]?.counts
   const items = pages.flatMap((page) => page.items)
   const filtered = Boolean(filters.q || filters.source || filters.workMode || filters.seniority)
+  const openId = useMatch('/vagas/:id')?.params.id
+  const query = params.toString()
 
   return (
     <div className={styles.page}>
@@ -105,7 +107,7 @@ export function JobsPage() {
 
       <ul className={styles.list} aria-busy={jobs.isFetching}>
         {items.map((job) => (
-          <JobRow key={job.id} job={job} />
+          <JobRow key={job.id} job={job} open={job.id === openId} panelOpen={openId !== undefined} search={query} />
         ))}
       </ul>
 
@@ -116,15 +118,22 @@ export function JobsPage() {
       )}
 
       {adding && <AddLinkDialog onClose={() => setAdding(false)} />}
+      <Outlet />
     </div>
   )
 }
 
-function JobRow({ job }: { job: JobListItem }) {
+/** Opens the job in the side panel, keeping the filters; switching jobs replaces the entry so back still closes the panel. */
+function JobRow({ job, open, panelOpen, search }: { job: JobListItem; open: boolean; panelOpen: boolean; search: string }) {
   const meta = [job.company, job.location].filter(Boolean).join(' · ')
   return (
     <li>
-      <Link to={`/vagas/${job.id}`} className={styles.row}>
+      <Link
+        to={{ pathname: `/vagas/${job.id}`, search }}
+        replace={panelOpen}
+        aria-current={open ? 'true' : undefined}
+        className={open ? `${styles.row} ${styles.rowOpen}` : styles.row}
+      >
         <span className={job.isHighlight ? `${styles.score} ${styles.scoreHigh}` : styles.score} title="Score">
           {job.score}
         </span>

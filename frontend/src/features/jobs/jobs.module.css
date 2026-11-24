@@ -251,17 +251,6 @@
   color: var(--faint);
 }
 
-.back {
-  align-self: flex-start;
-  font-size: 13px;
-  color: var(--muted);
-  text-decoration: none;
-}
-
-.back:hover {
-  color: var(--ink);
-}
-
 .detailHeader {
   display: flex;
   flex-direction: column;
@@ -520,5 +509,132 @@
 @media (max-width: 560px) {
   .rowWhen {
     display: none;
+  }
+}
+
+/* Job detail in a side panel over the list. Full screen on phones. */
+.drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 30;
+  width: min(600px, 100vw);
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  border-left: 1px solid var(--border);
+  box-shadow: -24px 0 48px rgba(0, 0, 0, 0.45);
+}
+
+.drawerBar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 52px;
+  padding: 0 12px 0 24px;
+  border-bottom: 1px solid var(--border);
+}
+
+.drawerLabel {
+  margin: 0;
+  font: 500 12px/1 var(--font-sans);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+/* Focus lands here when the panel opens, for screen readers; no ring for a heading. */
+.drawerLabel:focus,
+.drawerLabel:focus-visible {
+  outline: none;
+}
+
+.drawerClose {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.drawerClose:hover {
+  color: var(--ink);
+  background: var(--surface);
+}
+
+.drawerClose:focus-visible {
+  outline: 2px solid var(--signal-bright);
+  outline-offset: -2px;
+}
+
+.drawerBody {
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 24px 24px 40px;
+}
+
+.detail {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.rowOpen,
+.rowOpen:hover {
+  background: var(--surface);
+}
+
+.toolTabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--border);
+}
+
+.toolTab {
+  height: 36px;
+  padding: 0 12px;
+  margin-bottom: -1px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: var(--muted);
+  font: 500 14px var(--font-sans);
+  cursor: pointer;
+}
+
+.toolTab:hover {
+  color: var(--ink);
+}
+
+/* The tab already names the tool; its panel's own heading stays for screen readers only. */
+.toolPanel > section > h2:first-child {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.toolTabActive {
+  color: var(--ink);
+  border-bottom-color: var(--signal-bright);
+}
+
+@media (max-width: 640px) {
+  .drawer {
+    border-left: 0;
+    box-shadow: none;
+  }
+
+  .drawerBody {
+    padding: 20px var(--space-4) 32px;
   }
 }

@@ -12,7 +12,7 @@ import { AdminModelsPage } from '../features/admin/AdminModelsPage'
 import { AdminSourcesPage } from '../features/admin/AdminSourcesPage'
 import { ApplicationPage } from '../features/funnel/ApplicationPage'
 import { FunnelPage } from '../features/funnel/FunnelPage'
-import { JobDetailPage } from '../features/jobs/JobDetailPage'
+import { JobDrawer } from '../features/jobs/JobDrawer'
 import { JobsPage } from '../features/jobs/JobsPage'
 import { OnboardingPage } from '../features/onboarding/OnboardingPage'
 import { AppLayout } from './AppLayout'
@@ -40,8 +40,8 @@ export const router = createBrowserRouter([
       {
         element: <AppLayout />,
         children: [
-          { path: '/', element: <JobsPage /> },
-          { path: '/vagas/:id', element: <JobDetailPage /> },
+          // The job detail opens over the list, so the list stays where it was.
+          { path: '/', element: <JobsPage />, children: [{ path: 'vagas/:id', element: <JobDrawer /> }] },
           { path: '/funil', element: <FunnelPage /> },
           { path: '/funil/:id', element: <ApplicationPage /> },
           { path: '/qualidade', element: <AccuracyPage /> },
