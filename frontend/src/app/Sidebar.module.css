@@ -1,0 +1,225 @@
+.sidebar {
+  --width: 224px;
+  position: sticky;
+  top: 0;
+  flex: 0 0 var(--width);
+  width: var(--width);
+  height: 100vh;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding: 12px 10px 16px;
+  border-right: 1px solid var(--border);
+  background: var(--bg);
+  overflow-x: hidden;
+  overflow-y: auto;
+  transition: flex-basis 160ms ease, width 160ms ease;
+}
+
+.collapsed {
+  --width: 60px;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+}
+
+.menu {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.menu:hover {
+  color: var(--ink);
+  background: var(--surface);
+}
+
+.menu:focus-visible,
+.item:focus-visible,
+.groupHead:focus-visible {
+  outline: 2px solid var(--signal-bright);
+  outline-offset: -2px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+
+.collapsed .brand {
+  display: none;
+}
+
+.groups {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.groupHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 24px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--faint);
+  font: 500 12px/1 var(--font-sans);
+  cursor: pointer;
+}
+
+.groupHead:hover {
+  color: var(--muted);
+}
+
+/* The arrow shows on hover, or while the module is hidden so it can be found again. */
+.chevron {
+  display: grid;
+  opacity: 0;
+  transition: transform 160ms ease, opacity 120ms ease;
+}
+
+.groupHead:hover .chevron,
+.groupHead:focus-visible .chevron,
+.chevronClosed {
+  opacity: 1;
+}
+
+.chevron svg {
+  width: 14px;
+  height: 14px;
+}
+
+.chevronClosed {
+  transform: rotate(-90deg);
+}
+
+.divider {
+  height: 4px;
+}
+
+.items {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 34px;
+  padding: 0 10px;
+  border-radius: var(--radius-md);
+  color: var(--muted);
+  font-size: 14px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.item:hover {
+  color: var(--ink);
+  background: var(--surface);
+}
+
+.icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  color: var(--faint);
+}
+
+.item:hover .icon {
+  color: var(--muted);
+}
+
+.active,
+.active:hover {
+  color: var(--ink);
+  background: var(--surface);
+}
+
+.active .icon,
+.active:hover .icon {
+  color: var(--ink);
+}
+
+.collapsed .item {
+  justify-content: center;
+  padding: 0;
+}
+
+.collapsed .label {
+  display: none;
+}
+
+.footer {
+  display: flex;
+  flex-direction: column;
+}
+
+.footer .item {
+  width: 100%;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.footer .item:hover {
+  background: var(--surface);
+}
+
+/* Phones: off screen until the menu button opens it over the page. */
+@media (max-width: 768px) {
+  .sidebar {
+    position: fixed;
+    left: 0;
+    z-index: 50;
+    width: min(280px, 86vw);
+    transform: translateX(-100%);
+    transition: transform 180ms ease;
+    box-shadow: 24px 0 48px rgba(0, 0, 0, 0.5);
+  }
+
+  .mobileOpen {
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar,
+  .chevron {
+    transition: none;
+  }
+}
