@@ -161,7 +161,7 @@ internal static class CompanyEndpoints
             {
                 probe = probers.FirstOrDefault(p => p.Source == source) is { } prober
                     ? await prober.ProbeAsync(key, timeout.Token)
-                    : ProbeOf(await connector.FetchAsync(key, EveryId.Instance, timeout.Token));
+                    : ProbeOf(await connector.FetchAsync(key, KnownPages.ListOnlyCheck, timeout.Token));
             }
             catch (ConnectorException ex)
             {

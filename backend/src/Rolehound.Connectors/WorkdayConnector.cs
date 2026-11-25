@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Globalization;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -14,29 +13,17 @@ namespace Rolehound.Connectors;
 /// for "Brazil" and "Brasil" gives the candidates, and one whose listed place does not
 /// say Brazil is opened to check.
 /// </summary>
-public sealed partial class WorkdayConnector(HttpClient http) : IJobConnector, IJobLinkReader, ICompanyLinkReader, ITargetProber, IRemembersSkipped
+public sealed partial class WorkdayConnector(HttpClient http) : IJobConnector, IJobLinkReader, ICompanyLinkReader, ITargetProber
 {
     private const int PageSize = 20;
     private const int MaxPages = 50;
 
     private static readonly string[] BrazilQueries = ["Brazil", "Brasil"];
-    private const int MaxDetails = 80;
-    private const int DetailConcurrency = 4;
-
-    /// <summary>Jobs in several places that turned out not to include Brazil; kept for the life of the process.</summary>
-    private static readonly ConcurrentDictionary<string, byte> NotInBrazil = new(StringComparer.Ordinal);
+    private static readonly DetailPages.Limits Details = new(PerRun: 80, FirstRead: 80, Concurrency: 4);
 
     public JobSource Source => JobSource.Workday;
 
-    public void Remember(IEnumerable<string> pages)
-    {
-        foreach (var page in pages)
-        {
-            NotInBrazil.TryAdd(page, 0);
-        }
-    }
-
-    public async Task<Snapshot> FetchAsync(string target, IReadOnlySet<string> detailed, CancellationToken ct)
+    public async Task<Snapshot> FetchAsync(string target, KnownPages known, CancellationToken ct)
     {
         var site = Site.Parse(target) ?? throw new ConnectorException("target_invalid", $"Workday {target}: use empresa.wdN/Site.");
         var subject = $"Workday {target}";
@@ -85,72 +72,32 @@ public sealed partial class WorkdayConnector(HttpClient http) : IJobConnector, I
             complete &= pages < MaxPages || total <= pages * PageSize;
         }
 
-        var jobs = new ConcurrentBag<CollectedJob>();
-        var toOpen = new List<(string Path, string Title, string Locations, bool Sure)>();
+        var candidates = new List<(string Path, string Title, string Locations, bool Sure)>();
         foreach (var (path, title, locations) in postings.DistinctBy(p => p.Path))
         {
+            // Sure: the listing names Brazil. A job in several places is opened to check, unless found not in Brazil before.
             var sure = InBrazil(locations) || InBrazil(path.Replace('-', ' '));
-            var several = SeveralPlaces().IsMatch(locations);
-            if (!sure && (!several || NotInBrazil.ContainsKey(path)))
+            if (sure || (SeveralPlaces().IsMatch(locations) && !known.Skipped.Contains(path)))
             {
-                continue;
-            }
-
-            if (detailed.Contains(path))
-            {
-                jobs.Add(new CollectedJob(path, title, site.Tenant, locations, string.Empty, site.Page(path), null, null, HasDetails: false));
-            }
-            else
-            {
-                toOpen.Add((path, title, locations, sure));
+                candidates.Add((path, title, locations, sure));
             }
         }
 
-        var failures = 0;
-        var notHere = new ConcurrentBag<string>();
-        var skipped = Math.Max(0, toOpen.Count - MaxDetails);
-        await Parallel.ForEachAsync(toOpen.Take(MaxDetails), new ParallelOptions { MaxDegreeOfParallelism = DetailConcurrency, CancellationToken = ct }, async (item, token) =>
+        var opened = await DetailPages.OpenAsync(candidates, c => c.Path, known, Details, async (item, token) =>
         {
-            try
-            {
-                using var detail = await HttpJson.GetAsync(http, site.Api(item.Path.TrimStart('/')), $"{subject} vaga", token);
-                var job = ParseDetail(site, item.Path, detail.RootElement);
-                if (job is null)
-                {
-                    NotInBrazil.TryAdd(item.Path, 0);
-                    notHere.Add(item.Path);
-                    return;
-                }
+            using var detail = await HttpJson.GetAsync(http, site.Api(item.Path.TrimStart('/')), $"{subject} vaga", token);
+            return ParseDetail(site, item.Path, detail.RootElement) is { } job ? new DetailPages.Opened(job) : DetailPages.Opened.NotHere;
+        }, ct);
 
-                jobs.Add(job);
-            }
-            catch (ConnectorException)
-            {
-                Interlocked.Increment(ref failures);
-                if (item.Sure)
-                {
-                    jobs.Add(new CollectedJob(item.Path, item.Title, site.Tenant, item.Locations, string.Empty, site.Page(item.Path), null, null, HasDetails: false));
-                }
-            }
-        });
+        // Stored jobs still count as listed; jobs that failed or were left unopened only when surely in Brazil.
+        var unopened = opened.Failed.Concat(opened.Left).Where(c => c.Sure).Select(c => c.Path).ToHashSet(StringComparer.Ordinal);
+        var jobs = candidates
+            .Where(c => known.Detailed.Contains(c.Path) || unopened.Contains(c.Path))
+            .Select(c => new CollectedJob(c.Path, c.Title, site.Tenant, c.Locations, string.Empty, site.Page(c.Path), null, null, HasDetails: false))
+            .Concat(opened.Jobs)
+            .ToList();
 
-        // Jobs left unopened this time (over the cap) are only listed when surely in Brazil.
-        foreach (var item in toOpen.Skip(MaxDetails).Where(i => i.Sure))
-        {
-            jobs.Add(new CollectedJob(item.Path, item.Title, site.Tenant, item.Locations, string.Empty, site.Page(item.Path), null, null, HasDetails: false));
-        }
-
-        var warnings = new List<string>();
-        if (failures > 0)
-        {
-            warnings.Add($"{failures} vaga(s) sem detalhes");
-        }
-
-        if (skipped > 0)
-        {
-            warnings.Add($"{skipped} vaga(s) ficaram para a próxima coleta");
-        }
-
+        var warnings = opened.Notes();
         if (!complete)
         {
             warnings.Add("a lista passou do limite de leitura e foi lida em parte");
@@ -159,8 +106,8 @@ public sealed partial class WorkdayConnector(HttpClient http) : IJobConnector, I
         var warning = warnings.Count > 0 ? $"{subject}: {string.Join("; ", warnings)}." : null;
 
         // A list read only in part, or with jobs in several places left unchecked, must not close anything.
-        var authoritative = complete && skipped == 0;
-        return new Snapshot(jobs.ToList(), authoritative, warning, notHere.ToList());
+        var authoritative = complete && opened.Left.Count == 0;
+        return new Snapshot(jobs, authoritative, warning, opened.Skipped);
     }
 
     /// <summary>tenant.wdN.myworkdayjobs.com[/locale]/Site[/...].</summary>
@@ -255,7 +202,7 @@ public sealed partial class WorkdayConnector(HttpClient http) : IJobConnector, I
             published);
     }
 
-    internal static bool InBrazil(string text) => BrazilWord().IsMatch(text);
+    internal static bool InBrazil(string text) => Brazil.Mentioned(text);
 
     /// <summary>A Workday careers site: its tenant, data centre (wdN) and site name.</summary>
     internal sealed record Site(string Tenant, string Center, string Name)
@@ -306,8 +253,6 @@ public sealed partial class WorkdayConnector(HttpClient http) : IJobConnector, I
     [GeneratedRegex(@"^[A-Z]{2,3}\d{1,4}\s+")]
     private static partial Regex EntityCode();
 
-    [GeneratedRegex(@"\b(Brazil|Brasil|BR)\b", RegexOptions.IgnoreCase)]
-    private static partial Regex BrazilWord();
 
     [GeneratedRegex(@"^\d+\s+(Locations|Locais|Localidades|Ubicaciones)$", RegexOptions.IgnoreCase)]
     private static partial Regex SeveralPlaces();

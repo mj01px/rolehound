@@ -41,12 +41,6 @@ public sealed record CollectedJob(
 /// </summary>
 public sealed record Snapshot(IReadOnlyList<CollectedJob> Jobs, bool Authoritative = true, string? Warning = null, IReadOnlyList<string>? Skipped = null);
 
-/// <summary>Sources that open one page per job and can be told which pages were already found not to be jobs in Brazil.</summary>
-public interface IRemembersSkipped
-{
-    void Remember(IEnumerable<string> pages);
-}
-
 /// <summary>A failure with a stable code; a failed snapshot never closes jobs.</summary>
 public sealed class ConnectorException(string code, string message, Exception? inner = null) : Exception(message, inner)
 {
@@ -99,12 +93,13 @@ public interface ITargetProber
 /// <summary>
 /// The common contract. A target is what the source is asked for: a
 /// Greenhouse board token, a Lever site name, a GitHub repository, an InHire
-/// company or a Gupy search term. <c>detailed</c> holds the external ids
-/// already stored with details, so sources with one page per job skip them.
+/// company or a Gupy search term. <c>known</c> says which job pages
+/// are stored with details or were found not to be jobs in Brazil, so sources
+/// with one page per job open only new ones (<see cref="DetailPages"/>).
 /// </summary>
 public interface IJobConnector
 {
     JobSource Source { get; }
 
-    Task<Snapshot> FetchAsync(string target, IReadOnlySet<string> detailed, CancellationToken ct);
+    Task<Snapshot> FetchAsync(string target, KnownPages known, CancellationToken ct);
 }

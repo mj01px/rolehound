@@ -21,15 +21,7 @@ public static partial class JobPostingReader
     /// True when the job is in Brazil, or its country cannot be told (the score decides then).
     /// Without a country field, the location text is read for Brazil or a known foreign country.
     /// </summary>
-    public static bool InBrazilOrUnknown(JobPosting job)
-    {
-        if (job.Country is not null)
-        {
-            return BrazilCountry().IsMatch(job.Country.Trim());
-        }
-
-        return BrazilInText().IsMatch(job.Location) || !ForeignCountry().IsMatch(job.Location);
-    }
+    public static bool InBrazilOrUnknown(JobPosting job) => Brazil.KeepJob(job.Country, job.Location);
 
     private static JobPosting? FromJsonLd(string html)
     {
@@ -119,7 +111,7 @@ public static partial class JobPostingReader
                     ? c.ValueKind == JsonValueKind.String ? c.GetString() : Text(c, "name")
                     : null;
                 country ??= placeCountry;
-                if (placeCountry is not null && BrazilCountry().IsMatch(placeCountry.Trim()))
+                if (placeCountry is not null && Brazil.IsCountry(placeCountry))
                 {
                     country = placeCountry;
                 }
@@ -264,13 +256,4 @@ public static partial class JobPostingReader
 
     private static Regex OpenTag(string name) =>
         new($@"<([a-z][a-z0-9]*)\b[^>]*itemprop\s*=\s*[""']{Regex.Escape(name)}[""'][^>]*>", RegexOptions.IgnoreCase, TimeSpan.FromSeconds(1));
-
-    [GeneratedRegex(@"^(BR|BRA|Brasil|Brazil)$", RegexOptions.IgnoreCase)]
-    private static partial Regex BrazilCountry();
-
-    [GeneratedRegex(@"\b(Brasil|Brazil|BR)\b", RegexOptions.IgnoreCase)]
-    private static partial Regex BrazilInText();
-
-    [GeneratedRegex(@"\b(Chile|Argentina|Colombia|Col[oô]mbia|M[eé]xico|Mexico|Per[uú]|Uruguay|Uruguai|Paraguay|Paraguai|Bolivia|Bol[ií]via|Ecuador|Equador|Venezuela|Costa Rica|Panam[aá]|Guatemala|Portugal|Espa[nñ]a|Spain|United States|USA|Canada|Canad[aá]|India|[IÍ]ndia|United Kingdom|UK|Germany|Alemanha|France|Fran[cç]a|Italy|It[aá]lia|Netherlands|Ireland|Poland|Romania|Philippines|China|Japan|Singapore|Australia)\b", RegexOptions.IgnoreCase)]
-    private static partial Regex ForeignCountry();
 }

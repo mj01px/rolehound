@@ -86,12 +86,8 @@ public sealed partial class CollectionRunner(
             {
                 var detailed = (await db.Jobs.Where(j => j.TargetId == target.Id && j.Description != string.Empty)
                     .Select(j => j.ExternalId).ToListAsync(ct)).ToHashSet(StringComparer.Ordinal);
-                if (connector is IRemembersSkipped remembers)
-                {
-                    remembers.Remember(await db.SkippedPages.Where(p => p.TargetId == target.Id).Select(p => p.PageId).ToListAsync(ct));
-                }
-
-                var snapshot = await connector.FetchAsync(target.Key, detailed, ct);
+                var skipped = (await db.SkippedPages.Where(p => p.TargetId == target.Id).Select(p => p.PageId).ToListAsync(ct)).ToHashSet(StringComparer.Ordinal);
+                var snapshot = await connector.FetchAsync(target.Key, new KnownPages(detailed, skipped), ct);
                 complete = snapshot.Authoritative;
                 var changed = await ApplyAsync(target, snapshot, run, ct);
                 target.LastJobCount = run.Listed;

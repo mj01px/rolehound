@@ -16,7 +16,7 @@ public sealed partial class LeverConnector(HttpClient http) : IJobConnector, IJo
 
     public JobSource Source => JobSource.Lever;
 
-    public async Task<Snapshot> FetchAsync(string target, IReadOnlySet<string> detailed, CancellationToken ct)
+    public async Task<Snapshot> FetchAsync(string target, KnownPages known, CancellationToken ct)
     {
         var site = Uri.EscapeDataString(target.Trim());
         using var document = await HttpJson.GetAsync(http, new Uri($"{BaseUrl}{site}?mode=json"), $"Lever {target}", ct);

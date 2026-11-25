@@ -31,7 +31,7 @@ public sealed class FakeJobSource(JobSource source, bool authoritative = true) :
         }
     }
 
-    public Task<Snapshot> FetchAsync(string target, IReadOnlySet<string> detailed, CancellationToken ct)
+    public Task<Snapshot> FetchAsync(string target, KnownPages known, CancellationToken ct)
     {
         lock (Asked)
         {
@@ -67,7 +67,7 @@ public sealed class FakeJobSource(JobSource source, bool authoritative = true) :
 
     public async Task<CollectedJob> FetchOneAsync(JobLink link, Uri url, CancellationToken ct)
     {
-        var snapshot = await FetchAsync(link.Target, new HashSet<string>(), ct);
+        var snapshot = await FetchAsync(link.Target, KnownPages.None, ct);
         return snapshot.Jobs.FirstOrDefault(j => j.ExternalId == link.ExternalId)
             ?? throw new ConnectorException("target_not_found", "Vaga não encontrada.");
     }

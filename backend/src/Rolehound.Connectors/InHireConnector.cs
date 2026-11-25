@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
@@ -22,13 +21,14 @@ public sealed partial class InHireConnector(HttpClient http) : IJobConnector, IJ
     public const string ListUrl = "https://api.inhire.app/job-posts/public/pages/lean";
     public const string DetailUrl = "https://api.inhire.app/job-posts/public/pages/";
     private const string DefaultPage = "default";
-    private const int DetailConcurrency = 5;
+    // Company lists are short: every new job is opened, a few at a time.
+    private static readonly DetailPages.Limits Details = new(PerRun: 300, FirstRead: 300, Concurrency: 5);
     private static readonly string[] LocationKeys = ["city", "state", "country", "name"];
     private static readonly string[] PageKeys = ["careerPage", "id", "name"];
 
     public JobSource Source => JobSource.InHire;
 
-    public async Task<Snapshot> FetchAsync(string target, IReadOnlySet<string> detailed, CancellationToken ct)
+    public async Task<Snapshot> FetchAsync(string target, KnownPages known, CancellationToken ct)
     {
         var match = TargetPattern().Match(target.Trim().ToLowerInvariant());
         if (!match.Success)
@@ -66,28 +66,20 @@ public sealed partial class InHireConnector(HttpClient http) : IJobConnector, IJ
             }
         }
 
-        var details = new ConcurrentDictionary<string, CollectedJob>(StringComparer.Ordinal);
-        var missing = listed.Keys.Where(id => !detailed.Contains(id)).ToList();
-        var failures = 0;
-        await Parallel.ForEachAsync(missing, new ParallelOptions { MaxDegreeOfParallelism = DetailConcurrency, CancellationToken = ct }, async (id, token) =>
+        var opened = await DetailPages.OpenAsync(listed.Keys, id => id, known, Details, async (id, token) =>
         {
-            try
-            {
-                using var detail = await HttpJson.GetAsync(http, new Uri(DetailUrl + Uri.EscapeDataString(id)), $"InHire {target} vaga {id}", token, headers);
-                details[id] = ParseDetail(id, listed[id].Title, listed[id].Url, tenant, detail.RootElement);
-            }
-            catch (ConnectorException)
-            {
-                Interlocked.Increment(ref failures);
-            }
-        });
+            using var detail = await HttpJson.GetAsync(http, new Uri(DetailUrl + Uri.EscapeDataString(id)), $"InHire {target} vaga {id}", token, headers);
+            return new DetailPages.Opened(ParseDetail(id, listed[id].Title, listed[id].Url, tenant, detail.RootElement));
+        }, ct);
 
+        // Jobs not opened (stored, failed or left) still count as listed; their text comes later.
+        var details = opened.Jobs.ToDictionary(j => j.ExternalId, StringComparer.Ordinal);
         var jobs = listed.Select(entry => details.TryGetValue(entry.Key, out var job)
             ? job
             : new CollectedJob(entry.Key, entry.Value.Title, tenant, string.Empty, string.Empty, entry.Value.Url, null, null, HasDetails: false)).ToList();
 
-        var warning = failures > 0 ? $"InHire {target}: {failures} vaga(s) sem detalhes; tenta de novo na próxima coleta." : null;
-        return new Snapshot(jobs, Authoritative: true, warning);
+        var notes = opened.Notes();
+        return new Snapshot(jobs, Authoritative: true, notes.Count > 0 ? $"InHire {target}: {string.Join("; ", notes)}." : null);
     }
 
     /// <summary>

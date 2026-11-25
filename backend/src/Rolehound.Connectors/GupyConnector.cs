@@ -28,11 +28,11 @@ public sealed partial class GupyConnector(HttpClient http) : IJobConnector, ICom
 
     public JobSource Source => JobSource.Gupy;
 
-    public async Task<Snapshot> FetchAsync(string target, IReadOnlySet<string> detailed, CancellationToken ct)
+    public async Task<Snapshot> FetchAsync(string target, KnownPages known, CancellationToken ct)
     {
         if (IsCompanyTarget(target))
         {
-            return await FetchCompanyAsync(target.Trim().ToLowerInvariant(), detailed, ct);
+            return await FetchCompanyAsync(target.Trim().ToLowerInvariant(), known, ct);
         }
 
         var term = target.Trim();
@@ -161,9 +161,8 @@ public sealed partial class GupyConnector(HttpClient http) : IJobConnector, ICom
     private static partial Regex BuildIdPattern();
 
     // Company career pages: empresa.gupy.io lists every open job; empresa.gupy.io/jobs/{id} has one job.
-    private const int CompanyPagesPerRun = 100;
-    private const int CompanyFirstRead = 300;
-    private const int CompanyConcurrency = 3;
+    // A large company (Sicredi: about 800 jobs) is complete in a few runs (R58).
+    private static readonly DetailPages.Limits CompanyDetails = new(PerRun: 100, FirstRead: 300, Concurrency: 3);
 
     private static readonly HashSet<string> ReservedSubdomains = new(StringComparer.Ordinal)
     {
@@ -204,69 +203,32 @@ public sealed partial class GupyConnector(HttpClient http) : IJobConnector, ICom
         return new SourceProbe(listed.Count, company);
     }
 
-    private async Task<Snapshot> FetchCompanyAsync(string target, IReadOnlySet<string> detailed, CancellationToken ct)
+    private async Task<Snapshot> FetchCompanyAsync(string target, KnownPages known, CancellationToken ct)
     {
         var host = CompanyOfHost(target) ?? throw new ConnectorException("target_invalid", $"Gupy {target}: use empresa.gupy.io.");
         var (company, listed) = await CompanyListAsync(host, ct);
         var name = company ?? host;
 
-        var jobs = new System.Collections.Concurrent.ConcurrentBag<CollectedJob>();
-        var toOpen = new List<CompanyListing>();
-        foreach (var listing in listed)
+        var opened = await DetailPages.OpenAsync(listed, l => l.Id, known, CompanyDetails, async (listing, token) =>
         {
-            if (detailed.Contains(listing.Id))
-            {
-                jobs.Add(listing.ToJob(name, host, string.Empty, null, hasDetails: false));
-            }
-            else
-            {
-                toOpen.Add(listing);
-            }
-        }
+            var html = await HttpJson.GetTextAsync(http, new Uri($"https://{host}/jobs/{listing.Id}"), $"Gupy {host} vaga {listing.Id}", token);
+            var job = NextData(html, $"Gupy {host}").GetProperty("props").GetProperty("pageProps").GetProperty("job");
+            var sections = new (string Field, string Heading)[] { ("description", ""), ("responsibilities", "Responsabilidades"), ("prerequisites", "Requisitos"), ("relevantExperiences", "Diferenciais") };
+            var description = string.Join("\n\n", sections
+                .Select(section => (section.Heading, Text: HtmlText.ToPlain(job.String(section.Field))))
+                .Where(section => section.Text.Length > 0)
+                .Select(section => section.Heading.Length > 0 ? $"{section.Heading}\n{section.Text}" : section.Text));
+            DateTimeOffset? published = DateTimeOffset.TryParse(job.String("publishedAt"), CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var date)
+                ? date.ToUniversalTime()
+                : null;
+            return new DetailPages.Opened(listing.ToJob(name, host, description.Length > HtmlText.MaxLength ? description[..HtmlText.MaxLength] : description, published, hasDetails: true));
+        }, ct);
 
-        var cap = detailed.Count == 0 ? CompanyFirstRead : CompanyPagesPerRun;
-        var failures = 0;
-        await Parallel.ForEachAsync(toOpen.Take(cap), new ParallelOptions { MaxDegreeOfParallelism = CompanyConcurrency, CancellationToken = ct }, async (listing, token) =>
-        {
-            try
-            {
-                var html = await HttpJson.GetTextAsync(http, new Uri($"https://{host}/jobs/{listing.Id}"), $"Gupy {host} vaga {listing.Id}", token);
-                var job = NextData(html, $"Gupy {host}").GetProperty("props").GetProperty("pageProps").GetProperty("job");
-                var sections = new (string Field, string Heading)[] { ("description", ""), ("responsibilities", "Responsabilidades"), ("prerequisites", "Requisitos"), ("relevantExperiences", "Diferenciais") };
-                var description = string.Join("\n\n", sections
-                    .Select(section => (section.Heading, Text: HtmlText.ToPlain(job.String(section.Field))))
-                    .Where(section => section.Text.Length > 0)
-                    .Select(section => section.Heading.Length > 0 ? $"{section.Heading}\n{section.Text}" : section.Text));
-                DateTimeOffset? published = DateTimeOffset.TryParse(job.String("publishedAt"), CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var date)
-                    ? date.ToUniversalTime()
-                    : null;
-                jobs.Add(listing.ToJob(name, host, description.Length > HtmlText.MaxLength ? description[..HtmlText.MaxLength] : description, published, hasDetails: true));
-            }
-            catch (Exception ex) when (ex is ConnectorException or KeyNotFoundException or InvalidOperationException)
-            {
-                Interlocked.Increment(ref failures);
-                jobs.Add(listing.ToJob(name, host, string.Empty, null, hasDetails: false));
-            }
-        });
-
-        // Jobs not opened this time still count as listed, with title and place; their text comes in later runs.
-        foreach (var listing in toOpen.Skip(cap))
-        {
-            jobs.Add(listing.ToJob(name, host, string.Empty, null, hasDetails: false));
-        }
-
-        var notes = new List<string>();
-        if (failures > 0)
-        {
-            notes.Add($"{failures} vaga(s) sem detalhes");
-        }
-
-        if (toOpen.Count > cap)
-        {
-            notes.Add($"{toOpen.Count - cap} descrição(ões) ficaram para as próximas coletas");
-        }
-
-        return new Snapshot(jobs.ToList(), Authoritative: true, notes.Count > 0 ? $"Gupy {host}: {string.Join("; ", notes)}." : null);
+        // Jobs not opened this time (stored, failed or left) still count as listed, with title and place; their text comes in later runs.
+        var details = opened.Jobs.ToDictionary(j => j.ExternalId, StringComparer.Ordinal);
+        var jobs = listed.Select(listing => details.TryGetValue(listing.Id, out var job) ? job : listing.ToJob(name, host, string.Empty, null, hasDetails: false)).ToList();
+        var notes = opened.Notes(left: "descrição(ões) ficaram para as próximas coletas");
+        return new Snapshot(jobs, Authoritative: true, notes.Count > 0 ? $"Gupy {host}: {string.Join("; ", notes)}." : null);
     }
 
     /// <summary>The company's name and its open jobs in Brazil (or with no country), from the career page.</summary>
@@ -293,14 +255,14 @@ public sealed partial class GupyConnector(HttpClient http) : IJobConnector, ICom
             var workplace = item.TryGetProperty("workplace", out var w) && w.ValueKind == JsonValueKind.Object ? w : default;
             var address = workplace.ValueKind == JsonValueKind.Object && workplace.TryGetProperty("address", out var a) && a.ValueKind == JsonValueKind.Object ? a : default;
             var country = address.ValueKind == JsonValueKind.Object ? address.String("country")?.Trim() : null;
-            if (!string.IsNullOrEmpty(country) && !BrazilName().IsMatch(country))
+            var place = address.ValueKind == JsonValueKind.Object
+                ? string.Join(", ", new[] { address.String("city"), address.String("stateShortName") ?? address.String("state"), country }.Where(v => !string.IsNullOrWhiteSpace(v)))
+                : string.Empty;
+            if (!Brazil.KeepJob(country, place))
             {
                 continue;
             }
 
-            var place = address.ValueKind == JsonValueKind.Object
-                ? string.Join(", ", new[] { address.String("city"), address.String("stateShortName") ?? address.String("state"), country }.Where(v => !string.IsNullOrWhiteSpace(v)))
-                : string.Empty;
             var mode = workplace.ValueKind == JsonValueKind.Object ? HttpJson.WorkModeOf(workplace.String("workplaceType")) : null;
             jobs.Add(new CompanyListing(id, title.Length > 500 ? title[..500] : title, place, mode));
         }
@@ -338,7 +300,4 @@ public sealed partial class GupyConnector(HttpClient http) : IJobConnector, ICom
 
     [GeneratedRegex(@"<script id=""__NEXT_DATA__"" type=""application/json"">(.*?)</script>", RegexOptions.Singleline)]
     private static partial Regex NextDataScript();
-
-    [GeneratedRegex(@"^(Brasil|Brazil|BR)$", RegexOptions.IgnoreCase)]
-    private static partial Regex BrazilName();
 }

@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.IO.Compression;
 using System.Net;
 using System.Security.Cryptography;
@@ -15,26 +14,13 @@ namespace Rolehound.Connectors;
 /// The target is the site's host, such as carrera.sonda.com. Runs on
 /// <see cref="SafeHttp"/>: only public internet addresses are ever reached.
 /// </summary>
-public sealed partial class CareerSiteConnector(HttpClient http) : IJobConnector, ITargetProber, IRemembersSkipped
+public sealed partial class CareerSiteConnector(HttpClient http) : IJobConnector, ITargetProber
 {
     private const int MaxSitemaps = 12;
     private const int MaxUrls = 3000;
-    private const int MaxPagesPerRun = 60;
-    private const int FirstReadPages = 200;
     private const int ProbePages = 8;
-    private const int PageConcurrency = 2;
-    private static readonly TimeSpan Pause = TimeSpan.FromMilliseconds(300);
-
-    /// <summary>Pages (by id) that are not jobs in Brazil, so they are not opened again; the database keeps them across restarts.</summary>
-    private static readonly ConcurrentDictionary<string, byte> Skipped = new(StringComparer.Ordinal);
-
-    public void Remember(IEnumerable<string> pages)
-    {
-        foreach (var page in pages)
-        {
-            Skipped.TryAdd(page, 0);
-        }
-    }
+    // Polite to sites people add: two pages at a time, a short pause after each (R58).
+    private static readonly DetailPages.Limits Pages = new(PerRun: 60, FirstRead: 200, Concurrency: 2, Pause: TimeSpan.FromMilliseconds(300));
 
     public JobSource Source => JobSource.CareerSite;
 
@@ -45,68 +31,25 @@ public sealed partial class CareerSiteConnector(HttpClient http) : IJobConnector
         return url.Scheme == Uri.UriSchemeHttps && url.HostNameType == UriHostNameType.Dns && DomainPattern().IsMatch(host) ? host : null;
     }
 
-    public async Task<Snapshot> FetchAsync(string target, IReadOnlySet<string> detailed, CancellationToken ct)
+    public async Task<Snapshot> FetchAsync(string target, KnownPages known, CancellationToken ct)
     {
         var host = Host(target);
         var pages = await JobPagesAsync(host, ct);
 
-        var jobs = new ConcurrentBag<CollectedJob>();
-        var toOpen = new List<string>();
-        foreach (var page in pages)
-        {
-            var id = IdOf(page);
-            if (detailed.Contains(id))
-            {
-                jobs.Add(new CollectedJob(id, string.Empty, string.Empty, string.Empty, string.Empty, page, null, null, HasDetails: false));
-            }
-            else if (!Skipped.ContainsKey(id))
-            {
-                toOpen.Add(page);
-            }
-        }
-
         // Pages whose address points at Brazil go first; a first read (nothing stored yet) may open more.
-        toOpen = toOpen.OrderByDescending(LooksBrazilian).ToList();
-        var cap = detailed.Count == 0 ? FirstReadPages : MaxPagesPerRun;
-        var skipped = new ConcurrentBag<string>();
-        var failures = 0;
-        await Parallel.ForEachAsync(toOpen.Take(cap), new ParallelOptions { MaxDegreeOfParallelism = PageConcurrency, CancellationToken = ct }, async (page, token) =>
+        var opened = await DetailPages.OpenAsync(pages.OrderByDescending(LooksBrazilian), IdOf, known, Pages, async (page, token) =>
         {
-            try
-            {
-                var posting = await ReadPageAsync(page, token);
-                if (posting is null || !JobPostingReader.InBrazilOrUnknown(posting))
-                {
-                    Skipped.TryAdd(IdOf(page), 0);
-                    skipped.Add(IdOf(page));
-                }
-                else
-                {
-                    jobs.Add(ToJob(host, page, posting));
-                }
-            }
-            catch (ConnectorException)
-            {
-                Interlocked.Increment(ref failures);
-            }
-
-            await Task.Delay(Pause, token);
-        });
-
-        var left = Math.Max(0, toOpen.Count - cap);
-        var notes = new List<string>();
-        if (failures > 0)
-        {
-            notes.Add($"{failures} página(s) não abriram");
-        }
-
-        if (left > 0)
-        {
-            notes.Add($"{left} página(s) ficaram para as próximas coletas");
-        }
+            var posting = await ReadPageAsync(page, token);
+            return posting is not null && JobPostingReader.InBrazilOrUnknown(posting) ? new DetailPages.Opened(ToJob(host, page, posting)) : DetailPages.Opened.NotHere;
+        }, ct);
 
         // Stored jobs still listed come back as listed; one gone from the sitemap closes.
-        return new Snapshot(jobs.ToList(), Authoritative: true, notes.Count > 0 ? $"{host}: {string.Join("; ", notes)}." : null, skipped.ToList());
+        var jobs = pages.Where(page => known.Detailed.Contains(IdOf(page)))
+            .Select(page => new CollectedJob(IdOf(page), string.Empty, string.Empty, string.Empty, string.Empty, page, null, null, HasDetails: false))
+            .Concat(opened.Jobs)
+            .ToList();
+        var notes = opened.Notes(failed: "página(s) não abriram", left: "página(s) ficaram para as próximas coletas");
+        return new Snapshot(jobs, Authoritative: true, notes.Count > 0 ? $"{host}: {string.Join("; ", notes)}." : null, opened.Skipped);
     }
 
     /// <summary>

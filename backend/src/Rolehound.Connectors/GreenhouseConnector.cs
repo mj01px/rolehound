@@ -15,7 +15,7 @@ public sealed partial class GreenhouseConnector(HttpClient http) : IJobConnector
 
     public JobSource Source => JobSource.Greenhouse;
 
-    public async Task<Snapshot> FetchAsync(string target, IReadOnlySet<string> detailed, CancellationToken ct)
+    public async Task<Snapshot> FetchAsync(string target, KnownPages known, CancellationToken ct)
     {
         var board = Uri.EscapeDataString(target.Trim());
         using var document = await HttpJson.GetAsync(http, new Uri($"{BaseUrl}{board}/jobs?content=true"), $"Greenhouse {target}", ct);

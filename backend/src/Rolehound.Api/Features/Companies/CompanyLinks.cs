@@ -40,35 +40,6 @@ internal static class CompanyLinks
         list.FirstOrDefault(entry => host == entry.Domain || host.EndsWith($".{entry.Domain}", StringComparison.Ordinal)).Name;
 }
 
-/// <summary>
-/// The "detailed" set for a probe: every id counts as already stored, so a
-/// source with one page per job (InHire) only reads its list.
-/// </summary>
-internal sealed class EveryId : IReadOnlySet<string>
-{
-    public static readonly EveryId Instance = new();
-
-    public int Count => 0;
-
-    public bool Contains(string item) => true;
-
-    public IEnumerator<string> GetEnumerator() => Enumerable.Empty<string>().GetEnumerator();
-
-    IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
-
-    public bool IsProperSubsetOf(IEnumerable<string> other) => throw new NotSupportedException();
-
-    public bool IsProperSupersetOf(IEnumerable<string> other) => throw new NotSupportedException();
-
-    public bool IsSubsetOf(IEnumerable<string> other) => throw new NotSupportedException();
-
-    public bool IsSupersetOf(IEnumerable<string> other) => throw new NotSupportedException();
-
-    public bool Overlaps(IEnumerable<string> other) => throw new NotSupportedException();
-
-    public bool SetEquals(IEnumerable<string> other) => throw new NotSupportedException();
-}
-
 /// <summary>Each person tests at most <see cref="PerHour"/> links an hour: every test may call a source.</summary>
 public sealed class CompanyLinkLimiter(TimeProvider time)
 {
