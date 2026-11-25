@@ -442,10 +442,19 @@ namespace Rolehound.Api.Infrastructure.Persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("encrypted_key");
 
+                    b.Property<string>("EncryptedManagementKey")
+                        .HasColumnType("text")
+                        .HasColumnName("encrypted_management_key");
+
                     b.Property<string>("KeyHint")
                         .HasMaxLength(4)
                         .HasColumnType("character varying(4)")
                         .HasColumnName("key_hint");
+
+                    b.Property<string>("ManagementKeyHint")
+                        .HasMaxLength(4)
+                        .HasColumnType("character varying(4)")
+                        .HasColumnName("management_key_hint");
 
                     b.Property<string>("PitchAndAtsModel")
                         .HasMaxLength(120)

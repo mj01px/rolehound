@@ -25,6 +25,12 @@ public sealed class AiException(string code, string message) : Exception(message
 /// person's own key. Structured output uses <c>response_format</c> of type
 /// <c>json_schema</c>, routed only to providers that support it.
 /// </summary>
+/// <summary>
+/// One key's spending in USD: this UTC month, and its own limit when it has one
+/// (<paramref name="LimitReset"/>: daily, weekly, monthly or null for never).
+/// </summary>
+public sealed record KeySpending(decimal UsageMonthly, decimal? Limit, decimal? LimitRemaining, string? LimitReset);
+
 public sealed class OpenRouterClient(HttpClient http)
 {
     public const string HttpClientName = "openrouter";
@@ -48,6 +54,62 @@ public sealed class OpenRouterClient(HttpClient http)
         await ThrowIfFailedAsync(response, ct);
         return true;
     }
+
+    /// <summary>
+    /// GET /key: what this key spent and its own spending limit, in USD. The account's
+    /// credit balance needs a management key, which Rolehound never asks for.
+    /// </summary>
+    public async Task<KeySpending> KeySpendingAsync(string apiKey, CancellationToken ct)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, "key");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+        using var response = await SendAsync(request, ct);
+        await ThrowIfFailedAsync(response, ct);
+        try
+        {
+            using var document = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(ct), cancellationToken: ct);
+            var data = document.RootElement.GetProperty("data");
+            return new KeySpending(
+                Number(data, "usage_monthly") ?? 0,
+                Number(data, "limit"),
+                Number(data, "limit_remaining"),
+                data.TryGetProperty("limit_reset", out var reset) && reset.ValueKind == JsonValueKind.String ? reset.GetString() : null);
+        }
+        catch (Exception ex) when (ex is JsonException or KeyNotFoundException or InvalidOperationException)
+        {
+            throw new AiException("ai_unavailable", "O OpenRouter devolveu os dados da chave num formato inesperado.");
+        }
+    }
+
+    /// <summary>
+    /// GET /credits with a management key: the account's balance in USD (credits bought minus used).
+    /// Null when OpenRouter refuses the key, so a wrong or revoked key reads as "no balance".
+    /// </summary>
+    public async Task<decimal?> AccountBalanceAsync(string managementKey, CancellationToken ct)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, "credits");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", managementKey);
+        using var response = await SendAsync(request, ct);
+        if (response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
+        {
+            return null;
+        }
+
+        await ThrowIfFailedAsync(response, ct);
+        try
+        {
+            using var document = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(ct), cancellationToken: ct);
+            var data = document.RootElement.GetProperty("data");
+            return (Number(data, "total_credits") ?? 0) - (Number(data, "total_usage") ?? 0);
+        }
+        catch (Exception ex) when (ex is JsonException or KeyNotFoundException or InvalidOperationException)
+        {
+            throw new AiException("ai_unavailable", "O OpenRouter devolveu o saldo num formato inesperado.");
+        }
+    }
+
+    private static decimal? Number(JsonElement data, string name) =>
+        data.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.Number ? value.GetDecimal() : null;
 
     /// <summary>GET /models: OpenRouter's public model list. Needs no key.</summary>
     public async Task<JsonDocument> ListModelsAsync(CancellationToken ct)

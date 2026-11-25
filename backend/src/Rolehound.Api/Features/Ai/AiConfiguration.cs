@@ -11,6 +11,7 @@ internal sealed class AiSettingsConfiguration : IEntityTypeConfiguration<AiSetti
         builder.ToTable("ai_settings");
         builder.HasKey(s => s.UserId);
         builder.Property(s => s.KeyHint).HasMaxLength(4);
+        builder.Property(s => s.ManagementKeyHint).HasMaxLength(4);
         builder.Property(s => s.PitchAndAtsModel).HasMaxLength(120);
         builder.Property(s => s.ResumeModel).HasMaxLength(120);
         builder.Property(s => s.ProfileAndFixModel).HasMaxLength(120);

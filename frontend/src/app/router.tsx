@@ -1,4 +1,5 @@
 import { createBrowserRouter } from 'react-router'
+import { ProfilePage } from '../features/account/ProfilePage'
 import { SettingsPage } from '../features/account/SettingsPage'
 import { UserPage } from '../features/admin/users/UserPage'
 import { UsersPage } from '../features/admin/users/UsersPage'
@@ -49,6 +50,7 @@ export const router = createBrowserRouter([
           { path: '/empresas', element: <CompaniesPage /> },
           { path: '/qualidade', element: <AccuracyPage /> },
           { path: '/configuracoes', element: <SettingsPage /> },
+          { path: '/perfil', element: <ProfilePage /> },
           {
             element: <RequireAuth admin />,
             children: [

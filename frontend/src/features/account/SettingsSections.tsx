@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router'
 import { ApiError, api, apiUrl, errorMessage } from '../../lib/api'
 import { Alert, Notice } from '../../ui/Alert'
 import { Button } from '../../ui/Button'
+import { Field } from '../../ui/Field'
 import { DossierStep } from '../onboarding/DossierStep'
 import { KeyStep } from '../onboarding/KeyStep'
 import { ModelsStep } from '../onboarding/ModelsStep'
@@ -11,6 +12,7 @@ import { ProfileRefiner } from '../onboarding/ProfileRefiner'
 import { ProfileStep } from '../onboarding/ProfileStep'
 import type { AiSettings, ProfileDocument, ProfileGroup } from '../onboarding/api'
 import { useSensitive } from './sensitive'
+import { usageQuery } from './usage'
 import styles from './account.module.css'
 
 const isCancel = (error: unknown) => error instanceof Error && error.message === 'cancelled'
@@ -68,9 +70,86 @@ export function AiSection() {
               Mudar
             </Button>
           </div>
+          <ManagementKeyRow hint={settings.data.managementKeyHint} />
         </>
       )}
     </section>
+  )
+}
+
+/**
+ * The optional management key, only to show the account's credit balance. It can create and
+ * delete OpenRouter keys, so saving it asks for the password again and the risk is spelled out.
+ */
+function ManagementKeyRow({ hint }: { hint: string | null }) {
+  const queryClient = useQueryClient()
+  const sensitive = useSensitive()
+  const [open, setOpen] = useState(false)
+  const [key, setKey] = useState('')
+  const refresh = () => queryClient.invalidateQueries({ queryKey: ['ai'] })
+  const save = useMutation({
+    mutationFn: () => sensitive(() => api.put('/ai/management-key', { key: key.trim() })),
+    onSuccess: async () => {
+      setOpen(false)
+      setKey('')
+      await refresh()
+    },
+  })
+  const remove = useMutation({ mutationFn: () => api.delete('/ai/management-key'), onSuccess: refresh })
+  const error = save.error instanceof ApiError ? save.error : null
+  const cancelled = save.error instanceof Error && save.error.message === 'cancelled'
+
+  const submit = (event: FormEvent) => {
+    event.preventDefault()
+    save.mutate()
+  }
+
+  return (
+    <div className={styles.row}>
+      <div className={styles.rowText}>
+        <span className={styles.rowTitle}>Chave de gerenciamento (opcional)</span>
+        <span className={styles.muted}>{hint ? `Cadastrada (${hint}). Usada só para mostrar o saldo da conta.` : 'Só para mostrar o saldo da sua conta no resumo acima.'}</span>
+      </div>
+      {!open && (
+        <div className={styles.actions}>
+          {hint && (
+            <Button variant="ghost" onClick={() => remove.mutate()} disabled={remove.isPending}>
+              Remover
+            </Button>
+          )}
+          <Button variant="secondary" onClick={() => setOpen(true)}>
+            {hint ? 'Trocar' : 'Cadastrar'}
+          </Button>
+        </div>
+      )}
+      {open && (
+        <form className={styles.panel} onSubmit={submit} noValidate>
+          <Notice>
+            Crie em openrouter.ai, Settings › Management Keys. Se aparecer a opção de acesso, escolha "Read only", e coloque uma data de validade. O Rolehound guarda a chave
+            criptografada e usa só para ler o saldo. Você pode remover quando quiser.
+          </Notice>
+          <Field
+            label="Chave de gerenciamento"
+            type="password"
+            autoComplete="off"
+            value={key}
+            onChange={(event) => setKey(event.target.value)}
+            error={error?.field('key')}
+          />
+          {error && !error.field('key') && <Alert>{errorMessage(error)}</Alert>}
+          {save.isError && !error && !cancelled && <Alert>{errorMessage(save.error)}</Alert>}
+          <div className={styles.actions}>
+            <Button type="submit" disabled={save.isPending || !key.trim()}>
+              {save.isPending ? 'Conferindo…' : 'Salvar'}
+            </Button>
+            <Button variant="ghost" onClick={() => setOpen(false)}>
+              Cancelar
+            </Button>
+          </div>
+        </form>
+      )}
+      {remove.isError && <Alert>{errorMessage(remove.error)}</Alert>}
+    </div>
   )
 }
 
@@ -305,14 +384,6 @@ function ProfileForm({ initial, onSaved }: { initial: StoredProfile; onSaved: ()
   )
 }
 
-interface UsageRow {
-  feature: string
-  model: string
-  calls: number
-  failed: number
-  promptTokens: number
-  completionTokens: number
-}
 
 const featureLabel: Record<string, string> = {
   modeltest: 'Teste de modelo',
@@ -325,14 +396,11 @@ const featureLabel: Record<string, string> = {
 
 /** Tokens spent on the person's own key, by feature and model (FR-AI-13). */
 export function UsageSection() {
-  const usage = useQuery({
-    queryKey: ['account', 'ai-usage'],
-    queryFn: ({ signal }) => api.get<{ last30Days: UsageRow[]; allTime: UsageRow[] }>('/account/ai-usage', signal),
-  })
+  const usage = useQuery(usageQuery)
   const rows = usage.data?.last30Days ?? []
 
   return (
-    <section className={styles.section} aria-labelledby="usage-title">
+    <section id="uso" className={styles.section} aria-labelledby="usage-title">
       <h2 id="usage-title" className={styles.sectionTitle}>
         Consumo de IA nos últimos 30 dias
       </h2>
@@ -367,7 +435,7 @@ export function UsageSection() {
           </table>
         </div>
       )}
-      <p className={styles.muted}>O custo em dinheiro aparece no painel do OpenRouter, porque a chave é sua.</p>
+      <p className={styles.muted}>Tokens contados pelo Rolehound. O gasto em dinheiro desta chave está no resumo acima.</p>
     </section>
   )
 }

@@ -1,8 +1,26 @@
 .page {
   display: flex;
   flex-direction: column;
-  gap: 40px;
+  gap: 24px;
   max-width: 760px;
+}
+
+.heading {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.lead {
+  margin: 0;
+  font: 400 13px/18px var(--font-sans);
+  color: var(--muted);
+}
+
+.lead a {
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 .title {
@@ -16,15 +34,21 @@
 .section {
   display: flex;
   flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
 }
 
 .sectionTitle {
   margin: 0;
-  padding-bottom: 8px;
-  font: 500 12px/16px var(--font-sans);
-  color: var(--faint);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  font: 600 14px/20px var(--font-sans);
+  color: var(--ink);
+}
+
+/* Notes, editors and tables placed straight in a section line up with its rows. */
+.section > :not(.sectionTitle, .row) {
+  padding: 12px 20px;
 }
 
 .row {
@@ -33,12 +57,12 @@
   justify-content: space-between;
   align-items: center;
   gap: 12px;
-  padding: 16px 0;
+  padding: 16px 20px;
   border-bottom: 1px solid var(--border);
 }
 
-.row:first-of-type {
-  border-top: 1px solid var(--border);
+.row:last-child {
+  border-bottom: 0;
 }
 
 .rowText {
@@ -284,4 +308,70 @@
   height: 1px;
   overflow: hidden;
   clip: rect(0 0 0 0);
+}
+
+/* Profile header. */
+.identity {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.bigAvatar {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border: 1px solid var(--border-control);
+  border-radius: 999px;
+  background: var(--surface-raised);
+  font: 600 22px var(--font-sans);
+}
+
+/* AI summary strip. */
+.summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+
+.summaryCell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px 20px;
+  border-right: 1px solid var(--border);
+}
+
+.summaryCell:last-child {
+  border-right: 0;
+}
+
+.summaryLabel {
+  font: 500 12px/16px var(--font-sans);
+  color: var(--muted);
+}
+
+.summaryValue {
+  font: 600 20px/24px var(--font-mono);
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+
+.summaryUnit {
+  font: 500 13px var(--font-mono);
+  color: var(--muted);
+}
+
+.summaryHint {
+  font: 400 12px/16px var(--font-sans);
+  color: var(--faint);
+}
+
+.summaryHint a {
+  color: var(--muted);
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }

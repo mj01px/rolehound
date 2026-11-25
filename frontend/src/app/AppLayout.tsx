@@ -35,6 +35,7 @@ export function AppLayout() {
   }, [menuOpen])
 
   const inSettings = pathname.startsWith('/configuracoes')
+  const inProfile = pathname.startsWith('/perfil')
 
   return (
     <ReauthProvider>
@@ -69,11 +70,17 @@ export function AppLayout() {
               >
                 {icons.settings}
               </Link>
-              <span className={styles.profile} role="img" title={me ? `${me.username} · ${me.email}` : undefined} aria-label={me?.username}>
+              <Link
+                to="/perfil"
+                className={inProfile ? `${styles.profile} ${styles.profileCurrent}` : styles.profile}
+                aria-label="Seu perfil"
+                aria-current={inProfile ? 'page' : undefined}
+                title={me ? `Seu perfil · ${me.username}` : 'Seu perfil'}
+              >
                 <span className={styles.avatar} aria-hidden="true">
                   {me?.username[0]?.toUpperCase() ?? ''}
                 </span>
-              </span>
+              </Link>
             </div>
           </header>
           <main className={styles.content}>

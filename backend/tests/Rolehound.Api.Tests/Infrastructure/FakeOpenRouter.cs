@@ -14,6 +14,9 @@ public sealed class FakeOpenRouter : HttpMessageHandler
     public const string ValidKey = "sk-or-v1-test-key-0000000000000001";
     public const string BrokenModel = "nobody/missing-model";
 
+    /// <summary>A management key: reads /credits, cannot run models.</summary>
+    public const string ManagementKey = "sk-or-v1-test-management-0000000001";
+
     public ConcurrentQueue<JsonObject> Requests { get; } = new();
 
     /// <summary>How many times the public model list was fetched.</summary>
@@ -38,9 +41,16 @@ public sealed class FakeOpenRouter : HttpMessageHandler
             return CatalogDown ? Error(HttpStatusCode.ServiceUnavailable, "down") : Json(HttpStatusCode.OK, Catalog);
         }
 
+        if (path.EndsWith("/credits", StringComparison.Ordinal))
+        {
+            return request.Headers.Authorization?.Parameter == ManagementKey
+                ? Json(HttpStatusCode.OK, """{"data":{"total_credits":20,"total_usage":12.58}}""")
+                : Error(HttpStatusCode.Forbidden, "Management key required");
+        }
+
         if (path.EndsWith("/key", StringComparison.Ordinal))
         {
-            return authorized ? Json(HttpStatusCode.OK, """{"data":{"label":"test","usage":0,"limit":null,"is_free_tier":false}}""") : Error(HttpStatusCode.Unauthorized, "No auth credentials found");
+            return authorized ? Json(HttpStatusCode.OK, """{"data":{"label":"test","usage":3.5,"usage_monthly":1.18,"limit":10,"limit_remaining":6.5,"limit_reset":"monthly","is_free_tier":false}}""") : Error(HttpStatusCode.Unauthorized, "No auth credentials found");
         }
 
         if (!authorized)

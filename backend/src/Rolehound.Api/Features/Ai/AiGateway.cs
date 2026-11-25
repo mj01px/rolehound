@@ -20,7 +20,15 @@ public sealed class AiGateway(
 {
     private const string KeyPurpose = "Rolehound.Ai.OpenRouterKey.v1";
 
+    private const string ManagementKeyPurpose = "Rolehound.Ai.OpenRouterManagementKey.v1";
+
     private IDataProtector KeyProtector => dataProtection.CreateProtector(KeyPurpose);
+
+    private IDataProtector ManagementKeyProtector => dataProtection.CreateProtector(ManagementKeyPurpose);
+
+    public string ProtectManagementKey(string key) => ManagementKeyProtector.Protect(key);
+
+    public string UnprotectManagementKey(string encryptedKey) => ManagementKeyProtector.Unprotect(encryptedKey);
 
     public string Protect(string apiKey) => KeyProtector.Protect(apiKey);
 

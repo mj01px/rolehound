@@ -61,6 +61,19 @@
 .profile {
   display: grid;
   padding: 0 4px;
+  border-radius: 50%;
+  text-decoration: none;
+}
+
+.profile:hover .avatar,
+.profileCurrent .avatar {
+  color: var(--ink);
+  box-shadow: 0 0 0 1px var(--border-control);
+}
+
+.profile:focus-visible {
+  outline: 2px solid var(--signal-bright);
+  outline-offset: 2px;
 }
 
 .avatar {

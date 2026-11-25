@@ -45,6 +45,8 @@ const events: Record<string, { own: string; byAdmin: string; icon: Icon }> = {
   RecoveryCodesRegenerated: { own: 'Gerou novos códigos de recuperação', byAdmin: 'Gerou novos códigos de recuperação', icon: 'lock' },
   SessionsRevoked: { own: 'Encerrou as sessões nos outros aparelhos', byAdmin: 'Encerrou as sessões nos outros aparelhos', icon: 'lock' },
   AiKeyChanged: { own: 'Trocou a chave de IA', byAdmin: 'Trocou a chave de IA', icon: 'key' },
+  AiManagementKeyChanged: { own: 'Cadastrou a chave de gerenciamento', byAdmin: 'Cadastrou a chave de gerenciamento', icon: 'key' },
+  AiManagementKeyRemoved: { own: 'Removeu a chave de gerenciamento', byAdmin: 'Removeu a chave de gerenciamento', icon: 'key' },
   EmailChangeRequested: { own: 'Pediu a troca de e-mail', byAdmin: 'Troca de e-mail pedida', icon: 'mail' },
   EmailChanged: { own: 'Confirmou o e-mail novo', byAdmin: 'Confirmou o e-mail novo', icon: 'mail' },
   AccessLinkSent: { own: 'Link de acesso enviado', byAdmin: 'Link de acesso enviado', icon: 'mail' },

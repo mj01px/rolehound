@@ -35,6 +35,14 @@ public sealed class AiSettings
     /// <summary>Last four characters, to recognise the key (R46).</summary>
     public string? KeyHint { get; set; }
 
+    /// <summary>
+    /// Optional OpenRouter management key, only to read the account's credit balance.
+    /// It can create and delete keys, so it is encrypted apart and used for nothing else.
+    /// </summary>
+    public string? EncryptedManagementKey { get; set; }
+
+    public string? ManagementKeyHint { get; set; }
+
     public string? PitchAndAtsModel { get; set; }
 
     public string? ResumeModel { get; set; }

@@ -16,6 +16,8 @@ export interface AiSettings {
   keyHint: string | null
   models: Models | null
   suggested: Models
+  /** Last four characters of the optional management key, which only reads the account balance. */
+  managementKeyHint: string | null
 }
 
 export interface DossierError {
