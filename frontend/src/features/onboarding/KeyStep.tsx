@@ -4,8 +4,9 @@ import { ApiError, api, errorMessage } from '../../lib/api'
 import { Alert } from '../../ui/Alert'
 import { Button } from '../../ui/Button'
 import { Field } from '../../ui/Field'
-import uiStyles from '../../ui/ui.module.css'
 import { useSensitive } from '../account/sensitive'
+import { HelpGuide } from '../../ui/HelpGuide'
+import { apiKeyGuide } from '../account/keyGuides'
 import styles from './onboarding.module.css'
 
 export function KeyStep({ onDone }: { onDone: () => Promise<void> }) {
@@ -38,11 +39,7 @@ export function KeyStep({ onDone }: { onDone: () => Promise<void> }) {
         onChange={(e) => setKey(e.target.value)}
         help="Testamos a chave antes de salvar."
         error={fieldError}
-        aside={
-          <a href="https://openrouter.ai/keys" target="_blank" rel="noreferrer" className={uiStyles.link}>
-            Onde pegar a chave
-          </a>
-        }
+        aside={<HelpGuide guide={apiKeyGuide} label="Como pegar a chave do OpenRouter" />}
         autoFocus
       />
       <Button type="submit" size="large" block disabled={save.isPending || !key}>

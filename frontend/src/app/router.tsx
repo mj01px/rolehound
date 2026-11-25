@@ -1,4 +1,5 @@
 import { createBrowserRouter } from 'react-router'
+import { DossierPage } from '../features/account/DossierPage'
 import { ProfilePage } from '../features/account/ProfilePage'
 import { SettingsPage } from '../features/account/SettingsPage'
 import { UserPage } from '../features/admin/users/UserPage'
@@ -11,7 +12,11 @@ import { TwoFactorPage } from '../features/auth/TwoFactorPage'
 import { AccuracyPage } from '../features/accuracy/AccuracyPage'
 import { ConnectorsPage } from '../features/admin/connectors/ConnectorsPage'
 import { CollectionsPage } from '../features/admin/sources/CollectionsPage'
+import { AcceptPage } from '../features/legal/AcceptPage'
+import { PrivacyPage } from '../features/legal/PrivacyPage'
+import { TermsPage } from '../features/legal/TermsPage'
 import { CompaniesPage } from '../features/companies/CompaniesPage'
+import { CompanyPage } from '../features/companies/CompanyPage'
 import { SourcesPage } from '../features/admin/sources/SourcesPage'
 import { ApplicationPage } from '../features/funnel/ApplicationPage'
 import { FunnelPage } from '../features/funnel/FunnelPage'
@@ -36,10 +41,13 @@ export const router = createBrowserRouter([
   { path: '/acesso', element: <AccessPage /> },
   { path: '/nova-senha', element: <ResetPasswordPage /> },
   { path: '/confirmar-email', element: <ConfirmEmailPage /> },
+  { path: '/termos', element: <TermsPage /> },
+  { path: '/privacidade', element: <PrivacyPage /> },
   {
     element: <RequireAuth />,
     children: [
       { path: '/configuracao-inicial', element: <OnboardingPage /> },
+      { path: '/aceite-termos', element: <AcceptPage /> },
       {
         element: <AppLayout />,
         children: [
@@ -48,8 +56,10 @@ export const router = createBrowserRouter([
           { path: '/funil', element: <FunnelPage /> },
           { path: '/funil/:id', element: <ApplicationPage /> },
           { path: '/empresas', element: <CompaniesPage /> },
+          { path: '/empresas/:companyId', element: <CompanyPage />, children: [{ path: 'vagas/:id', element: <JobDrawer /> }] },
           { path: '/qualidade', element: <AccuracyPage /> },
           { path: '/configuracoes', element: <SettingsPage /> },
+          { path: '/configuracoes/dossier', element: <DossierPage /> },
           { path: '/perfil', element: <ProfilePage /> },
           {
             element: <RequireAuth admin />,

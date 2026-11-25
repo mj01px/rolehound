@@ -1,10 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState, type FormEvent } from 'react'
-import { useNavigate } from 'react-router'
+import { Link, useNavigate } from 'react-router'
 import { ApiError, api, apiUrl, errorMessage } from '../../lib/api'
 import { Alert, Notice } from '../../ui/Alert'
 import { Button } from '../../ui/Button'
 import { Field } from '../../ui/Field'
+import { HelpGuide } from '../../ui/HelpGuide'
+import { managementKeyGuide } from './keyGuides'
 import { DossierStep } from '../onboarding/DossierStep'
 import { KeyStep } from '../onboarding/KeyStep'
 import { ModelsStep } from '../onboarding/ModelsStep'
@@ -60,11 +62,18 @@ export function AiSection() {
           <div className={styles.row}>
             <div className={styles.rowText}>
               <span className={styles.rowTitle}>Modelos</span>
-              <span className={styles.muted}>
-                {settings.data.models
-                  ? `Pitch e ATS: ${settings.data.models.pitchAndAts} · Currículo: ${settings.data.models.resume} · Perfil: ${settings.data.models.profileAndFix}`
-                  : 'Ainda não escolhidos'}
-              </span>
+              {settings.data.models ? (
+                <dl className={styles.models}>
+                  <dt>Pitch e ATS:</dt>
+                  <dd>{settings.data.models.pitchAndAts}</dd>
+                  <dt>Currículo:</dt>
+                  <dd>{settings.data.models.resume}</dd>
+                  <dt>Perfil:</dt>
+                  <dd>{settings.data.models.profileAndFix}</dd>
+                </dl>
+              ) : (
+                <span className={styles.muted}>Ainda não escolhidos</span>
+              )}
             </div>
             <Button variant="secondary" onClick={() => setEditing('models')}>
               Mudar
@@ -125,11 +134,12 @@ function ManagementKeyRow({ hint }: { hint: string | null }) {
       {open && (
         <form className={styles.panel} onSubmit={submit} noValidate>
           <Notice>
-            Crie em openrouter.ai, Settings › Management Keys. Se aparecer a opção de acesso, escolha "Read only", e coloque uma data de validade. O Rolehound guarda a chave
-            criptografada e usa só para ler o saldo. Você pode remover quando quiser.
+            Crie em openrouter.ai, Management keys, com uma data de validade. O Rolehound guarda a chave criptografada e usa só para ler o saldo. Você pode remover quando
+            quiser. O passo a passo com imagens está no "?" do campo.
           </Notice>
           <Field
             label="Chave de gerenciamento"
+            aside={<HelpGuide guide={managementKeyGuide} label="Como pegar a chave de gerenciamento" />}
             type="password"
             autoComplete="off"
             value={key}
@@ -212,9 +222,16 @@ export function DossierSection() {
                 {dossier.data ? `Versão ${dossier.data.number}, de ${new Date(dossier.data.createdAt).toLocaleDateString('pt-BR')}` : 'Carregando'}
               </span>
             </div>
-            <Button variant="secondary" onClick={() => setStage('import')}>
-              Importar nova versão
-            </Button>
+            <div className={styles.actions}>
+              {dossier.data && (
+                <Link to="/configuracoes/dossier" className={styles.buttonLink}>
+                  Ver
+                </Link>
+              )}
+              <Button variant="secondary" onClick={() => setStage('import')}>
+                Importar nova versão
+              </Button>
+            </div>
           </div>
           <div className={styles.row}>
             <div className={styles.rowText}>
@@ -467,6 +484,20 @@ export function DataSection() {
         <a className={styles.buttonLink} href={apiUrl('/account/export')} download>
           Baixar
         </a>
+      </div>
+      <div className={styles.row}>
+        <div className={styles.rowText}>
+          <span className={styles.rowTitle}>Termos e privacidade</span>
+          <span className={styles.muted}>
+            <Link to="/termos" target="_blank" rel="noreferrer" className={styles.textLink}>
+              Termos de uso
+            </Link>
+            {' · '}
+            <Link to="/privacidade" target="_blank" rel="noreferrer" className={styles.textLink}>
+              Política de privacidade
+            </Link>
+          </span>
+        </div>
       </div>
       <div className={styles.row} style={{ flexDirection: 'column', alignItems: 'stretch' }}>
         <div className={styles.rowText}>

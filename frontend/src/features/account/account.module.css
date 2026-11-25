@@ -375,3 +375,76 @@
   text-decoration: underline;
   text-underline-offset: 3px;
 }
+
+.textLink {
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* Chosen models, one per line. */
+.models {
+  margin: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 2px 8px;
+  font: 400 13px/18px var(--font-sans);
+  color: var(--faint);
+}
+
+.models dd {
+  margin: 0;
+  font-family: var(--font-mono);
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+/* Dossier page. */
+.dossierPage {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-width: 960px;
+}
+
+.dossierHead {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px 24px;
+}
+
+.back {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--muted);
+  text-decoration: none;
+}
+
+.back:hover {
+  color: var(--ink);
+}
+
+.back:focus-visible,
+.json:focus-visible {
+  outline: 2px solid var(--signal-bright);
+  outline-offset: 2px;
+}
+
+.json {
+  margin: 0;
+  padding: 16px 20px;
+  max-height: 70vh;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  color: var(--ink);
+  font: 500 13px/20px var(--font-mono);
+  white-space: pre;
+  tab-size: 2;
+}
