@@ -31,6 +31,12 @@ public sealed class SourceTarget
 
     public string? LastError { get; set; }
 
+    /// <summary>What the platform says this target is (ADR-0002); set when it is created.</summary>
+    public TargetKind Kind { get; set; } = TargetKind.Company;
+
+    /// <summary>The app keeps it itself (Gupy search terms): people cannot add, pause or remove it.</summary>
+    public bool Automatic { get; set; }
+
     /// <summary>An open health incident (see <see cref="SourceHealth"/>); null while the source reads normally.</summary>
     public string? HealthIssue { get; set; }
 

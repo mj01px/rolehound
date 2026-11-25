@@ -102,6 +102,7 @@ public static class CollectionModule
             {
                 Source = source,
                 Key = parts[0],
+                Kind = TargetCatalog.KindOf(source, parts[0]),
                 Label = parts.Length > 1 && parts[1].Length > 0 ? parts[1] : null,
                 CreatedAt = time.GetUtcNow(),
             });

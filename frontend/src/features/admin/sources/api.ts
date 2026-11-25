@@ -17,6 +17,10 @@ export interface SourceTarget {
   addedBy: string | null
   /** Open health incident: 'failing' (last reads failed) or 'emptied' (went from many jobs to none). */
   healthIssue: 'failing' | 'emptied' | null
+  /** What the platform says the target is: a general search or one company's careers page. */
+  kind: 'search' | 'company'
+  /** The app keeps it itself (Gupy search terms); it cannot be paused or removed here. */
+  automatic: boolean
 }
 
 /** People tried to follow companies on a platform Rolehound does not read yet. */

@@ -875,6 +875,10 @@ namespace Rolehound.Api.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("added_by_user_id");
 
+                    b.Property<bool>("Automatic")
+                        .HasColumnType("boolean")
+                        .HasColumnName("automatic");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
@@ -897,6 +901,12 @@ namespace Rolehound.Api.Infrastructure.Persistence.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
                         .HasColumnName("key");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("kind");
 
                     b.Property<string>("Label")
                         .HasMaxLength(120)

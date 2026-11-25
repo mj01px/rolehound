@@ -205,8 +205,8 @@ function Row({ target }: { target: SourceTarget }) {
   const toggle = useToggleSource(target)
   const remove = useRemoveSource(target)
   const [confirming, setConfirming] = useState(false)
-  // Gupy search terms follow everyone's score profile; Gupy company pages (empresa.gupy.io) are managed like any source.
-  const managed = target.source === 'gupy' && !target.key.endsWith('.gupy.io')
+  // Targets the app keeps itself (Gupy search terms follow everyone's score profile) cannot be paused or removed here.
+  const managed = target.automatic
   const name = target.label ?? target.key
   const failure = toggle.error ?? remove.error
   const failureText = failure instanceof ApiError ? failure.problem.detail : failure ? errorMessage(failure) : null

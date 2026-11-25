@@ -28,13 +28,14 @@ public sealed partial class CollectionRunner(
     TimeProvider time,
     ILogger<CollectionRunner> logger)
 {
-    /// <summary>Sources whose items expire by age (previous tool: Gupy and GitHub).</summary>
+    /// <summary>How long jobs of searches, email alerts and pasted links stay open (BR-JOB-05).</summary>
     public static readonly TimeSpan MaxAge = TimeSpan.FromDays(30);
 
     // Jobs that arrived or reopened in this run: what the highlight message is about.
     private readonly List<Guid> _opened = [];
 
-    private static readonly HashSet<JobSource> ExpiringSources = [JobSource.GitHub, JobSource.Gupy, JobSource.Link, JobSource.EmailAlert];
+    // Jobs that never come from a collection target: no snapshot closes them, only age.
+    private static readonly HashSet<JobSource> Untargeted = [JobSource.Link, JobSource.EmailAlert];
 
     /// <summary>A full collection: every enabled source, then the age-based closing.</summary>
     public Task<CollectionSummary> RunAsync(CancellationToken ct) => RunCoreAsync(null, ct);
@@ -150,8 +151,8 @@ public sealed partial class CollectionRunner(
             .Where(t => t.Length is > 0 and <= 100)
             .ToHashSet(StringComparer.Ordinal);
 
-        // Company career pages (empresa.gupy.io) are sources people add, not search terms.
-        var current = (await db.SourceTargets.Where(t => t.Source == JobSource.Gupy).ToListAsync(ct)).Where(t => !GupyConnector.IsCompanyTarget(t.Key)).ToList();
+        // Only the terms the app keeps itself; Gupy company pages are sources people add.
+        var current = await db.SourceTargets.Where(t => t.Source == JobSource.Gupy && t.Automatic).ToListAsync(ct);
         foreach (var target in current)
         {
             target.Enabled = wanted.Remove(target.Key);
@@ -159,7 +160,7 @@ public sealed partial class CollectionRunner(
 
         foreach (var term in wanted)
         {
-            db.SourceTargets.Add(new SourceTarget { Source = JobSource.Gupy, Key = term, CreatedAt = time.GetUtcNow() });
+            db.SourceTargets.Add(new SourceTarget { Source = JobSource.Gupy, Key = term, Kind = TargetKind.Search, Automatic = true, CreatedAt = time.GetUtcNow() });
         }
 
         await db.SaveChangesAsync(ct);
@@ -177,8 +178,7 @@ public sealed partial class CollectionRunner(
         var oldest = now - MaxAge;
         return await db.Jobs
             .Where(j => j.Status == SourceStatus.Active)
-            .Where(j => (ExpiringSources.Contains(j.Source) && (j.PublishedAt ?? j.FirstSeenAt) < oldest
-                    && !db.SourceTargets.Any(t => t.Id == j.TargetId && t.Source == JobSource.Gupy && t.Key.EndsWith(".gupy.io")))
+            .Where(j => ((Untargeted.Contains(j.Source) || db.SourceTargets.Any(t => t.Id == j.TargetId && t.Kind == TargetKind.Search)) && (j.PublishedAt ?? j.FirstSeenAt) < oldest)
                 || (j.TargetId == null && j.OpenedAt < oldest))
             .Where(j => !db.Applications.Any(a => a.JobId == j.Id))
             .ExecuteUpdateAsync(s => s.SetProperty(j => j.Status, SourceStatus.Closed).SetProperty(j => j.ClosedAt, now), ct);
@@ -205,8 +205,8 @@ public sealed partial class CollectionRunner(
         var now = time.GetUtcNow();
         var oldest = now - MaxAge;
         // A company page lists every open job, so its jobs close when they leave it, not by age.
-        var companyPage = target.Source == JobSource.Gupy && GupyConnector.IsCompanyTarget(target.Key);
-        var expires = ExpiringSources.Contains(target.Source) && !companyPage;
+        var companyPage = target.Kind == TargetKind.Company;
+        var expires = target.Kind == TargetKind.Search;
 
         var listed = snapshot.Jobs.GroupBy(j => j.ExternalId).Select(g => g.First()).ToList();
         run.Listed = listed.Count;
@@ -221,6 +221,8 @@ public sealed partial class CollectionRunner(
 
         var existing = await db.Jobs.Where(j => j.Source == target.Source && (j.TargetId == target.Id || ids.Contains(j.ExternalId))).ToListAsync(ct);
         var byExternalId = existing.ToDictionary(j => j.ExternalId);
+        var owners = existing.Where(j => j.TargetId != null && j.TargetId != target.Id).Select(j => j.TargetId!.Value).Distinct().ToList();
+        var searchOwners = owners.Count == 0 ? [] : (await db.SourceTargets.Where(t => owners.Contains(t.Id) && t.Kind == TargetKind.Search).Select(t => t.Id).ToListAsync(ct)).ToHashSet();
         var changed = new List<Job>();
 
         foreach (var item in listed)
@@ -235,8 +237,8 @@ public sealed partial class CollectionRunner(
             {
                 job.LastSeenAt = now;
 
-                // The company page owns a Gupy job a term search found first: alerts and closing follow it.
-                if (companyPage && job.TargetId != target.Id)
+                // A company page owns a job a search found first (BR-JOB-08): alerts and closing follow it.
+                if (companyPage && (job.TargetId is null || searchOwners.Contains(job.TargetId.Value)))
                 {
                     job.TargetId = target.Id;
                 }

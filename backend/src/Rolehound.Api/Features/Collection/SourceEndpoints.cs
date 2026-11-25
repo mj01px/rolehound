@@ -1,5 +1,4 @@
 using System.Security.Claims;
-using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 using Rolehound.Api.Features.Accounts;
@@ -13,7 +12,7 @@ namespace Rolehound.Api.Features.Collection;
 /// <summary><see cref="AddedBy"/>: who added it by following a company link; null when the admin added it.</summary>
 public sealed record SourceTargetResponse(
     Guid Id, string Source, string Key, string? Label, bool Enabled, DateTimeOffset? LastRunAt, int? LastJobCount, string? LastError, int ActiveJobs, string? AddedBy,
-    string? HealthIssue = null, DateTimeOffset? HealthSince = null);
+    string? HealthIssue = null, DateTimeOffset? HealthSince = null, string Kind = "company", bool Automatic = false);
 
 /// <summary><see cref="Error"/>: the read failed and changed nothing; <see cref="Warning"/>: it counted but was partial.</summary>
 public sealed record CollectionRunResponse(
@@ -39,9 +38,8 @@ public sealed record UpdateSourceTargetRequest(bool Enabled, string? Label);
 /// plus a manual run. Gupy terms are not added here: they follow everyone's
 /// search terms, so the list only shows them.
 /// </summary>
-internal static partial class SourceEndpoints
+internal static class SourceEndpoints
 {
-    private static readonly JobSource[] Configurable = [JobSource.Greenhouse, JobSource.Lever, JobSource.GitHub, JobSource.InHire, JobSource.Workday, JobSource.CareerSite];
 
     public static IEndpointRouteBuilder MapSourceEndpoints(this IEndpointRouteBuilder endpoints)
     {
@@ -204,43 +202,16 @@ internal static partial class SourceEndpoints
     private static async Task<Results<Created<SourceTargetResponse>, ValidationProblem, ProblemHttpResult>> Add(
         AddSourceTargetRequest request, ClaimsPrincipal principal, RolehoundDbContext db, CollectionBacklog backlog, TimeProvider time, CancellationToken ct)
     {
-        var gupyCompany = string.Equals(request.Source, "gupy", StringComparison.OrdinalIgnoreCase) ? GupyConnector.CompanyTargetOf(request.Key ?? string.Empty) : null;
-        if (!Enum.TryParse<JobSource>(request.Source, ignoreCase: true, out var source) || (!Configurable.Contains(source) && gupyCompany is null))
+        // The platform reads what was typed (key, link or domain); its rules say what the target is.
+        if (!Enum.TryParse<JobSource>(request.Source, ignoreCase: true, out var source) || TargetCatalog.For(source) is not { } rules)
         {
-            return Problems.Validation("source", source == JobSource.Gupy
-                ? "Os termos do Gupy vêm dos perfis de score de quem usa o app. Para uma empresa, cole o link da página dela, como empresa.gupy.io."
-                : "Fonte inválida: use greenhouse, lever, github, inhire, workday ou careersite.");
+            return Problems.Validation("source", $"Fonte inválida: use {string.Join(", ", TargetCatalog.All.Select(r => r.Source.ToString().ToLowerInvariant()))}.");
         }
 
-        var key = gupyCompany ?? request.Key?.Trim() ?? string.Empty;
-        if (source == JobSource.InHire)
+        var input = rules.Read(request.Key ?? string.Empty);
+        if (input.Target is not { Length: > 0 } key || rules.IsAutomatic(key))
         {
-            key = key.ToLowerInvariant();
-        }
-
-        // Workday and careers sites take the link as pasted; the target comes out of it.
-        if (source == JobSource.Workday)
-        {
-            key = WorkdayConnector.TargetOf(key) ?? string.Empty;
-        }
-        else if (source == JobSource.CareerSite)
-        {
-            var address = key.Contains("://", StringComparison.Ordinal) ? key : $"https://{key}";
-            key = Uri.TryCreate(address, UriKind.Absolute, out var url) ? CareerSiteConnector.HostOf(url) ?? string.Empty : string.Empty;
-        }
-
-        var (valid, hint) = source switch
-        {
-            JobSource.Gupy => (true, string.Empty),
-            JobSource.Workday => (key.Length > 0, "Cole o link do site de vagas na Workday, como empresa.wd5.myworkdayjobs.com/Site."),
-            JobSource.CareerSite => (key.Length > 0, "Cole o link ou o domínio do site de vagas, como carreiras.empresa.com.br (precisa ser https)."),
-            JobSource.GitHub => (RepoPattern().IsMatch(key), "Use o formato dono/repositorio, como backend-br/vagas."),
-            JobSource.InHire => (InHirePattern().IsMatch(key), "Use empresa ou empresa/pagina, como em empresa.inhire.app/pagina/vagas."),
-            _ => (SlugPattern().IsMatch(key), "Use o identificador da empresa no endereço de vagas, como stone em job-boards.greenhouse.io/stone."),
-        };
-        if (!valid)
-        {
-            return Problems.Validation("key", hint);
+            return Problems.Validation("key", input.Hint);
         }
 
         if (await db.SourceTargets.AnyAsync(t => t.Source == source && t.Key == key, ct))
@@ -248,7 +219,7 @@ internal static partial class SourceEndpoints
             return Problems.Conflict("source_exists", "Essa fonte já está na lista.");
         }
 
-        var target = new SourceTarget { Source = source, Key = key, Label = Clean(request.Label), CreatedAt = time.GetUtcNow() };
+        var target = new SourceTarget { Source = source, Key = key, Kind = rules.KindOf(key), Label = Clean(request.Label), CreatedAt = time.GetUtcNow() };
         db.SourceTargets.Add(target);
         await db.SaveChangesAsync(ct);
         await RequestTargetReadAsync(db, backlog, target.Id, principal.GetUserId(), time, ct);
@@ -263,7 +234,7 @@ internal static partial class SourceEndpoints
             return Problems.NotFound();
         }
 
-        if (target.Source == JobSource.Gupy && !GupyConnector.IsCompanyTarget(target.Key))
+        if (target.Automatic)
         {
             return Problems.Conflict("source_managed", "Os termos do Gupy seguem os perfis de score; mude o termo no perfil.");
         }
@@ -283,7 +254,7 @@ internal static partial class SourceEndpoints
             return Problems.NotFound();
         }
 
-        if (target.Source == JobSource.Gupy && !GupyConnector.IsCompanyTarget(target.Key))
+        if (target.Automatic)
         {
             return Problems.Conflict("source_managed", "Os termos do Gupy seguem os perfis de score; mude o termo no perfil.");
         }
@@ -303,14 +274,6 @@ internal static partial class SourceEndpoints
     }
 
     private static SourceTargetResponse ToResponse(SourceTarget t, int activeJobs, string? addedBy = null) =>
-        new(t.Id, t.Source.ToString().ToLowerInvariant(), t.Key, t.Label, t.Enabled, t.LastRunAt, t.LastJobCount, t.LastError, activeJobs, addedBy, t.HealthIssue, t.HealthSince);
+        new(t.Id, t.Source.ToString().ToLowerInvariant(), t.Key, t.Label, t.Enabled, t.LastRunAt, t.LastJobCount, t.LastError, activeJobs, addedBy, t.HealthIssue, t.HealthSince, t.Kind.ToString().ToLowerInvariant(), t.Automatic);
 
-    [GeneratedRegex("^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")]
-    private static partial Regex RepoPattern();
-
-    [GeneratedRegex("^[a-z0-9-]{1,63}(/[a-z0-9-]{1,63})?$")]
-    private static partial Regex InHirePattern();
-
-    [GeneratedRegex("^[A-Za-z0-9_.-]{1,100}$")]
-    private static partial Regex SlugPattern();
 }

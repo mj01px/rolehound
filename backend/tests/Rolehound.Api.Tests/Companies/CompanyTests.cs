@@ -191,7 +191,7 @@ public sealed class CompanyTests(ApiFactory factory) : ApiTest(factory)
 
     private async Task<Guid> AddTargetAsync(JobSource source, string key, string? label)
     {
-        var target = new SourceTarget { Source = source, Key = key, Label = label, CreatedAt = DateTimeOffset.UtcNow };
+        var target = new SourceTarget { Source = source, Key = key, Kind = TargetCatalog.KindOf(source, key), Automatic = TargetCatalog.For(source)?.IsAutomatic(key) ?? false, Label = label, CreatedAt = DateTimeOffset.UtcNow };
         await ArrangeAsync(db =>
         {
             db.SourceTargets.Add(target);

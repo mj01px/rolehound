@@ -28,12 +28,8 @@ public sealed record ConnectorRequestSummary(string Platform, int Requests, int 
 /// </summary>
 internal static class CompanyEndpoints
 {
-    /// <summary>Sources whose targets are companies.</summary>
-    public static readonly JobSource[] Kinds = [JobSource.InHire, JobSource.Greenhouse, JobSource.Lever, JobSource.Workday, JobSource.CareerSite];
-
-    /// <summary>Targets that are companies: the company sources, and Gupy career pages (not Gupy search terms).</summary>
-    public static readonly System.Linq.Expressions.Expression<Func<SourceTarget, bool>> IsCompany =
-        t => Kinds.Contains(t.Source) || (t.Source == JobSource.Gupy && t.Key.EndsWith(".gupy.io"));
+    /// <summary>Targets that are companies, as their platform described them (ADR-0002).</summary>
+    public static readonly System.Linq.Expressions.Expression<Func<SourceTarget, bool>> IsCompany = t => t.Kind == TargetKind.Company;
 
     public static readonly TimeSpan ProbeTimeout = TimeSpan.FromSeconds(25);
 
@@ -126,9 +122,9 @@ internal static class CompanyEndpoints
         }
 
         // Any other public careers site: read through the pages it publishes for search engines.
-        if (found.Key is null && CareerSiteConnector.HostOf(url) is { } careersHost && connectors.Any(c => c.Source == JobSource.CareerSite))
+        if (found.Key is null && TargetCatalog.AnySite is { } anySite && anySite.TargetOfLink(url) is { } siteKey && connectors.Any(c => c.Source == anySite.Source))
         {
-            found = (JobSource.CareerSite, careersHost);
+            found = (anySite.Source, siteKey);
         }
 
         if (found.Key is null)
@@ -138,7 +134,7 @@ internal static class CompanyEndpoints
         }
 
         var (source, key) = (found.Source, found.Key);
-        var lowered = key.ToLowerInvariant();
+        var rules = TargetCatalog.For(source);
         // A handful of targets per source: compared in memory, ignoring case.
         var target = (await db.SourceTargets.Where(t => t.Source == source).ToListAsync(ct))
             .FirstOrDefault(t => string.Equals(t.Key, key, StringComparison.OrdinalIgnoreCase));
@@ -180,7 +176,8 @@ internal static class CompanyEndpoints
             target = new SourceTarget
             {
                 Source = source,
-                Key = source == JobSource.InHire ? lowered : key,
+                Key = rules?.Read(key).Target ?? key,
+                Kind = TargetKind.Company,
                 Label = name is { Length: > 120 } ? name[..120] : name,
                 AddedByUserId = userId,
                 CreatedAt = time.GetUtcNow(),
