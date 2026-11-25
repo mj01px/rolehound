@@ -397,38 +397,6 @@
   outline-offset: 2px;
 }
 
-/* Connector requests. */
-.requestsTitle {
-  margin: 0;
-  padding: 14px 20px 0;
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.requestsTitle + .panelNote {
-  padding-top: 6px;
-}
-
-.requests {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.request {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  gap: 4px 16px;
-  padding: 12px 20px;
-  border-bottom: 1px solid var(--border);
-  font-size: 13px;
-}
-
-.request:last-child {
-  border-bottom: 0;
-}
-
 /* Collections. */
 .batchHeading {
   margin: 0;

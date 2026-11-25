@@ -45,6 +45,7 @@ app.MapDossierEndpoints();
 app.MapScoreProfileEndpoints();
 app.MapSourceEndpoints();
 app.MapCompanyEndpoints();
+app.MapConnectorRequestEndpoints();
 app.MapJobEndpoints();
 app.MapFunnelEndpoints();
 app.MapPitchEndpoints();

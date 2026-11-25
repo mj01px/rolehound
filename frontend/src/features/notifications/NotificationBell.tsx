@@ -11,7 +11,7 @@ const EDGE = 24
 interface Notification {
   /** Names what it tells; a read one comes back only when that changes. */
   id: string
-  kind: 'model' | 'overdue' | 'sample' | 'highlights' | 'company' | 'collection' | 'source'
+  kind: 'model' | 'overdue' | 'sample' | 'highlights' | 'company' | 'collection' | 'source' | 'connector'
   title: string
   detail: string
   link: string

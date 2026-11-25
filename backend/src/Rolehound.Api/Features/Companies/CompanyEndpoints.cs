@@ -19,7 +19,6 @@ public sealed record FollowLinkRequest(string? Url);
 /// <summary><see cref="Reading"/>: a new company is being read in the background; the person hears when it ends.</summary>
 public sealed record FollowLinkResponse(CompanyResponse Company, bool Added, bool AlreadyFollowing, int Listed, bool Reading);
 
-public sealed record ConnectorRequestSummary(string Platform, int Requests, int People, DateTimeOffset LastAt);
 
 /// <summary>
 /// Empresas: everyone can follow a company and hear about its new jobs that match
@@ -41,7 +40,6 @@ internal static class CompanyEndpoints
         companies.MapPut("/{id:guid}/alert", Follow);
         companies.MapDelete("/{id:guid}/alert", Unfollow);
 
-        endpoints.MapGet("/admin/sources/requests", Requests).WithTags("Admin").RequireAuthorization(AccountsModule.AdminPolicy);
         return endpoints;
     }
 
@@ -222,16 +220,6 @@ internal static class CompanyEndpoints
         _ => Problems.Problem(StatusCodes.Status422UnprocessableEntity, "company_not_found",
             "Não achamos página de vagas nesse endereço. Confira o link."),
     };
-
-    /// <summary>Admin › Fontes: which platforms people asked for, most asked first.</summary>
-    private static async Task<Ok<List<ConnectorRequestSummary>>> Requests(RolehoundDbContext db, CancellationToken ct)
-    {
-        var rows = await db.ConnectorRequests.AsNoTracking()
-            .GroupBy(r => r.Platform)
-            .Select(g => new ConnectorRequestSummary(g.Key, g.Count(), g.Select(r => r.UserId).Distinct().Count(), g.Max(r => r.RequestedAt)))
-            .ToListAsync(ct);
-        return TypedResults.Ok(rows.OrderByDescending(r => r.Requests).ThenByDescending(r => r.LastAt).ToList());
-    }
 
     private static async Task<List<CompanyResponse>> DescribeAsync(RolehoundDbContext db, Guid userId, IReadOnlyCollection<SourceTarget> targets, CancellationToken ct)
     {

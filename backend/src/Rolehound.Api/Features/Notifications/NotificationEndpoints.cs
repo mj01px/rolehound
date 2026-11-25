@@ -116,6 +116,22 @@ internal static class NotificationEndpoints
             result.Add(new Notification($"collection:{request.Id}", "collection", CollectionMessages.Title(request, name), CollectionMessages.Detail(request), CollectionMessages.Link(request)));
         }
 
+        // Platforms this person asked for that can be followed now.
+        var announcedSince = time.GetUtcNow() - Companies.ConnectorRequestEndpoints.AnnouncedFor;
+        var ready = await db.ConnectorRequests.AsNoTracking()
+            .Where(r => r.UserId == userId && r.Announced && r.ResolvedAt > announcedSince)
+            .Select(r => new { r.Platform, r.Host, r.ResolvedAt })
+            .ToListAsync(ct);
+        foreach (var platform in ready.GroupBy(r => r.Platform))
+        {
+            result.Add(new Notification(
+                $"connector:{platform.Key}:{platform.Max(r => r.ResolvedAt)!.Value.ToUnixTimeSeconds()}",
+                "connector",
+                Companies.ConnectorRequestEndpoints.ReadyTitle(platform.Key),
+                Companies.ConnectorRequestEndpoints.ReadyDetail(platform.Select(r => r.Host).Distinct().ToList()),
+                "/empresas"));
+        }
+
         if (principal.IsInRole(nameof(Accounts.UserRole.Admin)))
         {
             var troubled = await db.SourceTargets.AsNoTracking()

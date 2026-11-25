@@ -35,6 +35,7 @@ const adminGroup: Group = {
   items: [
     { to: '/admin/usuarios', label: 'Usuários', icon: icons.users },
     { to: '/admin/fontes', label: 'Fontes', icon: icons.sources },
+    { to: '/admin/conectores', label: 'Conectores', icon: icons.connectors },
     { to: '/admin/qualidade', label: 'Qualidade do score', icon: icons.accuracy },
     { to: '/admin/modelos', label: 'Modelos sugeridos', icon: icons.models },
   ],

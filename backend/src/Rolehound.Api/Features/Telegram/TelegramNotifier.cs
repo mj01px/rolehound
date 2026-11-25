@@ -129,6 +129,26 @@ public sealed class TelegramNotifier(RolehoundDbContext db, TelegramClient teleg
         await telegram.SendAsync(link.ChatId, text, [[new TelegramButton("Abrir no Rolehound", Url: $"{BaseUrl}{Collection.CollectionMessages.Link(request)}")]], ct);
     }
 
+    /// <summary>Tells the people who asked for a platform that it can be followed now.</summary>
+    public async Task NotifyConnectorReadyAsync(string platform, IReadOnlyCollection<Guid> people, CancellationToken ct)
+    {
+        if (!options.Value.Enabled || people.Count == 0)
+        {
+            return;
+        }
+
+        var hosts = await db.ConnectorRequests.AsNoTracking()
+            .Where(r => people.Contains(r.UserId) && r.Platform == platform && r.Announced)
+            .Select(r => new { r.UserId, r.Host })
+            .ToListAsync(ct);
+        foreach (var link in await db.TelegramLinks.AsNoTracking().Where(l => people.Contains(l.UserId)).ToListAsync(ct))
+        {
+            var mine = hosts.Where(h => h.UserId == link.UserId).Select(h => h.Host).Distinct().ToList();
+            var text = $"<b>{TelegramEndpoints.Html(Companies.ConnectorRequestEndpoints.ReadyTitle(platform))}</b>\n{TelegramEndpoints.Html(Companies.ConnectorRequestEndpoints.ReadyDetail(mine))}";
+            await telegram.SendAsync(link.ChatId, text, [[new TelegramButton("Abrir Empresas", Url: $"{BaseUrl}/empresas")]], ct);
+        }
+    }
+
     /// <summary>FR-NOT-07: tells every admin on Telegram about sources whose incident just opened.</summary>
     public async Task NotifySourceHealthAsync(IReadOnlyCollection<Collection.SourceTarget> targets, CancellationToken ct)
     {

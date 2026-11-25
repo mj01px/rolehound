@@ -15,9 +15,21 @@ public sealed class CompanyAlert
     public DateTimeOffset CreatedAt { get; init; }
 }
 
+public enum ConnectorRequestStatus
+{
+    Open,
+
+    /// <summary>The platform is read now; the people who asked hear about it.</summary>
+    Done,
+
+    /// <summary>Not going to be read (a closed portal, too few companies); nobody is told.</summary>
+    Declined,
+}
+
 /// <summary>
 /// Someone tried to follow a company on a job platform Rolehound does not read
-/// yet. The admin sees the count per platform, to decide which connector comes next.
+/// yet. The admin sees the requests per platform, to decide which connector comes next,
+/// and closes them as done or declined.
 /// Only the host is kept, never the full link.
 /// </summary>
 public sealed class ConnectorRequest
@@ -31,6 +43,16 @@ public sealed class ConnectorRequest
     public Guid UserId { get; init; }
 
     public DateTimeOffset RequestedAt { get; init; }
+
+    public ConnectorRequestStatus Status { get; set; }
+
+    public DateTimeOffset? ResolvedAt { get; set; }
+
+    /// <summary>Why it was declined; shown to the admin only.</summary>
+    public string? Reason { get; set; }
+
+    /// <summary>Closed as done from the panel: the person who asked is told (bell and Telegram).</summary>
+    public bool Announced { get; set; }
 }
 
 internal sealed class CompanyAlertConfiguration : IEntityTypeConfiguration<CompanyAlert>
@@ -53,6 +75,9 @@ internal sealed class ConnectorRequestConfiguration : IEntityTypeConfiguration<C
         builder.Property(r => r.Platform).HasMaxLength(40);
         builder.Property(r => r.Host).HasMaxLength(255);
         builder.HasIndex(r => r.Platform);
+        builder.Property(r => r.Status).HasConversion<string>().HasMaxLength(16);
+        builder.Property(r => r.Reason).HasMaxLength(200);
+        builder.HasIndex(r => new { r.UserId, r.Status });
         builder.HasOne<User>().WithMany().HasForeignKey(r => r.UserId).OnDelete(DeleteBehavior.Cascade);
     }
 }

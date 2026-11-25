@@ -44,6 +44,12 @@ export const icons = {
       <path d="M4 5.5v6c0 1.4 3.6 2.5 8 2.5s8-1.1 8-2.5v-6M4 11.5v6c0 1.4 3.6 2.5 8 2.5s8-1.1 8-2.5v-6" />
     </>,
   ),
+  connectors: icon(
+    <>
+      <path d="M9 3v5M15 3v5M6 8h12v3a6 6 0 0 1-12 0V8z" />
+      <path d="M12 17v4" />
+    </>,
+  ),
   accuracy: icon(
     <>
       <path d="M4 20V10M10 20V4M16 20v-7M22 20H2" />

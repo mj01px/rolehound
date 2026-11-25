@@ -23,14 +23,6 @@ export interface SourceTarget {
   automatic: boolean
 }
 
-/** People tried to follow companies on a platform Rolehound does not read yet. */
-export interface ConnectorRequestSummary {
-  platform: string
-  requests: number
-  people: number
-  lastAt: string
-}
-
 export interface CollectionRun {
   id: string
   source: string
@@ -91,13 +83,6 @@ export function useCollections(limit = 10) {
   return useQuery({
     queryKey: [...sourcesKey, 'collections', limit],
     queryFn: ({ signal }) => api.get<CollectionBatch[]>(`/admin/sources/collections?limit=${limit}`, signal),
-  })
-}
-
-export function useConnectorRequests() {
-  return useQuery({
-    queryKey: [...sourcesKey, 'requests'],
-    queryFn: ({ signal }) => api.get<ConnectorRequestSummary[]>('/admin/sources/requests', signal),
   })
 }
 

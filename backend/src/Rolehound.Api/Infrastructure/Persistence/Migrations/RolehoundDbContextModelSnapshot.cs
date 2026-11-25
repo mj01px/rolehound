@@ -975,6 +975,10 @@ namespace Rolehound.Api.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<bool>("Announced")
+                        .HasColumnType("boolean")
+                        .HasColumnName("announced");
+
                     b.Property<string>("Host")
                         .IsRequired()
                         .HasMaxLength(255)
@@ -987,9 +991,24 @@ namespace Rolehound.Api.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(40)")
                         .HasColumnName("platform");
 
+                    b.Property<string>("Reason")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("reason");
+
                     b.Property<DateTimeOffset>("RequestedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("requested_at");
+
+                    b.Property<DateTimeOffset?>("ResolvedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("resolved_at");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("status");
 
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid")
@@ -1001,8 +1020,8 @@ namespace Rolehound.Api.Infrastructure.Persistence.Migrations
                     b.HasIndex("Platform")
                         .HasDatabaseName("ix_connector_requests_platform");
 
-                    b.HasIndex("UserId")
-                        .HasDatabaseName("ix_connector_requests_user_id");
+                    b.HasIndex("UserId", "Status")
+                        .HasDatabaseName("ix_connector_requests_user_id_status");
 
                     b.ToTable("connector_requests", (string)null);
                 });

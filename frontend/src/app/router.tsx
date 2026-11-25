@@ -10,6 +10,7 @@ import { TwoFactorPage } from '../features/auth/TwoFactorPage'
 import { AccuracyPage } from '../features/accuracy/AccuracyPage'
 import { AdminAccuracyPage } from '../features/admin/AdminAccuracyPage'
 import { AdminModelsPage } from '../features/admin/AdminModelsPage'
+import { ConnectorsPage } from '../features/admin/connectors/ConnectorsPage'
 import { CollectionsPage } from '../features/admin/sources/CollectionsPage'
 import { CompaniesPage } from '../features/companies/CompaniesPage'
 import { SourcesPage } from '../features/admin/sources/SourcesPage'
@@ -57,6 +58,7 @@ export const router = createBrowserRouter([
               { path: '/admin/usuarios/:id', element: <UserPage /> },
               { path: '/admin/fontes', element: <SourcesPage /> },
               { path: '/admin/fontes/leituras', element: <CollectionsPage /> },
+              { path: '/admin/conectores', element: <ConnectorsPage /> },
               { path: '/admin/qualidade', element: <AdminAccuracyPage /> },
               { path: '/admin/modelos', element: <AdminModelsPage /> },
             ],

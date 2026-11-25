@@ -58,11 +58,50 @@ public sealed class CompanyTests(ApiFactory factory) : ApiTest(factory)
         Assert.Equal("platform_unsupported", await ProblemCodeAsync(unsupported));
 
         using var admin = await SignedInAsync("rafael@exemplo.test");
-        var requests = await ReadAsync<List<ConnectorRequestSummary>>(await admin.GetAsync(new Uri("/admin/sources/requests", UriKind.Relative), Ct));
-        var asked = Assert.Single(requests);
-        Assert.Equal(("SmartRecruiters", 1, 1), (asked.Platform, asked.Requests, asked.People));
-        Assert.Equal(HttpStatusCode.Forbidden, (await browser.GetAsync(new Uri("/admin/sources/requests", UriKind.Relative), Ct)).StatusCode);
+        var asked = Assert.Single(await RequestsAsync(admin));
+        Assert.Equal(("SmartRecruiters", "open", 1, 1), (asked.Platform, asked.Status, asked.Requests, asked.People));
+        Assert.Equal(["jobs.smartrecruiters.com"], asked.Hosts);
+        Assert.Equal(HttpStatusCode.Forbidden, (await browser.GetAsync(new Uri("/admin/connector-requests", UriKind.Relative), Ct)).StatusCode);
     }
+
+    [Fact]
+    public async Task A_platform_done_tells_who_asked_and_a_declined_one_tells_nobody()
+    {
+        await CreateUserAsync("ana@exemplo.test");
+        await CreateUserAsync("rafael@exemplo.test", UserRole.Admin);
+        using var ana = await SignedInAsync("ana@exemplo.test");
+        using var admin = await SignedInAsync("rafael@exemplo.test");
+        await FollowAsync(ana, "https://jobs.smartrecruiters.com/Exemplo");
+        await FollowAsync(ana, "https://exemplo.breezy.hr/");
+
+        Assert.Equal(HttpStatusCode.BadRequest, (await ResolveAsync(admin, "SmartRecruiters", "open")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await ResolveAsync(admin, "Ashby", "done")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await ResolveAsync(ana, "SmartRecruiters", "done")).StatusCode);
+
+        var done = await ReadAsync<ResolveConnectorResponse>(await ResolveAsync(admin, "SmartRecruiters", "done"));
+        Assert.Equal((1, 1), (done.Resolved, done.Notified));
+        Assert.Equal(HttpStatusCode.OK, (await ResolveAsync(admin, "Breezy", "declined", "Poucas empresas no Brasil")).StatusCode);
+
+        var bell = (await ana.GetFromJsonAsync<List<Rolehound.Api.Features.Notifications.Notification>>("/notifications", Ct))!;
+        var ready = Assert.Single(bell, n => n.Kind == "connector");
+        Assert.Equal("SmartRecruiters já pode ser seguida", ready.Title);
+        Assert.Contains("jobs.smartrecruiters.com", ready.Detail, StringComparison.Ordinal);
+
+        var requests = await RequestsAsync(admin);
+        Assert.Equal("done", Assert.Single(requests, r => r.Platform == "SmartRecruiters").Status);
+        var declined = Assert.Single(requests, r => r.Platform == "Breezy");
+        Assert.Equal(("declined", "Poucas empresas no Brasil"), (declined.Status, declined.Reason));
+
+        // Asking again after it was declined opens a new request.
+        await FollowAsync(ana, "https://outra.breezy.hr/");
+        Assert.Contains(await RequestsAsync(admin), r => r.Platform == "Breezy" && r.Status == "open");
+    }
+
+    private static async Task<List<ConnectorPlatformResponse>> RequestsAsync(HttpClient admin) =>
+        await ReadAsync<List<ConnectorPlatformResponse>>(await admin.GetAsync(new Uri("/admin/connector-requests", UriKind.Relative), Ct));
+
+    private static Task<HttpResponseMessage> ResolveAsync(HttpClient client, string platform, string status, string? reason = null) =>
+        client.PostAsJsonAsync($"/admin/connector-requests/{Uri.EscapeDataString(platform)}/resolution", new { status, reason }, Ct);
 
     [Fact]
     public async Task A_new_company_is_tried_before_it_is_added_and_followed()

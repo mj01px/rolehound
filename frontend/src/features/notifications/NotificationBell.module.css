@@ -171,6 +171,10 @@
   background: var(--danger);
 }
 
+.connector {
+  background: var(--signal-bright);
+}
+
 .text {
   display: flex;
   flex-direction: column;
