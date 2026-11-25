@@ -28,6 +28,30 @@ public sealed class ConnectorTests
     }
 
     [Fact]
+    public async Task Greenhouse_and_lever_keep_only_jobs_in_brazil()
+    {
+        const string board = """
+            {"jobs": [
+              {"id": 1, "title": "Backend SP", "location": {"name": "São Paulo, Brasil"}, "absolute_url": "https://job-boards.greenhouse.io/x/jobs/1", "content": "a"},
+              {"id": 2, "title": "Backend Bangalore", "location": {"name": "Bangalore, India"}, "absolute_url": "https://job-boards.greenhouse.io/x/jobs/2", "content": "b"},
+              {"id": 3, "title": "Backend remoto", "location": {"name": "Remote"}, "absolute_url": "https://job-boards.greenhouse.io/x/jobs/3", "content": "c"}
+            ]}
+            """;
+        var greenhouse = await new GreenhouseConnector(new HttpClient(new ScrapedSourceTests.Routes().On("boards", () => (HttpStatusCode.OK, board)))).FetchAsync("x", None, Ct);
+        Assert.Equal(["1", "3"], greenhouse.Jobs.Select(j => j.ExternalId).Order());
+
+        const string postings = """
+            [
+              {"id": "br", "text": "Dados", "country": "BR", "categories": {"location": "São Paulo"}, "hostedUrl": "https://jobs.lever.co/x/br", "descriptionPlain": "a"},
+              {"id": "us", "text": "Data", "country": "US", "categories": {"location": "New York"}, "hostedUrl": "https://jobs.lever.co/x/us", "descriptionPlain": "b"},
+              {"id": "none", "text": "Dados remoto", "categories": {"location": "Remoto"}, "hostedUrl": "https://jobs.lever.co/x/none", "descriptionPlain": "c"}
+            ]
+            """;
+        var lever = await new LeverConnector(new HttpClient(new ScrapedSourceTests.Routes().On("postings", () => (HttpStatusCode.OK, postings)))).FetchAsync("x", None, Ct);
+        Assert.Equal(["br", "none"], lever.Jobs.Select(j => j.ExternalId).Order());
+    }
+
+    [Fact]
     public async Task Lever_maps_the_stated_work_mode_and_keeps_the_lists()
     {
         var snapshot = await new LeverConnector(new HttpClient(new Fixture("lever.json"))).FetchAsync("exemplo", None, Ct);

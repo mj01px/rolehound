@@ -38,7 +38,7 @@ public sealed class LiveCheckTests
 
     [Theory]
     [InlineData(JobSource.Greenhouse, "stone")]
-    [InlineData(JobSource.Lever, "palantir")]
+    [InlineData(JobSource.Lever, "neon")]
     [InlineData(JobSource.GitHub, "backend-br/vagas")]
     [InlineData(JobSource.Gupy, "desenvolvedor")]
     public async Task Sources_that_list_with_details_still_answer(JobSource source, string target)

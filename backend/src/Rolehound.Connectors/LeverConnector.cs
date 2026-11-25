@@ -29,7 +29,8 @@ public sealed partial class LeverConnector(HttpClient http) : IJobConnector, IJo
         var result = new List<CollectedJob>();
         foreach (var posting in document.RootElement.EnumerateArray())
         {
-            if (Parse(posting, target) is { } job)
+            // Only jobs in Brazil (BR-JOB-07): Lever gives a country code; a pasted link is read whatever its place.
+            if (Parse(posting, target) is { } job && Brazil.KeepJob(posting.String("country"), job.Location))
             {
                 result.Add(job);
             }

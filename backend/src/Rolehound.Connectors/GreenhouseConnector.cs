@@ -28,7 +28,8 @@ public sealed partial class GreenhouseConnector(HttpClient http) : IJobConnector
         var result = new List<CollectedJob>();
         foreach (var job in jobs.EnumerateArray())
         {
-            if (Parse(job, target) is { } collected)
+            // Only jobs in Brazil (BR-JOB-07); a pasted link is read whatever its place.
+            if (Parse(job, target) is { } collected && Brazil.KeepJob(null, collected.Location))
             {
                 result.Add(collected);
             }
