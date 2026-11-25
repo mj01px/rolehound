@@ -3,6 +3,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 using Rolehound.Api.Features.Accuracy;
+using Rolehound.Api.Features.Collection;
 using Rolehound.Api.Features.Funnel;
 using Rolehound.Api.Features.Jobs;
 using Rolehound.Api.Infrastructure.Http;
@@ -12,7 +13,7 @@ namespace Rolehound.Api.Features.Notifications;
 
 /// <summary>
 /// Something that needs the person, and where it gets done. <see cref="Kind"/> is one
-/// of model, overdue, sample, highlights and company; <see cref="Link"/> is a path in the app.
+/// of model, overdue, sample, highlights, company and collection; <see cref="Link"/> is a path in the app.
 /// </summary>
 public sealed record Notification(string Kind, string Title, string Detail, string Link);
 
@@ -71,6 +72,19 @@ internal static class NotificationEndpoints
                 highlights == 1 ? "1 destaque novo desde a sua última visita" : $"{highlights} destaques novos desde a sua última visita",
                 "Vagas que o seu perfil marcou como destaque.",
                 "/?aba=highlights"));
+        }
+
+        var since = time.GetUtcNow() - TimeSpan.FromDays(3);
+        var finished = await db.CollectionRequests.AsNoTracking()
+            .Where(r => r.RequestedBy == userId && r.FinishedAt != null && r.SeenAt == null && r.FinishedAt > since)
+            .OrderByDescending(r => r.FinishedAt)
+            .ToListAsync(ct);
+        var targetIds = finished.Where(r => r.TargetId != null).Select(r => r.TargetId!.Value).ToList();
+        var names = await db.SourceTargets.AsNoTracking().Where(t => targetIds.Contains(t.Id)).ToDictionaryAsync(t => t.Id, t => t.Label ?? t.Key, ct);
+        foreach (var request in finished)
+        {
+            var name = request.TargetId is { } id ? names.GetValueOrDefault(id) : null;
+            result.Add(new Notification("collection", CollectionMessages.Title(request, name), CollectionMessages.Detail(request), CollectionMessages.Link(request)));
         }
 
         foreach (var news in await JobEndpoints.NewFromFollowedAsync(db, userId, time, ct))

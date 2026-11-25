@@ -5,7 +5,7 @@ using Rolehound.Api.Infrastructure.Persistence;
 
 namespace Rolehound.Api.Features.Maintenance;
 
-public sealed record CleanupResponse(int SecurityEventsDeleted, int AccountTokensDeleted, int JobsDeleted, int TombstonesDeleted);
+public sealed record CleanupResponse(int SecurityEventsDeleted, int AccountTokensDeleted, int JobsDeleted, int TombstonesDeleted, int RequestsDeleted = 0, int SkippedPagesDeleted = 0);
 
 /// <summary>
 /// POST /tasks/cleanup: deletes data past its retention. Idempotent; safe to
@@ -22,6 +22,12 @@ internal static class Cleanup
     /// <summary>PRD 6.5: closed at the source and untouched by everyone for this long.</summary>
     public static readonly TimeSpan JobRetention = TimeSpan.FromDays(30);
 
+    /// <summary>Requested collections: long enough to read their notification.</summary>
+    public static readonly TimeSpan RequestRetention = TimeSpan.FromDays(30);
+
+    /// <summary>Pages found not to be jobs in Brazil are checked again after this.</summary>
+    public static readonly TimeSpan SkippedPageRetention = TimeSpan.FromDays(60);
+
     /// <summary>PRD 6.5: a tombstone lives this long after the source last listed the job.</summary>
     public static readonly TimeSpan TombstoneRetention = TimeSpan.FromDays(60);
 
@@ -37,7 +43,11 @@ internal static class Cleanup
             .ExecuteDeleteAsync(ct);
 
         var (jobs, tombstones) = await DeleteOldJobsAsync(db, now, ct);
-        return TypedResults.Ok(new CleanupResponse(events, tokens, jobs, tombstones));
+        var requestsBefore = now - RequestRetention;
+        var skippedBefore = now - SkippedPageRetention;
+        var requests = await db.CollectionRequests.Where(r => r.RequestedAt < requestsBefore && r.FinishedAt != null).ExecuteDeleteAsync(ct);
+        var skipped = await db.SkippedPages.Where(p => p.SkippedAt < skippedBefore).ExecuteDeleteAsync(ct);
+        return TypedResults.Ok(new CleanupResponse(events, tokens, jobs, tombstones, requests, skipped));
     }
 
     /// <summary>

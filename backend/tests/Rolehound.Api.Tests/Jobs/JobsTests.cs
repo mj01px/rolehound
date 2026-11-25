@@ -188,19 +188,41 @@ public sealed class JobsTests(ApiFactory factory) : ApiTest(factory)
         await AddTargetAsync();
         using var admin = await SignedInAsync("rafael@exemplo.test");
 
-        Assert.Equal(HttpStatusCode.OK, (await admin.PostAsync(new Uri("/admin/sources/run", UriKind.Relative), null, Ct)).StatusCode);
+        Assert.Equal(HttpStatusCode.Accepted, (await admin.PostAsync(new Uri("/admin/sources/run", UriKind.Relative), null, Ct)).StatusCode);
         var again = await admin.PostAsync(new Uri("/admin/sources/run", UriKind.Relative), null, Ct);
-        Assert.Equal(HttpStatusCode.TooManyRequests, again.StatusCode);
-        Assert.Equal("run_too_soon", await ProblemCodeAsync(again));
+        var code = await ProblemCodeAsync(again);
+        Assert.True(code is "run_in_progress" or "run_too_soon", code);
+
+        // The collection runs in the background; the person who asked hears when it ends.
+        var notified = await WaitForAsync(admin, "collection");
+        Assert.StartsWith("Coleta terminou", notified.Title, StringComparison.Ordinal);
+        Assert.Equal("run_too_soon", await ProblemCodeAsync(await admin.PostAsync(new Uri("/admin/sources/run", UriKind.Relative), null, Ct)));
 
         var collections = await ReadAsync<List<CollectionBatchResponse>>(await admin.GetAsync(new Uri("/admin/sources/collections", UriKind.Relative), Ct));
         var collection = Assert.Single(collections);
+        Assert.DoesNotContain((await admin.GetFromJsonAsync<List<Rolehound.Api.Features.Notifications.Notification>>("/notifications", Ct))!, n => n.Kind == "collection");
         Assert.Equal(1, collection.Targets);
         Assert.Equal(collection.Targets, collection.Changes.Count + collection.Unchanged);
 
         var status = await ReadAsync<SourcesStatusResponse>(await admin.GetAsync(new Uri("/admin/sources/status", UriKind.Relative), Ct));
         Assert.NotNull(status.ManualAvailableAt);
         Assert.True(status.NextScheduledAt > DateTimeOffset.UtcNow);
+    }
+
+    private static async Task<Rolehound.Api.Features.Notifications.Notification> WaitForAsync(HttpClient browser, string kind)
+    {
+        for (var attempt = 0; attempt < 100; attempt++)
+        {
+            var found = (await browser.GetFromJsonAsync<List<Rolehound.Api.Features.Notifications.Notification>>("/notifications", Ct))!.FirstOrDefault(n => n.Kind == kind);
+            if (found is not null)
+            {
+                return found;
+            }
+
+            await Task.Delay(100, Ct);
+        }
+
+        throw new TimeoutException($"No {kind} notification.");
     }
 
     private async Task<User> OnboardedAsync(string email)

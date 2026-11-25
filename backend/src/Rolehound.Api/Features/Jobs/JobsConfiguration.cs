@@ -76,6 +76,7 @@ internal sealed class CollectionRunConfiguration : IEntityTypeConfiguration<Coll
     {
         builder.ToTable("collection_runs");
         builder.Property(r => r.Error).HasMaxLength(500);
+        builder.Property(r => r.Warning).HasMaxLength(500);
         builder.HasIndex(r => r.StartedAt);
         builder.HasIndex(r => r.BatchId);
         builder.HasOne<SourceTarget>().WithMany().HasForeignKey(r => r.TargetId).OnDelete(DeleteBehavior.Cascade);

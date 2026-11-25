@@ -170,7 +170,8 @@ internal static class JobEndpoints
         if (job.TargetId is { } targetId)
         {
             var target = await db.SourceTargets.AsNoTracking()
-                .Where(t => t.Id == targetId && Companies.CompanyEndpoints.Kinds.Contains(t.Source))
+                .Where(Companies.CompanyEndpoints.IsCompany)
+                .Where(t => t.Id == targetId)
                 .Select(t => new { t.Label, t.Key })
                 .SingleOrDefaultAsync(ct);
             if (target is not null)

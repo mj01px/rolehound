@@ -9,10 +9,10 @@ import { kindLabels, kinds, plural, useCollections, useConnectorRequests, useRem
 import { AddSourceDialog } from './AddSourceDialog'
 import styles from './sources.module.css'
 
-const nameColumn: Record<SourceKind, string> = { inhire: 'Empresa', gupy: 'Termo', github: 'Repositório', greenhouse: 'Empresa', lever: 'Empresa', workday: 'Empresa', careersite: 'Site' }
+const nameColumn: Record<SourceKind, string> = { inhire: 'Empresa', gupy: 'Termo ou empresa', github: 'Repositório', greenhouse: 'Empresa', lever: 'Empresa', workday: 'Empresa', careersite: 'Site' }
 const searchHint: Record<SourceKind, string> = {
   inhire: 'Buscar empresa',
-  gupy: 'Buscar termo',
+  gupy: 'Buscar termo ou empresa',
   github: 'Buscar repositório',
   greenhouse: 'Buscar empresa',
   lever: 'Buscar empresa',
@@ -39,6 +39,7 @@ export function SourcesPage() {
   const openJobs = all.reduce((sum, target) => sum + target.activeJobs, 0)
   const last = collections.data?.[0]
   const waitUntil = status.data?.manualAvailableAt ?? null
+  const running = status.data?.running ?? null
 
   const shown = useMemo(() => {
     const words = normalize(query.trim())
@@ -62,20 +63,22 @@ export function SourcesPage() {
             </svg>
             Adicionar fonte
           </Button>
-          <Button onClick={() => run.mutate()} disabled={run.isPending || waitUntil !== null} title={waitUntil ? `A coleta manual libera às ${clock(waitUntil)}` : undefined}>
+          <Button
+            onClick={() => run.mutate()}
+            disabled={run.isPending || running !== null || waitUntil !== null}
+            title={waitUntil && !running ? `A coleta manual libera às ${clock(waitUntil)}` : undefined}
+          >
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M21 12a9 9 0 1 1-3-6.7L21 8M21 3v5h-5" />
             </svg>
-            {run.isPending ? 'Coletando…' : waitUntil ? `Coletar às ${clock(waitUntil)}` : 'Coletar agora'}
+            {running ? 'Coletando…' : waitUntil ? `Coletar às ${clock(waitUntil)}` : 'Coletar agora'}
           </Button>
         </div>
       </header>
 
-      {run.isPending && <Notice>Coletando todas as fontes. Pode levar alguns minutos.</Notice>}
-      {run.data && (
+      {running && (
         <Notice>
-          Coleta feita: {plural(run.data.added, 'vaga nova', 'vagas novas')}, {run.data.reopened} reabertas, {run.data.closed} encerradas
-          {run.data.failed > 0 ? `, ${plural(run.data.failed, 'fonte com erro', 'fontes com erro')}` : ''}.
+          Coleta {running.status === 'running' ? `rodando desde ${clock(running.startedAt ?? running.requestedAt)}` : 'na fila'}. Você recebe uma notificação quando ela terminar.
         </Notice>
       )}
       {run.isError && <Alert>{errorMessage(run.error)}</Alert>}
@@ -140,16 +143,16 @@ export function SourcesPage() {
 
       <div role="tabpanel" id="sources-panel" aria-labelledby={`tab-${kind}`} className={styles.panel}>
         {kind === 'gupy' && (
-          <p className={styles.panelNote}>Os termos vêm dos perfis de score de quem usa o app. Um termo que ninguém usa mais fica pausado e as vagas dele expiram com o tempo.</p>
+          <p className={styles.panelNote}>
+            Os termos de busca vêm dos perfis de score de quem usa o app; um termo que ninguém usa mais fica pausado. As empresas da Gupy (empresa.gupy.io) entram por Adicionar fonte ou pela página Empresas.
+          </p>
         )}
         {targets.data && counts[kind] === 0 ? (
           <div className={styles.empty}>
             <p>Nenhuma fonte do {kindLabels[kind]} ainda.</p>
-            {kind !== 'gupy' && (
-              <Button variant="secondary" onClick={() => setAdding(true)}>
-                Adicionar fonte
-              </Button>
-            )}
+            <Button variant="secondary" onClick={() => setAdding(true)}>
+              Adicionar fonte
+            </Button>
           </div>
         ) : (
           <div className={styles.tableWrap}>
@@ -202,7 +205,8 @@ function Row({ target }: { target: SourceTarget }) {
   const toggle = useToggleSource(target)
   const remove = useRemoveSource(target)
   const [confirming, setConfirming] = useState(false)
-  const managed = target.source === 'gupy'
+  // Gupy search terms follow everyone's score profile; Gupy company pages (empresa.gupy.io) are managed like any source.
+  const managed = target.source === 'gupy' && !target.key.endsWith('.gupy.io')
   const name = target.label ?? target.key
   const failure = toggle.error ?? remove.error
   const failureText = failure instanceof ApiError ? failure.problem.detail : failure ? errorMessage(failure) : null

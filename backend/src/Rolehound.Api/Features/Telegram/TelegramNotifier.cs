@@ -108,6 +108,27 @@ public sealed class TelegramNotifier(RolehoundDbContext db, TelegramClient teleg
         }
     }
 
+    /// <summary>A collection the person asked for ended: what it brought, with a link to see it.</summary>
+    public async Task NotifyCollectionAsync(Collection.CollectionRequest request, CancellationToken ct)
+    {
+        if (!options.Value.Enabled || request.RequestedBy is not { } person)
+        {
+            return;
+        }
+
+        var link = await db.TelegramLinks.AsNoTracking().SingleOrDefaultAsync(l => l.UserId == person, ct);
+        if (link is null)
+        {
+            return;
+        }
+
+        var name = request.TargetId is { } targetId
+            ? await db.SourceTargets.AsNoTracking().Where(t => t.Id == targetId).Select(t => t.Label ?? t.Key).SingleOrDefaultAsync(ct)
+            : null;
+        var text = $"<b>{TelegramEndpoints.Html(Collection.CollectionMessages.Title(request, name))}</b>\n{TelegramEndpoints.Html(Collection.CollectionMessages.Detail(request))}";
+        await telegram.SendAsync(link.ChatId, text, [[new TelegramButton("Abrir no Rolehound", Url: $"{BaseUrl}{Collection.CollectionMessages.Link(request)}")]], ct);
+    }
+
     /// <summary>FR-NOT-03: once a day, the person's overdue applications. Safe to call more than once a day.</summary>
     public async Task<int> NotifyOverdueAsync(CancellationToken ct)
     {

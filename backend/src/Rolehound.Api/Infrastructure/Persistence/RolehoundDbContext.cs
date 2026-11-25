@@ -72,6 +72,10 @@ public sealed class RolehoundDbContext(DbContextOptions<RolehoundDbContext> opti
 
     public DbSet<SuggestedModelsRow> SuggestedModels => Set<SuggestedModelsRow>();
 
+    public DbSet<CollectionRequest> CollectionRequests => Set<CollectionRequest>();
+
+    public DbSet<SkippedPage> SkippedPages => Set<SkippedPage>();
+
     public DbSet<Features.Companies.CompanyAlert> CompanyAlerts => Set<Features.Companies.CompanyAlert>();
 
     public DbSet<Features.Companies.ConnectorRequest> ConnectorRequests => Set<Features.Companies.ConnectorRequest>();

@@ -24,6 +24,7 @@ public sealed partial class CollectionRunner(
     IEnumerable<IJobConnector> connectors,
     JobScoring scoring,
     TelegramNotifier notifier,
+    CollectionLock gate,
     TimeProvider time,
     ILogger<CollectionRunner> logger)
 {
@@ -35,11 +36,37 @@ public sealed partial class CollectionRunner(
 
     private static readonly HashSet<JobSource> ExpiringSources = [JobSource.GitHub, JobSource.Gupy, JobSource.Link, JobSource.EmailAlert];
 
-    public async Task<CollectionSummary> RunAsync(CancellationToken ct)
+    /// <summary>A full collection: every enabled source, then the age-based closing.</summary>
+    public Task<CollectionSummary> RunAsync(CancellationToken ct) => RunCoreAsync(null, ct);
+
+    /// <summary>
+    /// One source on its own, right after it was added. Marked partial, so it does
+    /// not count as the scheduled collection of the hour or as a manual collection.
+    /// </summary>
+    public Task<CollectionSummary> RunTargetAsync(Guid targetId, CancellationToken ct) => RunCoreAsync(targetId, ct);
+
+    private async Task<CollectionSummary> RunCoreAsync(Guid? only, CancellationToken ct)
+    {
+        await gate.Gate.WaitAsync(ct);
+        try
+        {
+            return await CollectAsync(only, ct);
+        }
+        finally
+        {
+            gate.Gate.Release();
+        }
+    }
+
+    private async Task<CollectionSummary> CollectAsync(Guid? only, CancellationToken ct)
     {
         var byKind = connectors.ToDictionary(c => c.Source);
-        await SyncSearchTermsAsync(ct);
-        var targets = await db.SourceTargets.Where(t => t.Enabled).OrderBy(t => t.Source).ThenBy(t => t.Key).ToListAsync(ct);
+        if (only is null)
+        {
+            await SyncSearchTermsAsync(ct);
+        }
+
+        var targets = await db.SourceTargets.Where(t => t.Enabled && (only == null || t.Id == only)).OrderBy(t => t.Source).ThenBy(t => t.Key).ToListAsync(ct);
         int failed = 0, added = 0, reopened = 0, closed = 0;
         var batch = Guid.CreateVersion7();
 
@@ -50,16 +77,23 @@ public sealed partial class CollectionRunner(
                 continue;
             }
 
-            var run = new CollectionRun { TargetId = target.Id, BatchId = batch, StartedAt = time.GetUtcNow() };
+            var run = new CollectionRun { TargetId = target.Id, BatchId = batch, StartedAt = time.GetUtcNow(), Partial = only is not null };
             db.CollectionRuns.Add(run);
             try
             {
                 var detailed = (await db.Jobs.Where(j => j.TargetId == target.Id && j.Description != string.Empty)
                     .Select(j => j.ExternalId).ToListAsync(ct)).ToHashSet(StringComparer.Ordinal);
+                if (connector is IRemembersSkipped remembers)
+                {
+                    remembers.Remember(await db.SkippedPages.Where(p => p.TargetId == target.Id).Select(p => p.PageId).ToListAsync(ct));
+                }
+
                 var snapshot = await connector.FetchAsync(target.Key, detailed, ct);
                 var changed = await ApplyAsync(target, snapshot, run, ct);
                 target.LastJobCount = run.Listed;
-                run.Error = target.LastError = snapshot.Warning;
+                target.LastError = null;
+                run.Warning = snapshot.Warning is { Length: > 500 } longWarning ? longWarning[..500] : snapshot.Warning;
+                await RememberSkippedAsync(target.Id, snapshot.Skipped, ct);
                 await db.SaveChangesAsync(ct);
                 await scoring.ScoreJobsAsync(changed, ct);
             }
@@ -78,7 +112,11 @@ public sealed partial class CollectionRunner(
             closed += run.Closed;
         }
 
-        closed += await CloseAgedAsync(ct);
+        if (only is null)
+        {
+            closed += await CloseAgedAsync(ct);
+        }
+
         await notifier.NotifyHighlightsAsync(_opened, ct);
         await notifier.NotifyCompaniesAsync(_opened, ct);
         return new CollectionSummary(targets.Count, failed, added, reopened, closed);
@@ -103,7 +141,8 @@ public sealed partial class CollectionRunner(
             .Where(t => t.Length is > 0 and <= 100)
             .ToHashSet(StringComparer.Ordinal);
 
-        var current = await db.SourceTargets.Where(t => t.Source == JobSource.Gupy).ToListAsync(ct);
+        // Company career pages (empresa.gupy.io) are sources people add, not search terms.
+        var current = (await db.SourceTargets.Where(t => t.Source == JobSource.Gupy).ToListAsync(ct)).Where(t => !GupyConnector.IsCompanyTarget(t.Key)).ToList();
         foreach (var target in current)
         {
             target.Enabled = wanted.Remove(target.Key);
@@ -129,10 +168,24 @@ public sealed partial class CollectionRunner(
         var oldest = now - MaxAge;
         return await db.Jobs
             .Where(j => j.Status == SourceStatus.Active)
-            .Where(j => (ExpiringSources.Contains(j.Source) && (j.PublishedAt ?? j.FirstSeenAt) < oldest)
+            .Where(j => (ExpiringSources.Contains(j.Source) && (j.PublishedAt ?? j.FirstSeenAt) < oldest
+                    && !db.SourceTargets.Any(t => t.Id == j.TargetId && t.Source == JobSource.Gupy && t.Key.EndsWith(".gupy.io")))
                 || (j.TargetId == null && j.OpenedAt < oldest))
             .Where(j => !db.Applications.Any(a => a.JobId == j.Id))
             .ExecuteUpdateAsync(s => s.SetProperty(j => j.Status, SourceStatus.Closed).SetProperty(j => j.ClosedAt, now), ct);
+    }
+
+    /// <summary>Stores the pages this read found not to be jobs in Brazil, once each.</summary>
+    private async Task RememberSkippedAsync(Guid targetId, IReadOnlyList<string>? pages, CancellationToken ct)
+    {
+        if (pages is not { Count: > 0 })
+        {
+            return;
+        }
+
+        var ids = pages.Where(p => p.Length <= 200).Distinct(StringComparer.Ordinal).ToList();
+        var known = (await db.SkippedPages.Where(p => p.TargetId == targetId && ids.Contains(p.PageId)).Select(p => p.PageId).ToListAsync(ct)).ToHashSet(StringComparer.Ordinal);
+        db.SkippedPages.AddRange(ids.Where(id => !known.Contains(id)).Select(id => new SkippedPage { TargetId = targetId, PageId = id, SkippedAt = time.GetUtcNow() }));
     }
 
     internal static string NormalizeTerm(string term) => string.Join(' ', term.Trim().ToLowerInvariant().Split(' ', StringSplitOptions.RemoveEmptyEntries));
@@ -142,7 +195,9 @@ public sealed partial class CollectionRunner(
     {
         var now = time.GetUtcNow();
         var oldest = now - MaxAge;
-        var expires = ExpiringSources.Contains(target.Source);
+        // A company page lists every open job, so its jobs close when they leave it, not by age.
+        var companyPage = target.Source == JobSource.Gupy && GupyConnector.IsCompanyTarget(target.Key);
+        var expires = ExpiringSources.Contains(target.Source) && !companyPage;
 
         var listed = snapshot.Jobs.GroupBy(j => j.ExternalId).Select(g => g.First()).ToList();
         run.Listed = listed.Count;
@@ -170,6 +225,13 @@ public sealed partial class CollectionRunner(
             if (byExternalId.TryGetValue(item.ExternalId, out var job))
             {
                 job.LastSeenAt = now;
+
+                // The company page owns a Gupy job a term search found first: alerts and closing follow it.
+                if (companyPage && job.TargetId != target.Id)
+                {
+                    job.TargetId = target.Id;
+                }
+
                 if (JobFields.Apply(job, item, target.Label))
                 {
                     changed.Add(job);

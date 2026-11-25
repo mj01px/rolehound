@@ -15,17 +15,26 @@ namespace Rolehound.Connectors;
 /// The target is the site's host, such as carrera.sonda.com. Runs on
 /// <see cref="SafeHttp"/>: only public internet addresses are ever reached.
 /// </summary>
-public sealed partial class CareerSiteConnector(HttpClient http) : IJobConnector, ITargetProber
+public sealed partial class CareerSiteConnector(HttpClient http) : IJobConnector, ITargetProber, IRemembersSkipped
 {
     private const int MaxSitemaps = 12;
     private const int MaxUrls = 3000;
     private const int MaxPagesPerRun = 60;
+    private const int FirstReadPages = 200;
     private const int ProbePages = 8;
     private const int PageConcurrency = 2;
     private static readonly TimeSpan Pause = TimeSpan.FromMilliseconds(300);
 
-    /// <summary>Pages that are not jobs in Brazil, so they are not opened again while the process lives.</summary>
+    /// <summary>Pages (by id) that are not jobs in Brazil, so they are not opened again; the database keeps them across restarts.</summary>
     private static readonly ConcurrentDictionary<string, byte> Skipped = new(StringComparer.Ordinal);
+
+    public void Remember(IEnumerable<string> pages)
+    {
+        foreach (var page in pages)
+        {
+            Skipped.TryAdd(page, 0);
+        }
+    }
 
     public JobSource Source => JobSource.CareerSite;
 
@@ -50,21 +59,26 @@ public sealed partial class CareerSiteConnector(HttpClient http) : IJobConnector
             {
                 jobs.Add(new CollectedJob(id, string.Empty, string.Empty, string.Empty, string.Empty, page, null, null, HasDetails: false));
             }
-            else if (!Skipped.ContainsKey(page))
+            else if (!Skipped.ContainsKey(id))
             {
                 toOpen.Add(page);
             }
         }
 
+        // Pages whose address points at Brazil go first; a first read (nothing stored yet) may open more.
+        toOpen = toOpen.OrderByDescending(LooksBrazilian).ToList();
+        var cap = detailed.Count == 0 ? FirstReadPages : MaxPagesPerRun;
+        var skipped = new ConcurrentBag<string>();
         var failures = 0;
-        await Parallel.ForEachAsync(toOpen.Take(MaxPagesPerRun), new ParallelOptions { MaxDegreeOfParallelism = PageConcurrency, CancellationToken = ct }, async (page, token) =>
+        await Parallel.ForEachAsync(toOpen.Take(cap), new ParallelOptions { MaxDegreeOfParallelism = PageConcurrency, CancellationToken = ct }, async (page, token) =>
         {
             try
             {
                 var posting = await ReadPageAsync(page, token);
                 if (posting is null || !JobPostingReader.InBrazilOrUnknown(posting))
                 {
-                    Skipped.TryAdd(page, 0);
+                    Skipped.TryAdd(IdOf(page), 0);
+                    skipped.Add(IdOf(page));
                 }
                 else
                 {
@@ -79,7 +93,7 @@ public sealed partial class CareerSiteConnector(HttpClient http) : IJobConnector
             await Task.Delay(Pause, token);
         });
 
-        var left = Math.Max(0, toOpen.Count - MaxPagesPerRun);
+        var left = Math.Max(0, toOpen.Count - cap);
         var notes = new List<string>();
         if (failures > 0)
         {
@@ -92,7 +106,7 @@ public sealed partial class CareerSiteConnector(HttpClient http) : IJobConnector
         }
 
         // Stored jobs still listed come back as listed; one gone from the sitemap closes.
-        return new Snapshot(jobs.ToList(), Authoritative: true, notes.Count > 0 ? $"{host}: {string.Join("; ", notes)}." : null);
+        return new Snapshot(jobs.ToList(), Authoritative: true, notes.Count > 0 ? $"{host}: {string.Join("; ", notes)}." : null, skipped.ToList());
     }
 
     /// <summary>
@@ -191,6 +205,9 @@ public sealed partial class CareerSiteConnector(HttpClient http) : IJobConnector
     /// <summary>The page address is the job's id; a very long one is hashed to fit.</summary>
     internal static string IdOf(string page) =>
         page.Length <= 200 ? page : "sha256:" + Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(page)));
+
+    /// <summary>The address mentions Brazil, a Brazilian state or a big Brazilian city, or remote work.</summary>
+    internal static bool LooksBrazilian(string page) => BrazilianPath().IsMatch(Uri.UnescapeDataString(new Uri(page).AbsolutePath));
 
     private static bool OnSite(Uri page, string host)
     {
@@ -356,6 +373,9 @@ public sealed partial class CareerSiteConnector(HttpClient http) : IJobConnector
 
     [GeneratedRegex(@"^(?=.{4,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$")]
     private static partial Regex DomainPattern();
+
+    [GeneratedRegex(@"(brasil|brazil|s[aã]o[-_ ]paulo|rio[-_ ]de[-_ ]janeiro|belo[-_ ]horizonte|curitiba|porto[-_ ]alegre|recife|salvador|fortaleza|bras[ií]lia|campinas|florian[oó]polis|goi[aâ]nia|manaus|bel[eé]m|vit[oó]ria|remot[oe]|[-_/](sp|rj|mg|pr|rs|sc|pe|ba|df|ce|go|es|am|pa)[-_/])", RegexOptions.IgnoreCase)]
+    private static partial Regex BrazilianPath();
 
     [GeneratedRegex(@"(^|/)(jobs?|vagas?|careers?|carreiras?|oportunidades?|positions?|openings?|requisitions?|postings?|empregos?|trabalhe-conosco)(/|-|_|$)", RegexOptions.IgnoreCase)]
     private static partial Regex JobPath();

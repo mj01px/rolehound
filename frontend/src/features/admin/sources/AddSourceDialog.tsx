@@ -7,7 +7,7 @@ import { Modal, ModalHead } from '../../../ui/Modal'
 import { kindLabels, useAddSource, type SourceKind, type SourceTarget } from './api'
 import styles from './sources.module.css'
 
-type Addable = Exclude<SourceKind, 'gupy'>
+type Addable = SourceKind
 
 const fields: Record<Addable, { label: string; placeholder: string; help: string }> = {
   inhire: {
@@ -30,6 +30,11 @@ const fields: Record<Addable, { label: string; placeholder: string; help: string
     placeholder: 'dono/repositorio',
     help: 'Um repositório de vagas em issues, como backend-br/vagas.',
   },
+  gupy: {
+    label: 'Empresa na Gupy',
+    placeholder: 'https://empresa.gupy.io',
+    help: 'A página de vagas da empresa na Gupy, como sicredi.gupy.io. Os termos de busca não entram aqui: vêm dos perfis de score.',
+  },
   workday: {
     label: 'Site de vagas na Workday',
     placeholder: 'https://empresa.wd5.myworkdayjobs.com/Site',
@@ -42,11 +47,11 @@ const fields: Record<Addable, { label: string; placeholder: string; help: string
   },
 }
 
-const addable: Addable[] = ['inhire', 'greenhouse', 'lever', 'workday', 'careersite', 'github']
+const addable: Addable[] = ['inhire', 'gupy', 'greenhouse', 'lever', 'workday', 'careersite', 'github']
 
 export function AddSourceDialog({ initial, onClose, onAdded }: { initial: SourceKind; onClose: () => void; onAdded: (target: SourceTarget) => void }) {
   const add = useAddSource()
-  const [kind, setKind] = useState<Addable>(initial === 'gupy' ? 'inhire' : initial)
+  const [kind, setKind] = useState<Addable>(initial)
   const [key, setKey] = useState('')
   const [label, setLabel] = useState('')
   const error = add.error instanceof ApiError ? add.error : null
@@ -63,7 +68,7 @@ export function AddSourceDialog({ initial, onClose, onAdded }: { initial: Source
         <ModalHead
           id="add-source-title"
           title="Adicionar fonte"
-          text="A fonte entra na próxima coleta. Os termos do Gupy não entram aqui: vêm dos perfis de score de quem usa o app."
+          text="O Rolehound lê a fonte logo depois de adicionada, e você recebe uma notificação quando terminar."
           onClose={onClose}
         />
         <fieldset className={styles.kinds}>

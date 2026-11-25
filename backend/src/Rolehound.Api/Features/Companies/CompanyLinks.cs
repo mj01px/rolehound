@@ -25,7 +25,6 @@ internal static class CompanyLinks
     /// <summary>Job platforms companies use that Rolehound does not read yet.</summary>
     private static readonly (string Domain, string Name)[] Unsupported =
     [
-        ("gupy.io", "Gupy"),
         ("smartrecruiters.com", "SmartRecruiters"),
         ("ashbyhq.com", "Ashby"),
         ("breezy.hr", "Breezy"),

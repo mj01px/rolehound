@@ -14,6 +14,9 @@ public sealed class FakeJobSource(JobSource source, bool authoritative = true) :
 
     public void Lists(string target, params CollectedJob[] jobs) => _answers[target] = () => new Snapshot(jobs, authoritative);
 
+    /// <summary>A partial answer that still counts, with a warning.</summary>
+    public void ListsPartly(string target, string warning, params CollectedJob[] jobs) => _answers[target] = () => new Snapshot(jobs, authoritative, warning);
+
     public void Fails(string target) => _answers[target] = () => throw new ConnectorException("source_unreachable", $"{source} {target}: sem resposta da fonte.");
 
     /// <summary>The source answers with an error of the given code, such as target_not_found or target_closed.</summary>

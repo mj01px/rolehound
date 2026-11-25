@@ -16,7 +16,8 @@ public sealed record CompanyResponse(Guid Id, string Name, string Source, string
 public sealed record FollowLinkRequest(string? Url);
 
 /// <summary><see cref="Added"/>: the company was new to Rolehound; <see cref="Listed"/>: open jobs it has now.</summary>
-public sealed record FollowLinkResponse(CompanyResponse Company, bool Added, bool AlreadyFollowing, int Listed);
+/// <summary><see cref="Reading"/>: a new company is being read in the background; the person hears when it ends.</summary>
+public sealed record FollowLinkResponse(CompanyResponse Company, bool Added, bool AlreadyFollowing, int Listed, bool Reading);
 
 public sealed record ConnectorRequestSummary(string Platform, int Requests, int People, DateTimeOffset LastAt);
 
@@ -29,6 +30,10 @@ internal static class CompanyEndpoints
 {
     /// <summary>Sources whose targets are companies.</summary>
     public static readonly JobSource[] Kinds = [JobSource.InHire, JobSource.Greenhouse, JobSource.Lever, JobSource.Workday, JobSource.CareerSite];
+
+    /// <summary>Targets that are companies: the company sources, and Gupy career pages (not Gupy search terms).</summary>
+    public static readonly System.Linq.Expressions.Expression<Func<SourceTarget, bool>> IsCompany =
+        t => Kinds.Contains(t.Source) || (t.Source == JobSource.Gupy && t.Key.EndsWith(".gupy.io"));
 
     public static readonly TimeSpan ProbeTimeout = TimeSpan.FromSeconds(25);
 
@@ -44,10 +49,16 @@ internal static class CompanyEndpoints
         return endpoints;
     }
 
-    private static async Task<Ok<List<CompanyResponse>>> List(ClaimsPrincipal principal, RolehoundDbContext db, CancellationToken ct)
+    private static async Task<Ok<List<CompanyResponse>>> List(ClaimsPrincipal principal, RolehoundDbContext db, TimeProvider time, CancellationToken ct)
     {
         var userId = principal.GetUserId();
-        var targets = await db.SourceTargets.AsNoTracking().Where(t => Kinds.Contains(t.Source)).ToListAsync(ct);
+
+        // Seeing the companies is what the "company read" notification asks for.
+        await db.CollectionRequests
+            .Where(r => r.RequestedBy == userId && r.Kind == CollectionRequestKind.Target && r.FinishedAt != null && r.SeenAt == null)
+            .ExecuteUpdateAsync(s => s.SetProperty(r => r.SeenAt, time.GetUtcNow()), ct);
+
+        var targets = await db.SourceTargets.AsNoTracking().Where(IsCompany).ToListAsync(ct);
         var result = await DescribeAsync(db, userId, targets, ct);
         return TypedResults.Ok(result.OrderByDescending(c => c.Following).ThenBy(c => c.Name, StringComparer.Create(System.Globalization.CultureInfo.GetCultureInfo("pt-BR"), true)).ToList());
     }
@@ -55,7 +66,7 @@ internal static class CompanyEndpoints
     private static async Task<Results<NoContent, ProblemHttpResult>> Follow(Guid id, ClaimsPrincipal principal, RolehoundDbContext db, TimeProvider time, CancellationToken ct)
     {
         var userId = principal.GetUserId();
-        if (!await db.SourceTargets.AnyAsync(t => t.Id == id && Kinds.Contains(t.Source), ct))
+        if (!await db.SourceTargets.Where(IsCompany).AnyAsync(t => t.Id == id, ct))
         {
             return Problems.NotFound("Empresa não encontrada.");
         }
@@ -88,6 +99,7 @@ internal static class CompanyEndpoints
         IEnumerable<IJobConnector> connectors,
         IEnumerable<ITargetProber> probers,
         CompanyLinkLimiter limiter,
+        CollectionBacklog backlog,
         TimeProvider time,
         CancellationToken ct)
     {
@@ -185,8 +197,13 @@ internal static class CompanyEndpoints
         }
 
         await db.SaveChangesAsync(ct);
+        if (added)
+        {
+            await SourceEndpoints.RequestTargetReadAsync(db, backlog, target.Id, userId, time, ct);
+        }
+
         var company = (await DescribeAsync(db, userId, [target], ct)).Single();
-        return TypedResults.Ok(new FollowLinkResponse(company, added, already, added ? listed : company.OpenJobs));
+        return TypedResults.Ok(new FollowLinkResponse(company, added, already, added ? listed : company.OpenJobs, added));
     }
 
     /// <summary>A probe made from a full read: the job count and the most common company name.</summary>

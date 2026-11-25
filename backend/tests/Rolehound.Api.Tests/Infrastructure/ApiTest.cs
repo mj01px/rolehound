@@ -31,6 +31,18 @@ public abstract class ApiTest(ApiFactory factory) : IAsyncLifetime
     {
         await using var scope = Factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<RolehoundDbContext>();
+
+        // A collection a previous test asked for may still run in the background: let it end first.
+        for (var attempt = 0; attempt < 150 && await db.CollectionRequests.AnyAsync(
+            r => r.Status == Rolehound.Api.Features.Collection.CollectionRequestStatus.Queued || r.Status == Rolehound.Api.Features.Collection.CollectionRequestStatus.Running, Ct); attempt++)
+        {
+            await Task.Delay(100, Ct);
+        }
+
+        var gate = Factory.Services.GetRequiredService<Rolehound.Api.Features.Collection.CollectionLock>().Gate;
+        await gate.WaitAsync(Ct);
+        gate.Release();
+
         await db.Database.ExecuteSqlRawAsync(
             "TRUNCATE users, account_tokens, security_events, user_claims, user_logins, user_tokens, ai_settings, ai_usage, dossier_versions, score_profiles, jobs, job_tombstones, user_jobs, source_targets, collection_runs, applications, interactions, pitch_versions, resume_texts, ats_reports, resume_generations, sample_items, telegram_links, telegram_link_codes, suggested_models CASCADE", Ct);
         Factory.Emails.Clear();

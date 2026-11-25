@@ -14,7 +14,7 @@ namespace Rolehound.Connectors;
 /// Pages hold 12 jobs and the reported total is unreliable, so a short page
 /// ends the term. A search is not authoritative: Gupy jobs close only by age.
 /// </summary>
-public sealed partial class GupyConnector(HttpClient http) : IJobConnector
+public sealed partial class GupyConnector(HttpClient http) : IJobConnector, ICompanyLinkReader, ITargetProber
 {
     public const string Portal = "https://portal.gupy.io";
     public const int PageSize = 12;
@@ -30,6 +30,11 @@ public sealed partial class GupyConnector(HttpClient http) : IJobConnector
 
     public async Task<Snapshot> FetchAsync(string target, IReadOnlySet<string> detailed, CancellationToken ct)
     {
+        if (IsCompanyTarget(target))
+        {
+            return await FetchCompanyAsync(target.Trim().ToLowerInvariant(), detailed, ct);
+        }
+
         var term = target.Trim();
         if (term.Length is 0 or > 100)
         {
@@ -154,4 +159,186 @@ public sealed partial class GupyConnector(HttpClient http) : IJobConnector
 
     [GeneratedRegex("\"buildId\"\\s*:\\s*\"([^\"]+)\"")]
     private static partial Regex BuildIdPattern();
+
+    // Company career pages: empresa.gupy.io lists every open job; empresa.gupy.io/jobs/{id} has one job.
+    private const int CompanyPagesPerRun = 100;
+    private const int CompanyFirstRead = 300;
+    private const int CompanyConcurrency = 3;
+
+    private static readonly HashSet<string> ReservedSubdomains = new(StringComparer.Ordinal)
+    {
+        "portal", "www", "api", "app", "login", "help", "ajuda", "blog", "empresas", "statics", "front-statics-assets", "attachments", "job-boards",
+    };
+
+    /// <summary>A company target is the career page host, such as sicredi.gupy.io; anything else is a search term.</summary>
+    public static bool IsCompanyTarget(string target) => target.Trim().EndsWith(".gupy.io", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// The company target from a career page or job link, or from its host (sicredi.gupy.io).
+    /// A bare word is a search term, never a company: null.
+    /// </summary>
+    public static string? CompanyTargetOf(string input)
+    {
+        var value = input.Trim();
+        if (!value.Contains(".gupy.io", StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        return Uri.TryCreate(value.Contains("://", StringComparison.Ordinal) ? value : $"https://{value}", UriKind.Absolute, out var url) ? CompanyOfHost(url.Host) : null;
+    }
+
+    public string? CompanyOf(Uri url) => CompanyOfHost(url.Host);
+
+    private static string? CompanyOfHost(string host)
+    {
+        var match = CompanyHost().Match(host.ToLowerInvariant());
+        return match.Success && !ReservedSubdomains.Contains(match.Groups[1].Value) ? $"{match.Groups[1].Value}.gupy.io" : null;
+    }
+
+    /// <summary>The company page answers and lists its jobs; the count is of jobs in Brazil.</summary>
+    public async Task<SourceProbe> ProbeAsync(string target, CancellationToken ct)
+    {
+        var host = CompanyOfHost(target) ?? throw new ConnectorException("target_invalid", $"Gupy {target}: use empresa.gupy.io.");
+        var (company, listed) = await CompanyListAsync(host, ct);
+        return new SourceProbe(listed.Count, company);
+    }
+
+    private async Task<Snapshot> FetchCompanyAsync(string target, IReadOnlySet<string> detailed, CancellationToken ct)
+    {
+        var host = CompanyOfHost(target) ?? throw new ConnectorException("target_invalid", $"Gupy {target}: use empresa.gupy.io.");
+        var (company, listed) = await CompanyListAsync(host, ct);
+        var name = company ?? host;
+
+        var jobs = new System.Collections.Concurrent.ConcurrentBag<CollectedJob>();
+        var toOpen = new List<CompanyListing>();
+        foreach (var listing in listed)
+        {
+            if (detailed.Contains(listing.Id))
+            {
+                jobs.Add(listing.ToJob(name, host, string.Empty, null, hasDetails: false));
+            }
+            else
+            {
+                toOpen.Add(listing);
+            }
+        }
+
+        var cap = detailed.Count == 0 ? CompanyFirstRead : CompanyPagesPerRun;
+        var failures = 0;
+        await Parallel.ForEachAsync(toOpen.Take(cap), new ParallelOptions { MaxDegreeOfParallelism = CompanyConcurrency, CancellationToken = ct }, async (listing, token) =>
+        {
+            try
+            {
+                var html = await HttpJson.GetTextAsync(http, new Uri($"https://{host}/jobs/{listing.Id}"), $"Gupy {host} vaga {listing.Id}", token);
+                var job = NextData(html, $"Gupy {host}").GetProperty("props").GetProperty("pageProps").GetProperty("job");
+                var sections = new (string Field, string Heading)[] { ("description", ""), ("responsibilities", "Responsabilidades"), ("prerequisites", "Requisitos"), ("relevantExperiences", "Diferenciais") };
+                var description = string.Join("\n\n", sections
+                    .Select(section => (section.Heading, Text: HtmlText.ToPlain(job.String(section.Field))))
+                    .Where(section => section.Text.Length > 0)
+                    .Select(section => section.Heading.Length > 0 ? $"{section.Heading}\n{section.Text}" : section.Text));
+                DateTimeOffset? published = DateTimeOffset.TryParse(job.String("publishedAt"), CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var date)
+                    ? date.ToUniversalTime()
+                    : null;
+                jobs.Add(listing.ToJob(name, host, description.Length > HtmlText.MaxLength ? description[..HtmlText.MaxLength] : description, published, hasDetails: true));
+            }
+            catch (Exception ex) when (ex is ConnectorException or KeyNotFoundException or InvalidOperationException)
+            {
+                Interlocked.Increment(ref failures);
+                jobs.Add(listing.ToJob(name, host, string.Empty, null, hasDetails: false));
+            }
+        });
+
+        // Jobs not opened this time still count as listed, with title and place; their text comes in later runs.
+        foreach (var listing in toOpen.Skip(cap))
+        {
+            jobs.Add(listing.ToJob(name, host, string.Empty, null, hasDetails: false));
+        }
+
+        var notes = new List<string>();
+        if (failures > 0)
+        {
+            notes.Add($"{failures} vaga(s) sem detalhes");
+        }
+
+        if (toOpen.Count > cap)
+        {
+            notes.Add($"{toOpen.Count - cap} descrição(ões) ficaram para as próximas coletas");
+        }
+
+        return new Snapshot(jobs.ToList(), Authoritative: true, notes.Count > 0 ? $"Gupy {host}: {string.Join("; ", notes)}." : null);
+    }
+
+    /// <summary>The company's name and its open jobs in Brazil (or with no country), from the career page.</summary>
+    private async Task<(string? Company, List<CompanyListing> Jobs)> CompanyListAsync(string host, CancellationToken ct)
+    {
+        var html = await HttpJson.GetTextAsync(http, new Uri($"https://{host}/"), $"Gupy {host}", ct);
+        var props = NextData(html, $"Gupy {host}").GetProperty("props").GetProperty("pageProps");
+        var company = props.TryGetProperty("careerPage", out var page) && page.ValueKind == JsonValueKind.Object ? page.String("name")?.Trim() : null;
+        if (!props.TryGetProperty("jobs", out var list) || list.ValueKind != JsonValueKind.Array)
+        {
+            throw new ConnectorException("target_not_found", $"Gupy {host}: página de vagas não encontrada.");
+        }
+
+        var jobs = new List<CompanyListing>();
+        foreach (var item in list.EnumerateArray())
+        {
+            var id = item.TryGetProperty("id", out var idValue) && idValue.ValueKind is JsonValueKind.Number or JsonValueKind.String ? idValue.ToString() : null;
+            var title = item.String("title")?.Trim();
+            if (string.IsNullOrEmpty(id) || string.IsNullOrEmpty(title))
+            {
+                continue;
+            }
+
+            var workplace = item.TryGetProperty("workplace", out var w) && w.ValueKind == JsonValueKind.Object ? w : default;
+            var address = workplace.ValueKind == JsonValueKind.Object && workplace.TryGetProperty("address", out var a) && a.ValueKind == JsonValueKind.Object ? a : default;
+            var country = address.ValueKind == JsonValueKind.Object ? address.String("country")?.Trim() : null;
+            if (!string.IsNullOrEmpty(country) && !BrazilName().IsMatch(country))
+            {
+                continue;
+            }
+
+            var place = address.ValueKind == JsonValueKind.Object
+                ? string.Join(", ", new[] { address.String("city"), address.String("stateShortName") ?? address.String("state"), country }.Where(v => !string.IsNullOrWhiteSpace(v)))
+                : string.Empty;
+            var mode = workplace.ValueKind == JsonValueKind.Object ? HttpJson.WorkModeOf(workplace.String("workplaceType")) : null;
+            jobs.Add(new CompanyListing(id, title.Length > 500 ? title[..500] : title, place, mode));
+        }
+
+        return (company, jobs);
+    }
+
+    private static JsonElement NextData(string html, string subject)
+    {
+        var match = NextDataScript().Match(html);
+        if (!match.Success)
+        {
+            throw new ConnectorException("source_invalid", $"{subject}: página fora do formato esperado.");
+        }
+
+        try
+        {
+            using var document = JsonDocument.Parse(match.Groups[1].Value);
+            return document.RootElement.Clone();
+        }
+        catch (JsonException ex)
+        {
+            throw new ConnectorException("source_invalid", $"{subject}: página fora do formato esperado.", ex);
+        }
+    }
+
+    private sealed record CompanyListing(string Id, string Title, string Location, Scoring.WorkMode? WorkMode)
+    {
+        public CollectedJob ToJob(string company, string host, string description, DateTimeOffset? published, bool hasDetails) =>
+            new(Id, Title, company, Location, description, $"https://{host}/jobs/{Id}", WorkMode, published, hasDetails);
+    }
+
+    [GeneratedRegex(@"^([a-z0-9][a-z0-9-]{0,62})\.gupy\.io$")]
+    private static partial Regex CompanyHost();
+
+    [GeneratedRegex(@"<script id=""__NEXT_DATA__"" type=""application/json"">(.*?)</script>", RegexOptions.Singleline)]
+    private static partial Regex NextDataScript();
+
+    [GeneratedRegex(@"^(Brasil|Brazil|BR)$", RegexOptions.IgnoreCase)]
+    private static partial Regex BrazilName();
 }

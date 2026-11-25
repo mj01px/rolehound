@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
@@ -13,15 +14,20 @@ namespace Rolehound.Api.Features.Collection;
 public sealed record SourceTargetResponse(
     Guid Id, string Source, string Key, string? Label, bool Enabled, DateTimeOffset? LastRunAt, int? LastJobCount, string? LastError, int ActiveJobs, string? AddedBy);
 
+/// <summary><see cref="Error"/>: the read failed and changed nothing; <see cref="Warning"/>: it counted but was partial.</summary>
 public sealed record CollectionRunResponse(
-    Guid Id, string Source, string Key, DateTimeOffset StartedAt, DateTimeOffset FinishedAt, int Listed, int Added, int Reopened, int Closed, string? Error);
+    Guid Id, string Source, string Key, DateTimeOffset StartedAt, DateTimeOffset FinishedAt, int Listed, int Added, int Reopened, int Closed, string? Error, string? Warning);
 
 /// <summary>One collection: every source read in the same run, summed, with only the reads that changed something or failed.</summary>
+/// <summary><see cref="Partial"/>: one source read on its own, right after it was added.</summary>
 public sealed record CollectionBatchResponse(
     Guid Id, DateTimeOffset StartedAt, DateTimeOffset FinishedAt, int Targets, int Listed, int Added, int Reopened, int Closed, int Failed,
-    IReadOnlyList<CollectionRunResponse> Changes, int Unchanged);
+    IReadOnlyList<CollectionRunResponse> Changes, int Unchanged, bool Partial);
 
-public sealed record SourcesStatusResponse(DateTimeOffset NextScheduledAt, DateTimeOffset? ManualAvailableAt);
+/// <summary>A collection someone asked for, waiting or running.</summary>
+public sealed record CollectionRequestResponse(Guid Id, string Kind, string Status, DateTimeOffset RequestedAt, DateTimeOffset? StartedAt);
+
+public sealed record SourcesStatusResponse(DateTimeOffset NextScheduledAt, DateTimeOffset? ManualAvailableAt, CollectionRequestResponse? Running);
 
 public sealed record AddSourceTargetRequest(string? Source, string? Key, string? Label);
 
@@ -52,25 +58,71 @@ internal static partial class SourceEndpoints
     /// <summary>FR-JOB-06: a manual run at most once every 15 minutes.</summary>
     public static readonly TimeSpan ManualRunInterval = TimeSpan.FromMinutes(15);
 
-    private static async Task<Results<Ok<CollectionSummary>, ProblemHttpResult>> RunNow(
-        CollectionRunner runner, RolehoundDbContext db, TimeProvider time, CancellationToken ct)
+    /// <summary>
+    /// Asks for a full collection: it runs in the background and the person who
+    /// asked hears about it when it ends. 202 with the request.
+    /// </summary>
+    private static async Task<Results<Accepted<CollectionRequestResponse>, ProblemHttpResult>> RunNow(
+        ClaimsPrincipal principal, RolehoundDbContext db, CollectionBacklog backlog, TimeProvider time, CancellationToken ct)
     {
-        var last = await db.CollectionRuns.MaxAsync(r => (DateTimeOffset?)r.StartedAt, ct);
+        if (await ActiveFullRequestAsync(db, ct) is not null)
+        {
+            return Problems.Problem(StatusCodes.Status409Conflict, "run_in_progress", "Já tem uma coleta rodando. Você recebe uma notificação quando ela terminar.");
+        }
+
+        var last = await LastFullCollectionAsync(db, ct);
         if (last is not null && time.GetUtcNow() - last < ManualRunInterval)
         {
             var wait = (int)Math.Ceiling((ManualRunInterval - (time.GetUtcNow() - last.Value)).TotalMinutes);
             return Problems.Problem(StatusCodes.Status429TooManyRequests, "run_too_soon", $"A última coleta foi há pouco. Tente de novo em {wait} min.");
         }
 
-        return await RunAsync(runner, ct);
+        var request = new CollectionRequest { Kind = CollectionRequestKind.Full, RequestedBy = principal.GetUserId(), RequestedAt = time.GetUtcNow(), Status = CollectionRequestStatus.Queued };
+        db.CollectionRequests.Add(request);
+        await db.SaveChangesAsync(ct);
+        backlog.Enqueue(request.Id);
+        return TypedResults.Accepted("/admin/sources/status", ToResponse(request));
     }
+
+    /// <summary>Reads one source on its own in the background; the person who asked hears about it.</summary>
+    internal static async Task RequestTargetReadAsync(RolehoundDbContext db, CollectionBacklog backlog, Guid targetId, Guid requestedBy, TimeProvider time, CancellationToken ct)
+    {
+        var request = new CollectionRequest { Kind = CollectionRequestKind.Target, TargetId = targetId, RequestedBy = requestedBy, RequestedAt = time.GetUtcNow(), Status = CollectionRequestStatus.Queued };
+        db.CollectionRequests.Add(request);
+        await db.SaveChangesAsync(ct);
+        backlog.Enqueue(request.Id);
+    }
+
+    /// <summary>The latest full collection that started or was asked for (one-source reads do not count).</summary>
+    private static async Task<DateTimeOffset?> LastFullCollectionAsync(RolehoundDbContext db, CancellationToken ct)
+    {
+        var run = await db.CollectionRuns.Where(r => !r.Partial).MaxAsync(r => (DateTimeOffset?)r.StartedAt, ct);
+        var asked = await db.CollectionRequests.Where(r => r.Kind == CollectionRequestKind.Full).MaxAsync(r => (DateTimeOffset?)r.RequestedAt, ct);
+        return run > asked || asked is null ? run : asked;
+    }
+
+    private static Task<CollectionRequest?> ActiveFullRequestAsync(RolehoundDbContext db, CancellationToken ct) =>
+        db.CollectionRequests.AsNoTracking()
+            .Where(r => r.Kind == CollectionRequestKind.Full && (r.Status == CollectionRequestStatus.Queued || r.Status == CollectionRequestStatus.Running))
+            .OrderByDescending(r => r.RequestedAt)
+            .FirstOrDefaultAsync(ct);
+
+    private static CollectionRequestResponse ToResponse(CollectionRequest r) =>
+        new(r.Id, r.Kind.ToString().ToLowerInvariant(), r.Status.ToString().ToLowerInvariant(), r.RequestedAt, r.StartedAt);
 
     public const int CollectionsDefaultLimit = 10;
     public const int CollectionsMaxLimit = 50;
 
     /// <summary>The latest collections, newest first, each with its reads summed.</summary>
-    private static async Task<Results<Ok<List<CollectionBatchResponse>>, ValidationProblem>> Collections(int? limit, RolehoundDbContext db, CancellationToken ct)
+    private static async Task<Results<Ok<List<CollectionBatchResponse>>, ValidationProblem>> Collections(
+        int? limit, ClaimsPrincipal principal, RolehoundDbContext db, TimeProvider time, CancellationToken ct)
     {
+        // Seeing the readings is what the "collection ended" notification asks for.
+        var userId = principal.GetUserId();
+        await db.CollectionRequests
+            .Where(r => r.RequestedBy == userId && r.Kind == CollectionRequestKind.Full && r.FinishedAt != null && r.SeenAt == null)
+            .ExecuteUpdateAsync(s => s.SetProperty(r => r.SeenAt, time.GetUtcNow()), ct);
+
         var take = limit ?? CollectionsDefaultLimit;
         if (take is < 1 or > CollectionsMaxLimit)
         {
@@ -95,11 +147,11 @@ internal static partial class SourceEndpoints
             .Select(g =>
             {
                 var changes = g
-                    .Where(x => x.Run.Error is not null || x.Run.Added + x.Run.Reopened + x.Run.Closed > 0)
+                    .Where(x => x.Run.Error is not null || x.Run.Warning is not null || x.Run.Added + x.Run.Reopened + x.Run.Closed > 0)
                     .OrderByDescending(x => x.Run.Error is not null).ThenByDescending(x => x.Run.Added + x.Run.Reopened + x.Run.Closed)
                     .Select(x => new CollectionRunResponse(
                         x.Run.Id, x.Source.ToString().ToLowerInvariant(), x.Label ?? x.Key, x.Run.StartedAt, x.Run.FinishedAt,
-                        x.Run.Listed, x.Run.Added, x.Run.Reopened, x.Run.Closed, x.Run.Error))
+                        x.Run.Listed, x.Run.Added, x.Run.Reopened, x.Run.Closed, x.Run.Error, x.Run.Warning))
                     .ToList();
                 return new CollectionBatchResponse(
                     g.Key,
@@ -112,7 +164,8 @@ internal static partial class SourceEndpoints
                     g.Sum(x => x.Run.Closed),
                     g.Count(x => x.Run.Error is not null),
                     changes,
-                    g.Count() - changes.Count);
+                    g.Count() - changes.Count,
+                    g.All(x => x.Run.Partial));
             })
             .OrderByDescending(b => b.StartedAt)
             .ToList();
@@ -124,9 +177,10 @@ internal static partial class SourceEndpoints
     private static async Task<Ok<SourcesStatusResponse>> Status(RolehoundDbContext db, TimeProvider time, CancellationToken ct)
     {
         var now = time.GetUtcNow();
-        var last = await db.CollectionRuns.MaxAsync(r => (DateTimeOffset?)r.StartedAt, ct);
+        var last = await LastFullCollectionAsync(db, ct);
         DateTimeOffset? manual = last is not null && now - last < ManualRunInterval ? last + ManualRunInterval : null;
-        return TypedResults.Ok(new SourcesStatusResponse(CollectionSchedule.NextSlot(now), manual));
+        var running = await ActiveFullRequestAsync(db, ct);
+        return TypedResults.Ok(new SourcesStatusResponse(CollectionSchedule.NextSlot(now), manual, running is null ? null : ToResponse(running)));
     }
 
     internal static async Task<Ok<CollectionSummary>> RunAsync(CollectionRunner runner, CancellationToken ct) =>
@@ -147,16 +201,17 @@ internal static partial class SourceEndpoints
     }
 
     private static async Task<Results<Created<SourceTargetResponse>, ValidationProblem, ProblemHttpResult>> Add(
-        AddSourceTargetRequest request, RolehoundDbContext db, TimeProvider time, CancellationToken ct)
+        AddSourceTargetRequest request, ClaimsPrincipal principal, RolehoundDbContext db, CollectionBacklog backlog, TimeProvider time, CancellationToken ct)
     {
-        if (!Enum.TryParse<JobSource>(request.Source, ignoreCase: true, out var source) || !Configurable.Contains(source))
+        var gupyCompany = string.Equals(request.Source, "gupy", StringComparison.OrdinalIgnoreCase) ? GupyConnector.CompanyTargetOf(request.Key ?? string.Empty) : null;
+        if (!Enum.TryParse<JobSource>(request.Source, ignoreCase: true, out var source) || (!Configurable.Contains(source) && gupyCompany is null))
         {
             return Problems.Validation("source", source == JobSource.Gupy
-                ? "Os termos do Gupy vêm dos perfis de score de quem usa o app."
+                ? "Os termos do Gupy vêm dos perfis de score de quem usa o app. Para uma empresa, cole o link da página dela, como empresa.gupy.io."
                 : "Fonte inválida: use greenhouse, lever, github, inhire, workday ou careersite.");
         }
 
-        var key = request.Key?.Trim() ?? string.Empty;
+        var key = gupyCompany ?? request.Key?.Trim() ?? string.Empty;
         if (source == JobSource.InHire)
         {
             key = key.ToLowerInvariant();
@@ -175,6 +230,7 @@ internal static partial class SourceEndpoints
 
         var (valid, hint) = source switch
         {
+            JobSource.Gupy => (true, string.Empty),
             JobSource.Workday => (key.Length > 0, "Cole o link do site de vagas na Workday, como empresa.wd5.myworkdayjobs.com/Site."),
             JobSource.CareerSite => (key.Length > 0, "Cole o link ou o domínio do site de vagas, como carreiras.empresa.com.br (precisa ser https)."),
             JobSource.GitHub => (RepoPattern().IsMatch(key), "Use o formato dono/repositorio, como backend-br/vagas."),
@@ -194,6 +250,7 @@ internal static partial class SourceEndpoints
         var target = new SourceTarget { Source = source, Key = key, Label = Clean(request.Label), CreatedAt = time.GetUtcNow() };
         db.SourceTargets.Add(target);
         await db.SaveChangesAsync(ct);
+        await RequestTargetReadAsync(db, backlog, target.Id, principal.GetUserId(), time, ct);
         return TypedResults.Created($"/admin/sources/{target.Id}", ToResponse(target, 0));
     }
 
@@ -205,7 +262,7 @@ internal static partial class SourceEndpoints
             return Problems.NotFound();
         }
 
-        if (target.Source == JobSource.Gupy)
+        if (target.Source == JobSource.Gupy && !GupyConnector.IsCompanyTarget(target.Key))
         {
             return Problems.Conflict("source_managed", "Os termos do Gupy seguem os perfis de score; mude o termo no perfil.");
         }
@@ -225,7 +282,7 @@ internal static partial class SourceEndpoints
             return Problems.NotFound();
         }
 
-        if (target.Source == JobSource.Gupy)
+        if (target.Source == JobSource.Gupy && !GupyConnector.IsCompanyTarget(target.Key))
         {
             return Problems.Conflict("source_managed", "Os termos do Gupy seguem os perfis de score; mude o termo no perfil.");
         }

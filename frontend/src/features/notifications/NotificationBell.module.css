@@ -138,6 +138,10 @@
   background: var(--status-screening);
 }
 
+.collection {
+  background: var(--status-applied);
+}
+
 .text {
   display: flex;
   flex-direction: column;

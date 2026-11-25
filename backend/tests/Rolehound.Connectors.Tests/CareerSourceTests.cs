@@ -55,6 +55,50 @@ public sealed class CareerSourceTests
         Assert.True(snapshot.Authoritative);
     }
 
+    [Theory]
+    [InlineData("http://sicredi.gupy.io/", "sicredi.gupy.io")]
+    [InlineData("https://sicredi.gupy.io/jobs/12774620?jobBoardSource=gupy_public_page", "sicredi.gupy.io")]
+    [InlineData("sicredi.gupy.io", "sicredi.gupy.io")]
+    [InlineData("sicredi", null)]
+    [InlineData("https://portal.gupy.io/job-search/term=python", null)]
+    [InlineData("https://sicredi.gupy.com.br/", null)]
+    public void Gupy_company_pages_are_targets_and_search_terms_are_not(string input, string? target)
+    {
+        Assert.Equal(target, GupyConnector.CompanyTargetOf(input));
+        Assert.False(GupyConnector.IsCompanyTarget("python"));
+    }
+
+    [Fact]
+    public async Task A_Gupy_company_page_lists_its_jobs_in_Brazil_and_opens_their_text()
+    {
+        const string list = """
+            <html><script id="__NEXT_DATA__" type="application/json">{"props":{"pageProps":{"careerPage":{"name":"Sicredi"},"jobs":[
+              {"id":1,"title":"Dev Python","workplace":{"address":{"country":"Brasil","stateShortName":"RS","city":"Porto Alegre"},"workplaceType":"hybrid"}},
+              {"id":2,"title":"Analista Lisboa","workplace":{"address":{"country":"Portugal","city":"Lisboa"},"workplaceType":"on-site"}},
+              {"id":3,"title":"Dev Remoto","workplace":{"address":{"country":""},"workplaceType":"remote"}}]}}}</script></html>
+            """;
+        const string detail = """
+            <html><script id="__NEXT_DATA__" type="application/json">{"props":{"pageProps":{"job":{"description":"<p>Python e Django</p>","prerequisites":"<p>SQL</p>","publishedAt":"2026-11-20T10:00:00.000Z"}}}}</script></html>
+            """;
+        var routes = new Routes()
+            .On("/jobs/1", () => (HttpStatusCode.OK, detail))
+            .On("/jobs/3", () => (HttpStatusCode.NotFound, "{}"))
+            .On("sicredi.gupy.io/", () => (HttpStatusCode.OK, list));
+        var gupy = new GupyConnector(new HttpClient(routes));
+
+        var snapshot = await gupy.FetchAsync("sicredi.gupy.io", new HashSet<string>(), Ct);
+        var probe = await gupy.ProbeAsync("sicredi.gupy.io", Ct);
+
+        Assert.True(snapshot.Authoritative);
+        Assert.Equal(["1", "3"], snapshot.Jobs.Select(j => j.ExternalId).Order());
+        var python = snapshot.Jobs.Single(j => j.ExternalId == "1");
+        Assert.Equal(("Sicredi", "Porto Alegre, RS, Brasil", WorkMode.Hybrid, "https://sicredi.gupy.io/jobs/1"), (python.Company, python.Location, python.WorkMode, python.Url));
+        Assert.Contains("Python e Django", python.Description, StringComparison.Ordinal);
+        Assert.Contains("Requisitos", python.Description, StringComparison.Ordinal);
+        Assert.False(snapshot.Jobs.Single(j => j.ExternalId == "3").HasDetails);
+        Assert.Equal(new SourceProbe(2, "Sicredi"), probe);
+    }
+
     [Fact]
     public void A_JobPosting_in_json_ld_is_read_with_its_country()
     {

@@ -54,5 +54,12 @@ public sealed class CollectionRun
 
     public int Closed { get; set; }
 
+    /// <summary>The read failed; nothing changed for this source.</summary>
     public string? Error { get; set; }
+
+    /// <summary>The read counted but was partial (pages left for later, details that did not open).</summary>
+    public string? Warning { get; set; }
+
+    /// <summary>A read of one source on its own (just added), not a scheduled or full collection.</summary>
+    public bool Partial { get; init; }
 }

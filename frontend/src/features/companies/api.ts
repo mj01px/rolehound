@@ -22,6 +22,8 @@ export interface FollowLinkResult {
   alreadyFollowing: boolean
   /** Open jobs it has now. */
   listed: number
+  /** A new company is being read in the background; a notification comes when it ends. */
+  reading: boolean
 }
 
 const companiesKey = ['companies'] as const
@@ -57,7 +59,7 @@ export function useFollowLink() {
   })
 }
 
-export const sourceNames: Record<string, string> = { inhire: 'InHire', greenhouse: 'Greenhouse', lever: 'Lever', workday: 'Workday', careersite: 'Site de carreiras' }
+export const sourceNames: Record<string, string> = { inhire: 'InHire', gupy: 'Gupy', greenhouse: 'Greenhouse', lever: 'Lever', workday: 'Workday', careersite: 'Site de carreiras' }
 
 /** What happened after following by link, in one sentence. */
 export function followMessage(result: FollowLinkResult) {
@@ -66,5 +68,6 @@ export function followMessage(result: FollowLinkResult) {
   const paused = company.paused ? ' A coleta dela está pausada pelo admin, então nenhuma vaga nova chega até ele reativar.' : ''
   if (!added) return `Você está seguindo a ${company.name}.${paused}`
   if (listed === 0) return `Você está seguindo a ${company.name}. Ela não tem vagas abertas agora; você é avisado quando abrir.`
-  return `Você está seguindo a ${company.name}. ${listed === 1 ? '1 vaga aberta entra' : `${listed} vagas abertas entram`} na próxima coleta, e as que combinarem com você chegam nas suas notificações.`
+  const reading = result.reading ? ' Já estamos lendo as vagas; você recebe uma notificação quando terminar.' : ''
+  return `Você está seguindo a ${company.name}, que tem ${listed === 1 ? '1 vaga aberta' : `${listed} vagas abertas`}.${reading}`
 }

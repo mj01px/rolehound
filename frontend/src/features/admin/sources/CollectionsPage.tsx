@@ -57,7 +57,9 @@ function Batch({ batch, startOpen }: { batch: CollectionBatch; startOpen: boolea
     <section className={styles.panel} aria-labelledby={`${panelId}-title`}>
       <h2 id={`${panelId}-title`} className={styles.batchHeading}>
         <button type="button" className={styles.batchToggle} aria-expanded={open} aria-controls={panelId} onClick={() => setOpen((value) => !value)}>
-          <span className={styles.batchTitle}>Coleta de {when(batch.startedAt)}</span>
+          <span className={styles.batchTitle}>
+            {batch.partial ? 'Leitura de fonte nova' : 'Coleta'} de {when(batch.startedAt)}
+          </span>
           <Summary batch={batch} />
           <svg className={open ? styles.chevronOpen : styles.chevron} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <path d="M6 9l6 6 6-6" />
@@ -87,6 +89,7 @@ function Batch({ batch, startOpen }: { batch: CollectionBatch; startOpen: boolea
                             <span className={styles.nameMain}>{run.key}</span> <span className={styles.nameKey}>{kindLabels[run.source as SourceKind] ?? run.source}</span>
                           </span>
                           {run.error && <span className={styles.rowWarn}>{run.error} Nada mudou nesta fonte.</span>}
+                          {!run.error && run.warning && <span className={styles.rowNote}>{run.warning}</span>}
                         </span>
                       </td>
                       {run.error ? (

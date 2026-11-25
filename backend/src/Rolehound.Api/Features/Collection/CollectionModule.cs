@@ -61,9 +61,15 @@ public static class CollectionModule
         services.AddTransient<ICompanyLinkReader>(sp => sp.GetRequiredService<GreenhouseConnector>());
         services.AddTransient<ICompanyLinkReader>(sp => sp.GetRequiredService<LeverConnector>());
         services.AddTransient<ICompanyLinkReader>(sp => sp.GetRequiredService<WorkdayConnector>());
+        services.AddTransient<ICompanyLinkReader>(sp => sp.GetRequiredService<GupyConnector>());
+        services.AddTransient<ITargetProber>(sp => sp.GetRequiredService<GupyConnector>());
         services.AddTransient<ITargetProber>(sp => sp.GetRequiredService<WorkdayConnector>());
         services.AddTransient<ITargetProber>(sp => sp.GetRequiredService<CareerSiteConnector>());
         services.AddSingleton<Companies.CompanyLinkLimiter>();
+
+        services.AddSingleton<CollectionLock>();
+        services.AddSingleton<CollectionBacklog>();
+        services.AddHostedService<CollectionWorker>();
 
         services.AddScoped<JobScoring>();
         services.AddScoped<CollectionRunner>();

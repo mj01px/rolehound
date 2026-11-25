@@ -52,7 +52,8 @@ internal static class CollectionSchedule
     public static async Task<Ok<DueCollectionResponse>> RunIfDue(RolehoundDbContext db, CollectionRunner runner, TimeProvider time, CancellationToken ct)
     {
         var slot = LatestSlot(time.GetUtcNow());
-        if (await db.CollectionRuns.AnyAsync(r => r.StartedAt >= slot, ct))
+        // A source read on its own (just added) is not the collection of the hour.
+        if (await db.CollectionRuns.AnyAsync(r => r.StartedAt >= slot && !r.Partial, ct))
         {
             return TypedResults.Ok(new DueCollectionResponse(false, slot, null));
         }

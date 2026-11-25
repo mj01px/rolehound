@@ -37,8 +37,15 @@ public sealed record CollectedJob(
 /// list: jobs of the same target missing from it are closed. A search
 /// (Gupy) is not authoritative; its jobs close only by age.
 /// <paramref name="Warning"/> reports a partial answer that still counts.
+/// <paramref name="Skipped"/> lists pages opened and found not to be jobs in Brazil, so they are not opened again.
 /// </summary>
-public sealed record Snapshot(IReadOnlyList<CollectedJob> Jobs, bool Authoritative = true, string? Warning = null);
+public sealed record Snapshot(IReadOnlyList<CollectedJob> Jobs, bool Authoritative = true, string? Warning = null, IReadOnlyList<string>? Skipped = null);
+
+/// <summary>Sources that open one page per job and can be told which pages were already found not to be jobs in Brazil.</summary>
+public interface IRemembersSkipped
+{
+    void Remember(IEnumerable<string> pages);
+}
 
 /// <summary>A failure with a stable code; a failed snapshot never closes jobs.</summary>
 public sealed class ConnectorException(string code, string message, Exception? inner = null) : Exception(message, inner)

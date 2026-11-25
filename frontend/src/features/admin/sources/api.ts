@@ -36,7 +36,10 @@ export interface CollectionRun {
   added: number
   reopened: number
   closed: number
+  /** The read failed and changed nothing. */
   error: string | null
+  /** The read counted but was partial. */
+  warning: string | null
 }
 
 /** One collection: every source read in the same run, with only the reads that changed something or failed. */
@@ -52,20 +55,24 @@ export interface CollectionBatch {
   failed: number
   changes: CollectionRun[]
   unchanged: number
+  /** One source read on its own, right after it was added. */
+  partial: boolean
+}
+
+export interface CollectionRequest {
+  id: string
+  kind: 'full' | 'target'
+  status: 'queued' | 'running'
+  requestedAt: string
+  startedAt: string | null
 }
 
 export interface SourcesStatus {
   nextScheduledAt: string
   /** When a manual run is allowed again; null when it is allowed now. */
   manualAvailableAt: string | null
-}
-
-export interface CollectionSummary {
-  targets: number
-  failed: number
-  added: number
-  reopened: number
-  closed: number
+  /** A full collection someone asked for, waiting or running. */
+  running: CollectionRequest | null
 }
 
 const sourcesKey = ['admin', 'sources'] as const
@@ -89,18 +96,18 @@ export function useConnectorRequests() {
 }
 
 export function useSourcesStatus() {
-  // The manual run unlocks with time, so the answer is refreshed every minute.
+  // Every few seconds while a collection runs; otherwise every minute (the manual run unlocks with time).
   return useQuery({
     queryKey: [...sourcesKey, 'status'],
     queryFn: ({ signal }) => api.get<SourcesStatus>('/admin/sources/status', signal),
-    refetchInterval: 60_000,
+    refetchInterval: (query) => (query.state.data?.running ? 5_000 : 60_000),
   })
 }
 
 export function useRunNow() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: () => api.post<CollectionSummary>('/admin/sources/run'),
+    mutationFn: () => api.post<CollectionRequest>('/admin/sources/run'),
     onSettled: () => queryClient.invalidateQueries({ queryKey: sourcesKey }),
   })
 }

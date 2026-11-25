@@ -26,7 +26,7 @@ public sealed class Job
     public required string ExternalId { get; init; }
 
     /// <summary>The collection target that lists it; null for jobs added by link or email.</summary>
-    public Guid? TargetId { get; init; }
+    public Guid? TargetId { get; set; }
 
     public required string Title { get; set; }
 

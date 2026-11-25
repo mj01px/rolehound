@@ -14,7 +14,7 @@ namespace Rolehound.Connectors;
 /// for "Brazil" and "Brasil" gives the candidates, and one whose listed place does not
 /// say Brazil is opened to check.
 /// </summary>
-public sealed partial class WorkdayConnector(HttpClient http) : IJobConnector, IJobLinkReader, ICompanyLinkReader, ITargetProber
+public sealed partial class WorkdayConnector(HttpClient http) : IJobConnector, IJobLinkReader, ICompanyLinkReader, ITargetProber, IRemembersSkipped
 {
     private const int PageSize = 20;
     private const int MaxPages = 50;
@@ -27,6 +27,14 @@ public sealed partial class WorkdayConnector(HttpClient http) : IJobConnector, I
     private static readonly ConcurrentDictionary<string, byte> NotInBrazil = new(StringComparer.Ordinal);
 
     public JobSource Source => JobSource.Workday;
+
+    public void Remember(IEnumerable<string> pages)
+    {
+        foreach (var page in pages)
+        {
+            NotInBrazil.TryAdd(page, 0);
+        }
+    }
 
     public async Task<Snapshot> FetchAsync(string target, IReadOnlySet<string> detailed, CancellationToken ct)
     {
@@ -99,6 +107,7 @@ public sealed partial class WorkdayConnector(HttpClient http) : IJobConnector, I
         }
 
         var failures = 0;
+        var notHere = new ConcurrentBag<string>();
         var skipped = Math.Max(0, toOpen.Count - MaxDetails);
         await Parallel.ForEachAsync(toOpen.Take(MaxDetails), new ParallelOptions { MaxDegreeOfParallelism = DetailConcurrency, CancellationToken = ct }, async (item, token) =>
         {
@@ -109,6 +118,7 @@ public sealed partial class WorkdayConnector(HttpClient http) : IJobConnector, I
                 if (job is null)
                 {
                     NotInBrazil.TryAdd(item.Path, 0);
+                    notHere.Add(item.Path);
                     return;
                 }
 
@@ -150,7 +160,7 @@ public sealed partial class WorkdayConnector(HttpClient http) : IJobConnector, I
 
         // A list read only in part, or with jobs in several places left unchecked, must not close anything.
         var authoritative = complete && skipped == 0;
-        return new Snapshot(jobs.ToList(), authoritative, warning);
+        return new Snapshot(jobs.ToList(), authoritative, warning, notHere.ToList());
     }
 
     /// <summary>tenant.wdN.myworkdayjobs.com[/locale]/Site[/...].</summary>

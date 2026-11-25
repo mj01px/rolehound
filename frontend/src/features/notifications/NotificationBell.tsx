@@ -9,7 +9,7 @@ const PANEL_WIDTH = 340
 const EDGE = 24
 
 interface Notification {
-  kind: 'model' | 'overdue' | 'sample' | 'highlights' | 'company'
+  kind: 'model' | 'overdue' | 'sample' | 'highlights' | 'company' | 'collection'
   title: string
   detail: string
   link: string

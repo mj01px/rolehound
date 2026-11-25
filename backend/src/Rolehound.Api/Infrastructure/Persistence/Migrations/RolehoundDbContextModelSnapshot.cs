@@ -685,6 +685,93 @@ namespace Rolehound.Api.Infrastructure.Persistence.Migrations
                     b.ToTable("resume_texts", (string)null);
                 });
 
+            modelBuilder.Entity("Rolehound.Api.Features.Collection.CollectionRequest", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("Added")
+                        .HasColumnType("integer")
+                        .HasColumnName("added");
+
+                    b.Property<int>("Closed")
+                        .HasColumnType("integer")
+                        .HasColumnName("closed");
+
+                    b.Property<string>("Error")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("error");
+
+                    b.Property<int>("Failed")
+                        .HasColumnType("integer")
+                        .HasColumnName("failed");
+
+                    b.Property<DateTimeOffset?>("FinishedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("finished_at");
+
+                    b.Property<int?>("ForYou")
+                        .HasColumnType("integer")
+                        .HasColumnName("for_you");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("kind");
+
+                    b.Property<int>("Reopened")
+                        .HasColumnType("integer")
+                        .HasColumnName("reopened");
+
+                    b.Property<DateTimeOffset>("RequestedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("requested_at");
+
+                    b.Property<Guid?>("RequestedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("requested_by");
+
+                    b.Property<DateTimeOffset?>("SeenAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("seen_at");
+
+                    b.Property<DateTimeOffset?>("StartedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("started_at");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("status");
+
+                    b.Property<Guid?>("TargetId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("target_id");
+
+                    b.Property<int>("Targets")
+                        .HasColumnType("integer")
+                        .HasColumnName("targets");
+
+                    b.HasKey("Id")
+                        .HasName("pk_collection_requests");
+
+                    b.HasIndex("Status")
+                        .HasDatabaseName("ix_collection_requests_status");
+
+                    b.HasIndex("TargetId")
+                        .HasDatabaseName("ix_collection_requests_target_id");
+
+                    b.HasIndex("RequestedBy", "FinishedAt")
+                        .HasDatabaseName("ix_collection_requests_requested_by_finished_at");
+
+                    b.ToTable("collection_requests", (string)null);
+                });
+
             modelBuilder.Entity("Rolehound.Api.Features.Collection.CollectionRun", b =>
                 {
                     b.Property<Guid>("Id")
@@ -717,6 +804,10 @@ namespace Rolehound.Api.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("listed");
 
+                    b.Property<bool>("Partial")
+                        .HasColumnType("boolean")
+                        .HasColumnName("partial");
+
                     b.Property<int>("Reopened")
                         .HasColumnType("integer")
                         .HasColumnName("reopened");
@@ -728,6 +819,11 @@ namespace Rolehound.Api.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("TargetId")
                         .HasColumnType("uuid")
                         .HasColumnName("target_id");
+
+                    b.Property<string>("Warning")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("warning");
 
                     b.HasKey("Id")
                         .HasName("pk_collection_runs");
@@ -742,6 +838,30 @@ namespace Rolehound.Api.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_collection_runs_target_id");
 
                     b.ToTable("collection_runs", (string)null);
+                });
+
+            modelBuilder.Entity("Rolehound.Api.Features.Collection.SkippedPage", b =>
+                {
+                    b.Property<Guid>("TargetId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("target_id");
+
+                    b.Property<string>("PageId")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("page_id");
+
+                    b.Property<DateTimeOffset>("SkippedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("skipped_at");
+
+                    b.HasKey("TargetId", "PageId")
+                        .HasName("pk_skipped_pages");
+
+                    b.HasIndex("SkippedAt")
+                        .HasDatabaseName("ix_skipped_pages_skipped_at");
+
+                    b.ToTable("skipped_pages", (string)null);
                 });
 
             modelBuilder.Entity("Rolehound.Api.Features.Collection.SourceTarget", b =>
@@ -1590,6 +1710,21 @@ namespace Rolehound.Api.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_resume_texts_users_user_id");
                 });
 
+            modelBuilder.Entity("Rolehound.Api.Features.Collection.CollectionRequest", b =>
+                {
+                    b.HasOne("Rolehound.Api.Features.Accounts.User", null)
+                        .WithMany()
+                        .HasForeignKey("RequestedBy")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .HasConstraintName("fk_collection_requests_users_requested_by");
+
+                    b.HasOne("Rolehound.Api.Features.Collection.SourceTarget", null)
+                        .WithMany()
+                        .HasForeignKey("TargetId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_collection_requests_source_targets_target_id");
+                });
+
             modelBuilder.Entity("Rolehound.Api.Features.Collection.CollectionRun", b =>
                 {
                     b.HasOne("Rolehound.Api.Features.Collection.SourceTarget", null)
@@ -1598,6 +1733,16 @@ namespace Rolehound.Api.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_collection_runs_source_targets_target_id");
+                });
+
+            modelBuilder.Entity("Rolehound.Api.Features.Collection.SkippedPage", b =>
+                {
+                    b.HasOne("Rolehound.Api.Features.Collection.SourceTarget", null)
+                        .WithMany()
+                        .HasForeignKey("TargetId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_skipped_pages_source_targets_target_id");
                 });
 
             modelBuilder.Entity("Rolehound.Api.Features.Collection.SourceTarget", b =>

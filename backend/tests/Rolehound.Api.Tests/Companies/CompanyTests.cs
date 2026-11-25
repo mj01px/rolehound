@@ -53,14 +53,14 @@ public sealed class CompanyTests(ApiFactory factory) : ApiTest(factory)
         Assert.Equal(HttpStatusCode.BadRequest, (await FollowAsync(browser, "tech6")).StatusCode);
         Assert.Equal("portal_closed", await ProblemCodeAsync(await FollowAsync(browser, "https://www.linkedin.com/company/exemplo/jobs/")));
         Assert.Equal("site_unknown", await ProblemCodeAsync(await FollowAsync(browser, "http://carreiras.exemplo.com.br/vagas")));
-        var unsupported = await FollowAsync(browser, "https://exemplo.gupy.io/");
+        var unsupported = await FollowAsync(browser, "https://jobs.smartrecruiters.com/Exemplo");
         Assert.Equal(HttpStatusCode.UnprocessableEntity, unsupported.StatusCode);
         Assert.Equal("platform_unsupported", await ProblemCodeAsync(unsupported));
 
         using var admin = await SignedInAsync("rafael@exemplo.test");
         var requests = await ReadAsync<List<ConnectorRequestSummary>>(await admin.GetAsync(new Uri("/admin/sources/requests", UriKind.Relative), Ct));
-        var gupy = Assert.Single(requests);
-        Assert.Equal(("Gupy", 1, 1), (gupy.Platform, gupy.Requests, gupy.People));
+        var asked = Assert.Single(requests);
+        Assert.Equal(("SmartRecruiters", 1, 1), (asked.Platform, asked.Requests, asked.People));
         Assert.Equal(HttpStatusCode.Forbidden, (await browser.GetAsync(new Uri("/admin/sources/requests", UriKind.Relative), Ct)).StatusCode);
     }
 
@@ -108,7 +108,37 @@ public sealed class CompanyTests(ApiFactory factory) : ApiTest(factory)
 
         var followed = await ReadAsync<FollowLinkResponse>(await FollowAsync(browser, "https://Carreiras.Acme.test/job/1?origem=x"));
         Assert.True(followed.Added);
+        Assert.True(followed.Reading);
         Assert.Equal(("careersite", "carreiras.acme.test", 1), (followed.Company.Source, followed.Company.Key, followed.Listed));
+
+        // The new company is read right away; the person hears when it ends, and it is not the collection of the hour.
+        var read = await WaitForAsync(browser, "collection");
+        Assert.Equal("Empresa Exemplo lida: 1 vaga, 0 para você", read.Title);
+        Assert.Equal("/empresas", read.Link);
+        await ListAsync(browser);
+        Assert.DoesNotContain((await browser.GetFromJsonAsync<List<Notification>>("/notifications", Ct))!, n => n.Kind == "collection");
+
+        using var client = Factory.CreateClient();
+        using var due = new HttpRequestMessage(HttpMethod.Post, "/tasks/collect-due");
+        due.Headers.Add("X-Task-Key", ApiFactory.TaskKey);
+        var answer = await ReadAsync<DueCollectionResponse>(await client.SendAsync(due, Ct));
+        Assert.True(answer.Ran);
+    }
+
+    [Fact]
+    public async Task A_partial_read_counts_and_shows_as_a_warning_not_an_error()
+    {
+        await CreateUserAsync("rafael@exemplo.test", UserRole.Admin);
+        await AddTargetAsync(JobSource.Greenhouse, "exemplo", "Exemplo SA");
+        Factory.JobSource.ListsPartly("exemplo", "exemplo: 3 página(s) ficaram para as próximas coletas.", FakeJobSource.Job("1", "Dev Python"));
+        await CollectAsync();
+
+        using var admin = await SignedInAsync("rafael@exemplo.test");
+        var batch = Assert.Single(await ReadAsync<List<CollectionBatchResponse>>(await admin.GetAsync(new Uri("/admin/sources/collections", UriKind.Relative), Ct)));
+        var run = Assert.Single(batch.Changes);
+        Assert.Equal((0, 1, (string?)null), (batch.Failed, run.Added, run.Error));
+        Assert.StartsWith("exemplo: 3 página(s)", run.Warning, StringComparison.Ordinal);
+        Assert.Null((await ReadAsync<List<SourceTargetResponse>>(await admin.GetAsync(new Uri("/admin/sources", UriKind.Relative), Ct))).Single().LastError);
     }
 
     [Fact]
@@ -135,6 +165,22 @@ public sealed class CompanyTests(ApiFactory factory) : ApiTest(factory)
         var jobId = await db.Jobs.Where(j => j.Title == "Analista Python").Select(j => j.Id).SingleAsync(Ct);
         var detail = await ReadAsync<JobDetailResponse>(await browser.GetAsync(new Uri($"/jobs/{jobId}", UriKind.Relative), Ct));
         Assert.Equal(new JobCompany(company, "Exemplo SA", true), detail.Company);
+    }
+
+    private static async Task<Notification> WaitForAsync(HttpClient browser, string kind)
+    {
+        for (var attempt = 0; attempt < 100; attempt++)
+        {
+            var found = (await browser.GetFromJsonAsync<List<Notification>>("/notifications", Ct))!.FirstOrDefault(n => n.Kind == kind);
+            if (found is not null)
+            {
+                return found;
+            }
+
+            await Task.Delay(100, Ct);
+        }
+
+        throw new TimeoutException($"No {kind} notification.");
     }
 
     private static Task<HttpResponseMessage> FollowAsync(HttpClient browser, string url) =>
@@ -175,7 +221,11 @@ public sealed class CompanyTests(ApiFactory factory) : ApiTest(factory)
 
     private async Task CollectAsync(params CollectedJob[] jobs)
     {
-        Factory.JobSource.Lists("exemplo", jobs);
+        if (jobs.Length > 0)
+        {
+            Factory.JobSource.Lists("exemplo", jobs);
+        }
+
         using var client = Factory.CreateClient();
         using var request = new HttpRequestMessage(HttpMethod.Post, "/tasks/collect");
         request.Headers.Add("X-Task-Key", ApiFactory.TaskKey);
