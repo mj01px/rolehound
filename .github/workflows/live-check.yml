@@ -1,0 +1,29 @@
+name: Live check
+
+# Weekly read of one real company per connector (NFR-MAI-05): catches a platform
+# that changed its format before a user does. A failed run is emailed by GitHub.
+on:
+  schedule:
+    # Mondays 08:00 America/Sao_Paulo.
+    - cron: "0 11 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  connectors:
+    name: Connectors against real sites
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      ROLEHOUND_LIVE: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
+        with:
+          global-json-file: backend/global.json
+      - run: dotnet test tests/Rolehound.Connectors.Tests --filter "Category=Live"
