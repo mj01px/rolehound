@@ -6,6 +6,7 @@ import { Button } from '../../../ui/Button'
 import { Modal, ModalHead } from '../../../ui/Modal'
 import { MoreMenu } from '../../../ui/MoreMenu'
 import { Pager } from '../../../ui/Pager'
+import { Select } from '../../../ui/Select'
 import { pageOf } from '../../../ui/paging'
 import { kindLabels, kinds, plural, useCollections, useRemoveSource, useRunNow, useSourcesStatus, useTargets, useToggleSource, when, type SourceKind, type SourceTarget } from './api'
 import { AddSourceDialog } from './AddSourceDialog'
@@ -117,28 +118,18 @@ export function SourcesPage() {
         </div>
       </section>
 
-      <div className={styles.tabsRow}>
-        <div role="tablist" aria-label="Tipo de fonte" className={styles.tabs}>
-          {kinds.map((value) => (
-            <button
-              key={value}
-              type="button"
-              role="tab"
-              id={`tab-${value}`}
-              aria-selected={kind === value}
-              aria-controls="sources-panel"
-              className={kind === value ? `${styles.tab} ${styles.tabOn}` : styles.tab}
-              onClick={() => {
-                setKind(value)
-                setQuery('')
-                setPage(0)
-              }}
-            >
-              {kindLabels[value]}
-              <span className={styles.tabCount}>{counts[value]}</span>
-            </button>
-          ))}
-        </div>
+      <div className={styles.filtersRow}>
+        <Select
+          variant="compact"
+          label="Tipo de fonte"
+          value={kind}
+          options={kinds.map((value) => ({ value, label: `${kindLabels[value]} (${counts[value]})` }))}
+          onChange={(value) => {
+            setKind(value)
+            setQuery('')
+            setPage(0)
+          }}
+        />
         <label className={styles.search}>
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
             <circle cx="11" cy="11" r="7" />
@@ -157,7 +148,7 @@ export function SourcesPage() {
         </label>
       </div>
 
-      <div role="tabpanel" id="sources-panel" aria-labelledby={`tab-${kind}`} className={styles.panel}>
+      <div id="sources-panel" aria-label={`Fontes do ${kindLabels[kind]}`} className={styles.panel}>
         {kind === 'gupy' && (
           <p className={styles.panelNote}>
             Os termos de busca vêm dos perfis de score de quem usa o app; um termo que ninguém usa mais fica pausado. As empresas da Gupy (empresa.gupy.io) entram por Adicionar fonte ou pela página Empresas.
