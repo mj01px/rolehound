@@ -30,7 +30,6 @@ public sealed record AccuracyResponse(
     bool InFirstThirtyDays,
     IReadOnlyList<MonthMetrics> Months);
 
-public sealed record UserAccuracy(string Username, AccuracyResponse Metrics);
 
 /// <summary>
 /// Score quality (FR-ACU): a monthly labelled sample of highlights, precision
@@ -52,7 +51,7 @@ internal static class AccuracyEndpoints
         accuracy.MapPut("/sample/{itemId:guid}", Label);
         accuracy.MapPost("/sample/skip", Skip);
 
-        endpoints.MapGet("/admin/accuracy", Everyone).WithTags("Admin").RequireAuthorization(AccountsModule.AdminPolicy);
+        endpoints.MapGet("/admin/users/{id:guid}/accuracy", OfUser).WithTags("Admin").RequireAuthorization(AccountsModule.AdminPolicy);
         return endpoints;
     }
 
@@ -165,21 +164,15 @@ internal static class AccuracyEndpoints
     private static async Task<Ok<AccuracyResponse>> Mine(ClaimsPrincipal principal, RolehoundDbContext db, TimeProvider time, CancellationToken ct) =>
         TypedResults.Ok(await MetricsAsync(db, principal.GetUserId(), time, ct));
 
-    private static async Task<Ok<List<UserAccuracy>>> Everyone(RolehoundDbContext db, TimeProvider time, CancellationToken ct)
+    /// <summary>One person's score quality for the admin, numbers only: never their jobs (FR-ACU-04).</summary>
+    private static async Task<Results<Ok<AccuracyResponse>, ProblemHttpResult>> OfUser(Guid id, RolehoundDbContext db, TimeProvider time, CancellationToken ct)
     {
-        var users = await db.Users.AsNoTracking()
-            .Where(u => u.IsActive && u.OnboardingCompletedAt != null)
-            .OrderBy(u => u.UserName)
-            .Select(u => new { u.Id, u.UserName })
-            .ToListAsync(ct);
-
-        var result = new List<UserAccuracy>();
-        foreach (var user in users)
+        if (!await db.Users.AnyAsync(u => u.Id == id, ct))
         {
-            result.Add(new UserAccuracy(user.UserName ?? string.Empty, await MetricsAsync(db, user.Id, time, ct)));
+            return Problems.NotFound();
         }
 
-        return TypedResults.Ok(result);
+        return TypedResults.Ok(await MetricsAsync(db, id, time, ct));
     }
 
     internal static async Task<AccuracyResponse> MetricsAsync(RolehoundDbContext db, Guid userId, TimeProvider time, CancellationToken ct)

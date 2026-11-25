@@ -99,7 +99,7 @@ public sealed class AccuracyTests(ApiFactory factory) : ApiTest(factory)
     [Fact]
     public async Task People_label_only_their_own_items_and_the_admin_sees_numbers_only()
     {
-        await OnboardedAsync("ana@exemplo.test");
+        var anaId = await OnboardedAsync("ana@exemplo.test");
         await OnboardedAsync("bia@exemplo.test");
         await CreateUserAsync("rafael@exemplo.test", UserRole.Admin);
         await CollectAsync(2, highlights: true);
@@ -109,25 +109,25 @@ public sealed class AccuracyTests(ApiFactory factory) : ApiTest(factory)
         using (var bia = await SignedInAsync("bia@exemplo.test"))
         {
             Assert.Equal(HttpStatusCode.NotFound, (await bia.PutAsJsonAsync($"/accuracy/sample/{item.Id}", new { relevant = true }, Ct)).StatusCode);
-            Assert.Equal(HttpStatusCode.Forbidden, (await bia.GetAsync(new Uri("/admin/accuracy", UriKind.Relative), Ct)).StatusCode);
+            Assert.Equal(HttpStatusCode.Forbidden, (await bia.GetAsync(new Uri($"/admin/users/{anaId}/accuracy", UriKind.Relative), Ct)).StatusCode);
         }
 
         using var admin = await SignedInAsync("rafael@exemplo.test");
-        var response = await admin.GetAsync(new Uri("/admin/accuracy", UriKind.Relative), Ct);
+        var response = await admin.GetAsync(new Uri($"/admin/users/{anaId}/accuracy", UriKind.Relative), Ct);
         var body = await response.Content.ReadAsStringAsync(Ct);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.DoesNotContain("Dev Python", body, StringComparison.Ordinal);
-        // The admin is also an onboarded person, so three rows.
-        Assert.Equal(3, JsonDocument.Parse(body).RootElement.GetArrayLength());
+        Assert.Equal(HttpStatusCode.NotFound, (await admin.GetAsync(new Uri($"/admin/users/{Guid.NewGuid()}/accuracy", UriKind.Relative), Ct)).StatusCode);
     }
 
-    private async Task OnboardedAsync(string email)
+    private async Task<Guid> OnboardedAsync(string email)
     {
         var user = await CreateUserAsync(email);
         await using var scope = Factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<RolehoundDbContext>();
         db.ScoreProfiles.Add(new UserScoreProfile { UserId = user.Id, Document = JsonSerializer.Serialize(PythonProfile, ScoreProfileEndpoints.Json), UpdatedAt = DateTimeOffset.UtcNow });
         await db.SaveChangesAsync(Ct);
+        return user.Id;
     }
 
     private readonly List<CollectedJob> _listed = [];

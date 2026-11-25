@@ -5,6 +5,7 @@ import { Alert, Notice } from '../../../ui/Alert'
 import { Button } from '../../../ui/Button'
 import { dateTime, initial, longDate, roleLabel, useUser, type AdminUser } from './api'
 import { History } from './History'
+import { ScoreQuality } from './ScoreQuality'
 import { useActionsFor } from './useActionsFor'
 import { EditUserDialog } from './UserDialog'
 import { StatusBadge } from './UsersPage'
@@ -142,6 +143,8 @@ function Detail({ user }: { user: AdminUser }) {
           )}
         </section>
       </div>
+
+      {user.onboardingCompleted && <ScoreQuality userId={user.id} />}
 
       <History userId={user.id} />
 

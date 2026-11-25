@@ -55,7 +55,6 @@ app.MapTailoredResumeEndpoints();
 app.MapAccuracyEndpoints();
 app.MapNotificationEndpoints();
 app.MapTelegramEndpoints();
-app.MapSuggestedModelsEndpoints();
 app.MapTaskEndpoints(app.Configuration);
 
 await PrepareDatabaseAsync(app);

@@ -70,7 +70,6 @@ public sealed class RolehoundDbContext(DbContextOptions<RolehoundDbContext> opti
 
     public DbSet<TelegramLinkCode> TelegramLinkCodes => Set<TelegramLinkCode>();
 
-    public DbSet<SuggestedModelsRow> SuggestedModels => Set<SuggestedModelsRow>();
 
     public DbSet<CollectionRequest> CollectionRequests => Set<CollectionRequest>();
 

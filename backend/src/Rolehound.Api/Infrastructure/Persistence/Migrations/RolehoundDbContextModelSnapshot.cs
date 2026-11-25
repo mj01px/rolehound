@@ -520,43 +520,6 @@ namespace Rolehound.Api.Infrastructure.Persistence.Migrations
                     b.ToTable("ai_usage", (string)null);
                 });
 
-            modelBuilder.Entity("Rolehound.Api.Features.Ai.SuggestedModelsRow", b =>
-                {
-                    b.Property<int>("Id")
-                        .HasColumnType("integer")
-                        .HasColumnName("id");
-
-                    b.Property<string>("PitchAndAts")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("pitch_and_ats");
-
-                    b.Property<string>("ProfileAndFix")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("profile_and_fix");
-
-                    b.Property<string>("Resume")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("resume");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.HasKey("Id")
-                        .HasName("pk_suggested_models");
-
-                    b.ToTable("suggested_models", null, t =>
-                        {
-                            t.HasCheckConstraint("ck_suggested_models_single_row", "id = 1");
-                        });
-                });
-
             modelBuilder.Entity("Rolehound.Api.Features.Ats.AtsReport", b =>
                 {
                     b.Property<Guid>("Id")

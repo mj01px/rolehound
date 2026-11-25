@@ -50,18 +50,6 @@ export const icons = {
       <path d="M12 17v4" />
     </>,
   ),
-  accuracy: icon(
-    <>
-      <path d="M4 20V10M10 20V4M16 20v-7M22 20H2" />
-    </>,
-  ),
-  models: icon(
-    <>
-      <rect x="6" y="6" width="12" height="12" rx="2" />
-      <rect x="9.5" y="9.5" width="5" height="5" rx="1" />
-      <path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4" />
-    </>,
-  ),
   settings: icon(
     <>
       <circle cx="12" cy="12" r="3" />

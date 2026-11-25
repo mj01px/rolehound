@@ -44,7 +44,7 @@ public abstract class ApiTest(ApiFactory factory) : IAsyncLifetime
         gate.Release();
 
         await db.Database.ExecuteSqlRawAsync(
-            "TRUNCATE users, account_tokens, security_events, user_claims, user_logins, user_tokens, ai_settings, ai_usage, dossier_versions, score_profiles, jobs, job_tombstones, user_jobs, source_targets, collection_runs, applications, interactions, pitch_versions, resume_texts, ats_reports, resume_generations, sample_items, telegram_links, telegram_link_codes, suggested_models CASCADE", Ct);
+            "TRUNCATE users, account_tokens, security_events, user_claims, user_logins, user_tokens, ai_settings, ai_usage, dossier_versions, score_profiles, jobs, job_tombstones, user_jobs, source_targets, collection_runs, applications, interactions, pitch_versions, resume_texts, ats_reports, resume_generations, sample_items, telegram_links, telegram_link_codes CASCADE", Ct);
         Factory.Emails.Clear();
         Factory.JobSource.Clear();
         Factory.Gupy.Clear();

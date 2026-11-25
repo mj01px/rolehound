@@ -96,21 +96,13 @@ public sealed class AccountDataTests(ApiFactory factory) : ApiTest(factory)
 public sealed class SuggestedModelsTests(ApiFactory factory) : ApiTest(factory)
 {
     [Fact]
-    public async Task The_admin_changes_the_suggestions_people_see()
+    public async Task People_see_the_configured_suggestions()
     {
-        await CreateUserAsync("rafael@exemplo.test", UserRole.Admin);
         await CreateUserAsync("ana@exemplo.test");
-        using var admin = await SignedInAsync("rafael@exemplo.test");
-
-        var invalid = await admin.PutAsJsonAsync("/admin/ai/suggested", new { pitchAndAts = "sem barra", resume = "a/b", profileAndFix = "a/b" }, Ct);
-        Assert.Equal(HttpStatusCode.BadRequest, invalid.StatusCode);
-
-        var models = new { pitchAndAts = "qwen/qwen3-32b", resume = "anthropic/claude-sonnet-4.5", profileAndFix = "google/gemini-2.5-flash" };
-        Assert.Equal(HttpStatusCode.NoContent, (await admin.PutAsJsonAsync("/admin/ai/suggested", models, Ct)).StatusCode);
-
         using var ana = await SignedInAsync("ana@exemplo.test");
+
         var settings = await ReadAsync<AiSettingsResponse>(await ana.GetAsync(new Uri("/ai/settings", UriKind.Relative), Ct));
-        Assert.Equal("qwen/qwen3-32b", settings.Suggested.PitchAndAts);
-        Assert.Equal(HttpStatusCode.Forbidden, (await ana.PutAsJsonAsync("/admin/ai/suggested", models, Ct)).StatusCode);
+
+        Assert.Equal(new ModelsDto("deepseek/deepseek-chat", "anthropic/claude-sonnet-4.5", "google/gemini-2.5-flash"), settings.Suggested);
     }
 }

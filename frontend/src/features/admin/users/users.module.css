@@ -614,3 +614,42 @@
   }
 }
 
+/* Score quality. */
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  margin: 0;
+  border-top: 1px solid var(--border);
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px 24px;
+  border-right: 1px solid var(--border);
+}
+
+.stat:last-child {
+  border-right: 0;
+}
+
+.stat dt {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.stat dd {
+  margin: 0;
+}
+
+.statValue {
+  font: 600 20px/28px var(--font-mono);
+  color: var(--ink);
+}
+
+.statHint {
+  font-size: 12px;
+  line-height: 17px;
+  color: var(--faint);
+}

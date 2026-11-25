@@ -40,7 +40,9 @@ internal static class AiSettingsEndpoints
     private static async Task<Ok<AiSettingsResponse>> Get(ClaimsPrincipal principal, RolehoundDbContext db, IOptions<AiOptions> options, CancellationToken ct)
     {
         var settings = await db.AiSettings.AsNoTracking().SingleOrDefaultAsync(s => s.UserId == principal.GetUserId(), ct);
-        var suggested = await SuggestedModels.CurrentAsync(db, options, ct);
+        // Suggestions come from configuration (Ai:Suggested); each person can still pick others.
+        var fallback = options.Value.Suggested;
+        var suggested = new ModelsDto(fallback.PitchAndAts, fallback.Resume, fallback.ProfileAndFix);
         return TypedResults.Ok(new AiSettingsResponse(
             settings?.HasKey ?? false,
             settings?.KeyHint,
