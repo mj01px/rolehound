@@ -21,6 +21,7 @@ import {
   type ApplicationStatus,
   type Interaction,
 } from './api'
+import { Pager } from '../../ui/Pager'
 import styles from './application.module.css'
 
 const priorityLabels: Record<number, string> = { 1: 'Altíssima', 2: 'Alta', 3: 'Média', 4: 'Baixa', 5: 'Baixíssima' }
@@ -31,18 +32,6 @@ const priorities = [1, 2, 3, 4, 5].map((value) => ({ value: String(value), label
 const stages = statuses.filter((status) => status.value !== 'rejected' && status.value !== 'withdrawn')
 
 const PAGE_SIZE = 7
-
-/** Page indexes to show, with null for a gap: all of them up to seven, else the ends and the current one's neighbours. */
-function pageList(current: number, total: number): (number | null)[] {
-  if (total <= 7) return Array.from({ length: total }, (_, index) => index)
-  const middle = [current - 1, current, current + 1].filter((index) => index > 0 && index < total - 1)
-  const list: (number | null)[] = [0]
-  if ((middle[0] ?? 1) > 1) list.push(null)
-  list.push(...middle)
-  if ((middle[middle.length - 1] ?? total - 2) < total - 2) list.push(null)
-  list.push(total - 1)
-  return list
-}
 
 const byLabel = (label: string) => statuses.find((status) => status.label === label)
 
@@ -412,38 +401,7 @@ function Timeline({ id, entries, entered, adding, onDoneAdding }: { id: string; 
           )
         })}
       </ol>
-      {pages > 1 && (
-        <nav className={styles.pager} aria-label="Páginas do histórico">
-          <button type="button" className={styles.pagerButton} onClick={() => setPage(shown - 1)} disabled={shown === 0} aria-label="Página anterior">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="m15 18-6-6 6-6" />
-            </svg>
-          </button>
-          {pageList(shown, pages).map((item, index) =>
-            item === null ? (
-              <span key={`gap-${index}`} className={styles.pagerGap} aria-hidden="true">
-                …
-              </span>
-            ) : (
-              <button
-                key={item}
-                type="button"
-                className={item === shown ? `${styles.pagerButton} ${styles.pagerCurrent}` : styles.pagerButton}
-                onClick={() => setPage(item)}
-                aria-current={item === shown ? 'page' : undefined}
-                aria-label={`Página ${item + 1}`}
-              >
-                {item + 1}
-              </button>
-            ),
-          )}
-          <button type="button" className={styles.pagerButton} onClick={() => setPage(shown + 1)} disabled={shown === pages - 1} aria-label="Próxima página">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="m9 18 6-6-6-6" />
-            </svg>
-          </button>
-        </nav>
-      )}
+      <Pager page={shown} pages={pages} onChange={setPage} label="Páginas do histórico" />
     </>
   )
 }

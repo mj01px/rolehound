@@ -439,57 +439,6 @@
 }
 
 /* Pagination, centered: two quiet arrows with the page numbers between them. */
-.pager {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
-  padding-top: 4px;
-}
-
-.pagerGap {
-  width: 20px;
-  text-align: center;
-  color: var(--faint);
-  font-size: 13px;
-}
-
-.pagerButton {
-  display: grid;
-  place-items: center;
-  min-width: 28px;
-  height: 28px;
-  padding: 0 6px;
-  box-sizing: border-box;
-  border: 0;
-  border-radius: var(--radius-md);
-  background: none;
-  color: var(--muted);
-  font: 500 12px var(--font-mono);
-  cursor: pointer;
-}
-
-.pagerCurrent,
-.pagerCurrent:hover:not(:disabled) {
-  color: var(--ink);
-  background: var(--surface-raised);
-}
-
-.pagerButton:hover:not(:disabled) {
-  color: var(--ink);
-  background: var(--surface);
-}
-
-.pagerButton:disabled {
-  color: var(--border-control);
-  cursor: default;
-}
-
-.pagerButton:focus-visible {
-  outline: 2px solid var(--signal-bright);
-  outline-offset: 2px;
-}
-
 .entryForm {
   display: flex;
   flex-direction: column;

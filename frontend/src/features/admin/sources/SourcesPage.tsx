@@ -5,6 +5,8 @@ import { Alert, Notice } from '../../../ui/Alert'
 import { Button } from '../../../ui/Button'
 import { Modal, ModalHead } from '../../../ui/Modal'
 import { MoreMenu } from '../../../ui/MoreMenu'
+import { Pager } from '../../../ui/Pager'
+import { pageOf } from '../../../ui/paging'
 import { kindLabels, kinds, plural, useCollections, useConnectorRequests, useRemoveSource, useRunNow, useSourcesStatus, useTargets, useToggleSource, when, type SourceKind, type SourceTarget } from './api'
 import { AddSourceDialog } from './AddSourceDialog'
 import styles from './sources.module.css'
@@ -20,6 +22,8 @@ const searchHint: Record<SourceKind, string> = {
   careersite: 'Buscar site',
 }
 
+const PER_PAGE = 10
+
 const normalize = (text: string) => text.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase()
 const clock = (value: string) => new Date(value).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
 
@@ -31,6 +35,7 @@ export function SourcesPage() {
   const run = useRunNow()
   const [kind, setKind] = useState<SourceKind>('inhire')
   const [query, setQuery] = useState('')
+  const [page, setPage] = useState(0)
   const [adding, setAdding] = useState(false)
   const [added, setAdded] = useState<string | null>(null)
 
@@ -45,6 +50,7 @@ export function SourcesPage() {
     const words = normalize(query.trim())
     return all.filter((target) => target.source === kind && (!words || normalize(`${target.label ?? ''} ${target.key}`).includes(words)))
   }, [all, kind, query])
+  const paged = pageOf(shown, page, PER_PAGE)
 
   return (
     <div className={styles.page}>
@@ -125,6 +131,7 @@ export function SourcesPage() {
               onClick={() => {
                 setKind(value)
                 setQuery('')
+                setPage(0)
               }}
             >
               {kindLabels[value]}
@@ -137,7 +144,16 @@ export function SourcesPage() {
             <circle cx="11" cy="11" r="7" />
             <path d="m20 20-3.5-3.5" />
           </svg>
-          <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={searchHint[kind]} aria-label={searchHint[kind]} />
+          <input
+            type="search"
+            value={query}
+            onChange={(event) => {
+              setQuery(event.target.value)
+              setPage(0)
+            }}
+            placeholder={searchHint[kind]}
+            aria-label={searchHint[kind]}
+          />
         </label>
       </div>
 
@@ -169,7 +185,7 @@ export function SourcesPage() {
                 </tr>
               </thead>
               <tbody>
-                {shown.map((target) => (
+                {paged.items.map((target) => (
                   <Row key={target.id} target={target} />
                 ))}
               </tbody>
@@ -179,7 +195,8 @@ export function SourcesPage() {
         )}
         {targets.data && counts[kind] > 0 && (
           <div className={styles.panelFoot}>
-            {query.trim() ? `${shown.length} de ${counts[kind]}` : plural(counts[kind], kind === 'gupy' ? 'termo' : 'fonte', kind === 'gupy' ? 'termos' : 'fontes')}
+            <span>{query.trim() ? `${shown.length} de ${counts[kind]}` : plural(counts[kind], kind === 'gupy' ? 'termo' : 'fonte', kind === 'gupy' ? 'termos' : 'fontes')}</span>
+            <Pager page={paged.shown} pages={paged.pages} onChange={setPage} label={`Páginas de ${kindLabels[kind]}`} />
           </div>
         )}
       </div>
@@ -194,6 +211,7 @@ export function SourcesPage() {
             setAdding(false)
             setAdded(target.label ?? target.key)
             setKind(target.source as SourceKind)
+            setPage(0)
           }}
         />
       )}

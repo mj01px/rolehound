@@ -2,8 +2,13 @@ import { useMemo, useState, type FormEvent } from 'react'
 import { ApiError, errorMessage } from '../../lib/api'
 import { Alert, Notice } from '../../ui/Alert'
 import { Button } from '../../ui/Button'
+import { Pager } from '../../ui/Pager'
+import { pageOf } from '../../ui/paging'
 import { followMessage, sourceNames, useCompanies, useFollow, useFollowLink, type Company } from './api'
 import styles from './companies.module.css'
+
+const ALL_PER_PAGE = 10
+const FOLLOWING_PER_PAGE = 3
 
 const normalize = (text: string) => text.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase()
 
@@ -47,24 +52,39 @@ export function CompaniesPage() {
         </button>
       )}
 
-      {!words && following.length > 0 && <CompanyList title="Você segue" companies={following} />}
-      {companies.data && results.length > 0 && <CompanyList title={words ? 'Resultados' : 'Todas as empresas'} companies={words ? results : all.filter((company) => !company.following)} />}
+      {!words && following.length > 0 && <CompanyList title="Você segue" companies={following} perPage={FOLLOWING_PER_PAGE} />}
+      {companies.data && results.length > 0 && (
+        // A new search starts on its first page.
+        <CompanyList
+          key={words}
+          title={words ? 'Resultados' : 'Todas as empresas'}
+          companies={words ? results : all.filter((company) => !company.following)}
+          perPage={ALL_PER_PAGE}
+        />
+      )}
     </div>
   )
 }
 
-function CompanyList({ title, companies }: { title: string; companies: Company[] }) {
+function CompanyList({ title, companies, perPage }: { title: string; companies: Company[]; perPage: number }) {
+  const [page, setPage] = useState(0)
   if (companies.length === 0) return null
+  const { pages, shown, items } = pageOf(companies, page, perPage)
   return (
     <section className={styles.panel} aria-label={title}>
       <h2 className={styles.panelTitle}>
         {title} <span className={styles.count}>{companies.length}</span>
       </h2>
       <ul className={styles.list}>
-        {companies.map((company) => (
+        {items.map((company) => (
           <CompanyRow key={company.id} company={company} />
         ))}
       </ul>
+      {pages > 1 && (
+        <div className={styles.panelFoot}>
+          <Pager page={shown} pages={pages} onChange={setPage} label={`Páginas de ${title}`} />
+        </div>
+      )}
     </section>
   )
 }

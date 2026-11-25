@@ -1,0 +1,50 @@
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding-top: 4px;
+}
+
+.gap {
+  width: 20px;
+  text-align: center;
+  color: var(--faint);
+  font-size: 13px;
+}
+
+.button {
+  display: grid;
+  place-items: center;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 6px;
+  box-sizing: border-box;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: none;
+  color: var(--muted);
+  font: 500 12px var(--font-mono);
+  cursor: pointer;
+}
+
+.current,
+.current:hover:not(:disabled) {
+  color: var(--ink);
+  background: var(--surface-raised);
+}
+
+.button:hover:not(:disabled) {
+  color: var(--ink);
+  background: var(--surface);
+}
+
+.button:disabled {
+  color: var(--border-control);
+  cursor: default;
+}
+
+.button:focus-visible {
+  outline: 2px solid var(--signal-bright);
+  outline-offset: 2px;
+}
