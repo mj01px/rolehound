@@ -883,6 +883,15 @@ namespace Rolehound.Api.Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("enabled");
 
+                    b.Property<string>("HealthIssue")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("health_issue");
+
+                    b.Property<DateTimeOffset?>("HealthSince")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("health_since");
+
                     b.Property<string>("Key")
                         .IsRequired()
                         .HasMaxLength(200)

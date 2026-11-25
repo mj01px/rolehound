@@ -167,6 +167,10 @@
   background: var(--status-applied);
 }
 
+.source {
+  background: var(--danger);
+}
+
 .text {
   display: flex;
   flex-direction: column;

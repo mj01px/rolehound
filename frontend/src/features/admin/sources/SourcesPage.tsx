@@ -221,12 +221,13 @@ function Row({ target }: { target: SourceTarget }) {
               .filter(Boolean)
               .join(' · ')}
           </span>
-          {target.lastError && (
+          {(target.lastError || target.healthIssue === 'emptied') && (
             <span className={styles.rowWarn}>
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M12 9v4M12 17h.01M10.3 3.9 2.4 18a2 2 0 0 0 1.7 3h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" />
               </svg>
-              {target.lastError}
+              {target.healthIssue === 'failing' && 'Falhou nas últimas 3 leituras. '}
+              {target.healthIssue === 'emptied' ? 'Tinha vagas e agora não lista nenhuma. O site pode ter mudado.' : target.lastError}
             </span>
           )}
           {failureText && <span className={styles.rowError}>{failureText}</span>}

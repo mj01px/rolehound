@@ -129,6 +129,28 @@ public sealed class TelegramNotifier(RolehoundDbContext db, TelegramClient teleg
         await telegram.SendAsync(link.ChatId, text, [[new TelegramButton("Abrir no Rolehound", Url: $"{BaseUrl}{Collection.CollectionMessages.Link(request)}")]], ct);
     }
 
+    /// <summary>FR-NOT-07: tells every admin on Telegram about sources whose incident just opened.</summary>
+    public async Task NotifySourceHealthAsync(IReadOnlyCollection<Collection.SourceTarget> targets, CancellationToken ct)
+    {
+        if (!options.Value.Enabled || targets.Count == 0)
+        {
+            return;
+        }
+
+        var admins = await db.Users.AsNoTracking().Where(u => u.Role == Accounts.UserRole.Admin && u.IsActive).Select(u => u.Id).ToListAsync(ct);
+        var links = await db.TelegramLinks.AsNoTracking().Where(l => admins.Contains(l.UserId)).ToListAsync(ct);
+        foreach (var link in links)
+        {
+            var text = new StringBuilder("<b>Fontes com problema</b>\n");
+            foreach (var target in targets.Take(MaxJobsPerMessage))
+            {
+                text.Append(Br, $"\n<b>{TelegramEndpoints.Html(target.Label ?? target.Key)}</b>: {TelegramEndpoints.Html(Collection.SourceHealth.Detail(target.HealthIssue!, target.LastError))}");
+            }
+
+            await telegram.SendAsync(link.ChatId, text.ToString(), [[new TelegramButton("Abrir Fontes", Url: $"{BaseUrl}/admin/fontes")]], ct);
+        }
+    }
+
     /// <summary>FR-NOT-03: once a day, the person's overdue applications. Safe to call more than once a day.</summary>
     public async Task<int> NotifyOverdueAsync(CancellationToken ct)
     {

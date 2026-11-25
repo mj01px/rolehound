@@ -69,6 +69,7 @@ public sealed partial class CollectionRunner(
         var targets = await db.SourceTargets.Where(t => t.Enabled && (only == null || t.Id == only)).OrderBy(t => t.Source).ThenBy(t => t.Key).ToListAsync(ct);
         int failed = 0, added = 0, reopened = 0, closed = 0;
         var batch = Guid.CreateVersion7();
+        var troubled = new List<SourceTarget>();
 
         foreach (var target in targets)
         {
@@ -79,6 +80,7 @@ public sealed partial class CollectionRunner(
 
             var run = new CollectionRun { TargetId = target.Id, BatchId = batch, StartedAt = time.GetUtcNow(), Partial = only is not null };
             db.CollectionRuns.Add(run);
+            var complete = false;
             try
             {
                 var detailed = (await db.Jobs.Where(j => j.TargetId == target.Id && j.Description != string.Empty)
@@ -89,6 +91,7 @@ public sealed partial class CollectionRunner(
                 }
 
                 var snapshot = await connector.FetchAsync(target.Key, detailed, ct);
+                complete = snapshot.Authoritative;
                 var changed = await ApplyAsync(target, snapshot, run, ct);
                 target.LastJobCount = run.Listed;
                 target.LastError = null;
@@ -106,6 +109,11 @@ public sealed partial class CollectionRunner(
 
             run.FinishedAt = time.GetUtcNow();
             target.LastRunAt = run.FinishedAt;
+            if (await SourceHealth.CheckAsync(db, target, run, complete, run.FinishedAt, ct))
+            {
+                troubled.Add(target);
+            }
+
             await db.SaveChangesAsync(ct);
             added += run.Added;
             reopened += run.Reopened;
@@ -117,6 +125,7 @@ public sealed partial class CollectionRunner(
             closed += await CloseAgedAsync(ct);
         }
 
+        await notifier.NotifySourceHealthAsync(troubled, ct);
         await notifier.NotifyHighlightsAsync(_opened, ct);
         await notifier.NotifyCompaniesAsync(_opened, ct);
         return new CollectionSummary(targets.Count, failed, added, reopened, closed);

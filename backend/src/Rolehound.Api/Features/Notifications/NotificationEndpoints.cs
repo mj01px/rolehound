@@ -14,7 +14,7 @@ namespace Rolehound.Api.Features.Notifications;
 /// <summary>
 /// Something that needs the person, and where it gets done. <see cref="Id"/> names what it tells
 /// (kind plus the moment or item it is about), so a read one comes back only when that changes. <see cref="Kind"/> is one
-/// of model, overdue, sample, highlights, company and collection; <see cref="Link"/> is a path in the app.
+/// of model, overdue, sample, highlights, company, collection and source (admins only); <see cref="Link"/> is a path in the app.
 /// </summary>
 public sealed record Notification(string Id, string Kind, string Title, string Detail, string Link);
 
@@ -114,6 +114,24 @@ internal static class NotificationEndpoints
         {
             var name = request.TargetId is { } id ? names.GetValueOrDefault(id) : null;
             result.Add(new Notification($"collection:{request.Id}", "collection", CollectionMessages.Title(request, name), CollectionMessages.Detail(request), CollectionMessages.Link(request)));
+        }
+
+        if (principal.IsInRole(nameof(Accounts.UserRole.Admin)))
+        {
+            var troubled = await db.SourceTargets.AsNoTracking()
+                .Where(t => t.Enabled && t.HealthIssue != null)
+                .OrderBy(t => t.HealthSince)
+                .Select(t => new { t.Id, t.Label, t.Key, t.HealthIssue, t.HealthSince, t.LastError })
+                .ToListAsync(ct);
+            foreach (var target in troubled)
+            {
+                result.Add(new Notification(
+                    $"source:{target.Id}:{target.HealthSince!.Value.ToUnixTimeSeconds()}",
+                    "source",
+                    SourceHealth.Title(target.Label ?? target.Key),
+                    SourceHealth.Detail(target.HealthIssue!, target.LastError),
+                    "/admin/fontes"));
+            }
         }
 
         foreach (var news in await JobEndpoints.NewFromFollowedAsync(db, userId, time, ct))

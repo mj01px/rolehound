@@ -12,7 +12,8 @@ namespace Rolehound.Api.Features.Collection;
 
 /// <summary><see cref="AddedBy"/>: who added it by following a company link; null when the admin added it.</summary>
 public sealed record SourceTargetResponse(
-    Guid Id, string Source, string Key, string? Label, bool Enabled, DateTimeOffset? LastRunAt, int? LastJobCount, string? LastError, int ActiveJobs, string? AddedBy);
+    Guid Id, string Source, string Key, string? Label, bool Enabled, DateTimeOffset? LastRunAt, int? LastJobCount, string? LastError, int ActiveJobs, string? AddedBy,
+    string? HealthIssue = null, DateTimeOffset? HealthSince = null);
 
 /// <summary><see cref="Error"/>: the read failed and changed nothing; <see cref="Warning"/>: it counted but was partial.</summary>
 public sealed record CollectionRunResponse(
@@ -302,7 +303,7 @@ internal static partial class SourceEndpoints
     }
 
     private static SourceTargetResponse ToResponse(SourceTarget t, int activeJobs, string? addedBy = null) =>
-        new(t.Id, t.Source.ToString().ToLowerInvariant(), t.Key, t.Label, t.Enabled, t.LastRunAt, t.LastJobCount, t.LastError, activeJobs, addedBy);
+        new(t.Id, t.Source.ToString().ToLowerInvariant(), t.Key, t.Label, t.Enabled, t.LastRunAt, t.LastJobCount, t.LastError, activeJobs, addedBy, t.HealthIssue, t.HealthSince);
 
     [GeneratedRegex("^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")]
     private static partial Regex RepoPattern();

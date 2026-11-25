@@ -30,6 +30,12 @@ public sealed class SourceTarget
     public int? LastJobCount { get; set; }
 
     public string? LastError { get; set; }
+
+    /// <summary>An open health incident (see <see cref="SourceHealth"/>); null while the source reads normally.</summary>
+    public string? HealthIssue { get; set; }
+
+    /// <summary>When the open incident started; also names it, so the admin hears about it once.</summary>
+    public DateTimeOffset? HealthSince { get; set; }
 }
 
 /// <summary>One run of one target, for the admin's view of what happened.</summary>

@@ -221,6 +221,43 @@ public sealed class CollectionTests(ApiFactory factory) : ApiTest(factory)
         Assert.False((await DueAsync()).Ran);
     }
 
+    [Fact]
+    public async Task A_source_in_trouble_alerts_the_admin_once_and_recovers_by_itself()
+    {
+        await CreateUserAsync("rafael@exemplo.test", UserRole.Admin);
+        await CreateUserAsync("ana@exemplo.test");
+        await AddTargetAsync("exemplo");
+        using var admin = await SignedInAsync("rafael@exemplo.test");
+        using var ana = await SignedInAsync("ana@exemplo.test");
+
+        Factory.JobSource.Fails("exemplo");
+        await RunAsync();
+        await RunAsync();
+        Assert.DoesNotContain(await BellAsync(admin), n => n.Kind == "source");
+
+        await RunAsync();
+        var failing = Assert.Single(await BellAsync(admin), n => n.Kind == "source");
+        Assert.Equal("Fonte com problema: exemplo", failing.Title);
+        Assert.StartsWith("Falhou nas últimas 3 leituras", failing.Detail, StringComparison.Ordinal);
+        Assert.DoesNotContain(await BellAsync(ana), n => n.Kind == "source");
+
+        // A fourth failure is the same incident: same notification, nothing new to tell.
+        await RunAsync();
+        Assert.Equal(failing.Id, Assert.Single(await BellAsync(admin), n => n.Kind == "source").Id);
+
+        Factory.JobSource.Lists("exemplo", Enumerable.Range(1, 12).Select(i => FakeJobSource.Job($"e{i}", $"Vaga {i}")).ToArray());
+        await RunAsync();
+        Assert.DoesNotContain(await BellAsync(admin), n => n.Kind == "source");
+
+        Factory.JobSource.Lists("exemplo");
+        await RunAsync();
+        var emptied = Assert.Single(await BellAsync(admin), n => n.Kind == "source");
+        Assert.StartsWith("Tinha vagas e agora não lista nenhuma", emptied.Detail, StringComparison.Ordinal);
+    }
+
+    private static async Task<List<Rolehound.Api.Features.Notifications.Notification>> BellAsync(HttpClient browser) =>
+        (await browser.GetFromJsonAsync<List<Rolehound.Api.Features.Notifications.Notification>>("/notifications", Ct))!;
+
     private async Task<DueCollectionResponse> DueAsync()
     {
         using var client = Factory.CreateClient();

@@ -15,6 +15,8 @@ export interface SourceTarget {
   activeJobs: number
   /** Who added it by following a company link; null when the admin added it. */
   addedBy: string | null
+  /** Open health incident: 'failing' (last reads failed) or 'emptied' (went from many jobs to none). */
+  healthIssue: 'failing' | 'emptied' | null
 }
 
 /** People tried to follow companies on a platform Rolehound does not read yet. */
