@@ -25,6 +25,9 @@ internal static class Cleanup
     /// <summary>Requested collections: long enough to read their notification.</summary>
     public static readonly TimeSpan RequestRetention = TimeSpan.FromDays(30);
 
+    /// <summary>Read notifications: a read item older than this is about something long past.</summary>
+    public static readonly TimeSpan NotificationReadRetention = TimeSpan.FromDays(30);
+
     /// <summary>Pages found not to be jobs in Brazil are checked again after this.</summary>
     public static readonly TimeSpan SkippedPageRetention = TimeSpan.FromDays(60);
 
@@ -47,6 +50,8 @@ internal static class Cleanup
         var skippedBefore = now - SkippedPageRetention;
         var requests = await db.CollectionRequests.Where(r => r.RequestedAt < requestsBefore && r.FinishedAt != null).ExecuteDeleteAsync(ct);
         var skipped = await db.SkippedPages.Where(p => p.SkippedAt < skippedBefore).ExecuteDeleteAsync(ct);
+        var readsBefore = now - NotificationReadRetention;
+        await db.NotificationReads.Where(r => r.ReadAt < readsBefore).ExecuteDeleteAsync(ct);
         return TypedResults.Ok(new CleanupResponse(events, tokens, jobs, tombstones, requests, skipped));
     }
 

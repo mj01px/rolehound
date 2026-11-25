@@ -79,6 +79,31 @@
   color: var(--faint);
 }
 
+.headingRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.markAll {
+  padding: 6px 8px 8px;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: 500 12px var(--font-sans);
+  cursor: pointer;
+}
+
+.markAll:hover {
+  color: var(--signal-bright);
+}
+
+.markAll:focus-visible {
+  outline: 2px solid var(--signal-bright);
+  outline-offset: 2px;
+}
+
 .empty {
   margin: 0;
   padding: 12px 8px 14px;

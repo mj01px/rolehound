@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
 import { Link, useLocation } from 'react-router'
 import { icons } from '../../app/navIcons'
@@ -9,6 +9,8 @@ const PANEL_WIDTH = 340
 const EDGE = 24
 
 interface Notification {
+  /** Names what it tells; a read one comes back only when that changes. */
+  id: string
   kind: 'model' | 'overdue' | 'sample' | 'highlights' | 'company' | 'collection'
   title: string
   detail: string
@@ -16,8 +18,9 @@ interface Notification {
 }
 
 /**
- * The bell in the top bar. The API works the list out from the current state,
- * so a notification goes away once the person does the thing; nothing to mark as read.
+ * The bell in the top bar. The API works the list out from the current state, so a
+ * notification goes away once the person does the thing, or when they open it or mark
+ * all as read (FR-NOT-08).
  */
 export function NotificationBell() {
   const { pathname, search } = useLocation()
@@ -33,6 +36,16 @@ export function NotificationBell() {
     staleTime: 30 * 1000,
   })
   const { refetch } = notifications
+  const queryClient = useQueryClient()
+
+  // The item leaves the bell at once; the API remembers it was read.
+  const markRead = useMutation({
+    mutationFn: (ids: string[]) => api.post('/notifications/read', { ids }),
+    onMutate: (ids) => {
+      queryClient.setQueryData<Notification[]>(['notifications'], (current) => current?.filter((item) => !ids.includes(item.id)))
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['notifications'] }),
+  })
 
   // Moving around the app is when things get done, so check again.
   useEffect(() => {
@@ -96,14 +109,28 @@ export function NotificationBell() {
       </button>
       {open && (
         <div id={panelId} className={styles.panel} style={place} role="region" aria-label="Notificações">
-          <p className={styles.heading}>Notificações</p>
+          <div className={styles.headingRow}>
+            <p className={styles.heading}>Notificações</p>
+            {items.length > 0 && (
+              <button type="button" className={styles.markAll} onClick={() => markRead.mutate(items.map((item) => item.id).slice(0, 50))} disabled={markRead.isPending}>
+                Marcar todas como lidas
+              </button>
+            )}
+          </div>
           {items.length === 0 ? (
             <p className={styles.empty}>{notifications.isError ? 'Não deu para carregar agora.' : 'Tudo em dia.'}</p>
           ) : (
             <ul className={styles.list}>
               {items.map((item) => (
-                <li key={`${item.kind}-${item.title}`}>
-                  <Link to={item.link} className={styles.item} onClick={() => setOpen(false)}>
+                <li key={item.id}>
+                  <Link
+                    to={item.link}
+                    className={styles.item}
+                    onClick={() => {
+                      markRead.mutate([item.id])
+                      setOpen(false)
+                    }}
+                  >
                     <span className={`${styles.dot} ${styles[item.kind]}`} aria-hidden="true" />
                     <span className={styles.text}>
                       <span className={styles.title}>{item.title}</span>

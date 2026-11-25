@@ -1371,6 +1371,30 @@ namespace Rolehound.Api.Infrastructure.Persistence.Migrations
                     b.ToTable("user_jobs", (string)null);
                 });
 
+            modelBuilder.Entity("Rolehound.Api.Features.Notifications.NotificationRead", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.Property<string>("Key")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("key");
+
+                    b.Property<DateTimeOffset>("ReadAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("read_at");
+
+                    b.HasKey("UserId", "Key")
+                        .HasName("pk_notification_reads");
+
+                    b.HasIndex("ReadAt")
+                        .HasDatabaseName("ix_notification_reads_read_at");
+
+                    b.ToTable("notification_reads", (string)null);
+                });
+
             modelBuilder.Entity("Rolehound.Api.Features.Pitch.PitchVersion", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1842,6 +1866,16 @@ namespace Rolehound.Api.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_user_jobs_users_user_id");
+                });
+
+            modelBuilder.Entity("Rolehound.Api.Features.Notifications.NotificationRead", b =>
+                {
+                    b.HasOne("Rolehound.Api.Features.Accounts.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_notification_reads_users_user_id");
                 });
 
             modelBuilder.Entity("Rolehound.Api.Features.Pitch.PitchVersion", b =>

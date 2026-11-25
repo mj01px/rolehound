@@ -45,8 +45,11 @@ public sealed record JobDetailResponse(
 /// <summary>The company behind a job, when it is one people can follow (InHire, Greenhouse, Lever).</summary>
 public sealed record JobCompany(Guid TargetId, string Name, bool Following);
 
-/// <summary>New jobs from one followed company that match the person's profile.</summary>
-public sealed record FollowedCompanyNews(string Name, string Search, int Count);
+/// <summary>New jobs from one followed company that match the person's profile; <see cref="Latest"/>: when the newest arrived.</summary>
+public sealed record FollowedCompanyNews(Guid TargetId, string Name, string Search, int Count, DateTimeOffset Latest);
+
+/// <summary>New highlights since the last visit and when the newest arrived.</summary>
+public sealed record HighlightNews(int Count, DateTimeOffset? Latest);
 
 public sealed record ArchiveJobRequest(string? Reason, string? Note);
 
@@ -292,17 +295,21 @@ internal static class JobEndpoints
     /// Open highlights that arrived since the person's previous visit (BR-VIS-03), without
     /// recording a visit: a visit not recorded yet counts from the end of the last one.
     /// </summary>
-    internal static async Task<int> NewHighlightsAsync(RolehoundDbContext db, Guid userId, TimeProvider time, CancellationToken ct)
+    internal static async Task<HighlightNews> NewHighlightsAsync(RolehoundDbContext db, Guid userId, TimeProvider time, CancellationToken ct)
     {
         var user = await db.Users.AsNoTracking().SingleAsync(u => u.Id == userId, ct);
         var since = user.LastActivityAt is null || time.GetUtcNow() - user.LastActivityAt > VisitGap ? user.LastActivityAt : user.PreviousVisitEndedAt;
         if (since is null)
         {
-            return 0;
+            return new HighlightNews(0, null);
         }
 
-        return await Open(Listed(Visible(db, userId)))
-            .CountAsync(r => r.User.IsHighlight && (r.Job.OpenedAt > r.User.FirstScoredAt ? r.Job.OpenedAt : r.User.FirstScoredAt) > since, ct);
+        var arrivals = await Open(Listed(Visible(db, userId)))
+            .Where(r => r.User.IsHighlight)
+            .Select(r => r.Job.OpenedAt > r.User.FirstScoredAt ? r.Job.OpenedAt : r.User.FirstScoredAt)
+            .Where(arrived => arrived > since)
+            .ToListAsync(ct);
+        return new HighlightNews(arrivals.Count, arrivals.Count > 0 ? arrivals.Max() : null);
     }
 
     /// <summary>
@@ -322,7 +329,7 @@ internal static class JobEndpoints
         var rows = await Open(Listed(Visible(db, userId)))
             .Where(r => r.User.Score > 0 && r.Job.TargetId != null && followed.Contains(r.Job.TargetId.Value))
             .Where(r => (r.Job.OpenedAt > r.User.FirstScoredAt ? r.Job.OpenedAt : r.User.FirstScoredAt) > since)
-            .Select(r => new { TargetId = r.Job.TargetId!.Value, r.Job.Company })
+            .Select(r => new { TargetId = r.Job.TargetId!.Value, r.Job.Company, Arrived = r.Job.OpenedAt > r.User.FirstScoredAt ? r.Job.OpenedAt : r.User.FirstScoredAt })
             .ToListAsync(ct);
         if (rows.Count == 0)
         {
@@ -334,7 +341,7 @@ internal static class JobEndpoints
         return rows.GroupBy(r => r.TargetId).Select(g =>
         {
             var search = g.GroupBy(r => r.Company).OrderByDescending(c => c.Count()).First().Key;
-            return new FollowedCompanyNews(labels.GetValueOrDefault(g.Key) ?? search, search, g.Count());
+            return new FollowedCompanyNews(g.Key, labels.GetValueOrDefault(g.Key) ?? search, search, g.Count(), g.Max(r => r.Arrived));
         }).OrderByDescending(n => n.Count).ToList();
     }
 

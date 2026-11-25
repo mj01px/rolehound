@@ -74,6 +74,8 @@ public sealed class RolehoundDbContext(DbContextOptions<RolehoundDbContext> opti
 
     public DbSet<CollectionRequest> CollectionRequests => Set<CollectionRequest>();
 
+    public DbSet<Features.Notifications.NotificationRead> NotificationReads => Set<Features.Notifications.NotificationRead>();
+
     public DbSet<SkippedPage> SkippedPages => Set<SkippedPage>();
 
     public DbSet<Features.Companies.CompanyAlert> CompanyAlerts => Set<Features.Companies.CompanyAlert>();

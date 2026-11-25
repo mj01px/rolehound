@@ -1,3 +1,4 @@
+using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
@@ -58,6 +59,25 @@ public sealed class NotificationTests(ApiFactory factory) : ApiTest(factory)
         Assert.StartsWith("A mais antiga: Analista Python", notifications[1].Detail, StringComparison.Ordinal);
         Assert.Equal("/qualidade", notifications[2].Link);
         Assert.Equal("1 destaque novo desde a sua última visita", notifications[3].Title);
+    }
+
+    [Fact]
+    public async Task A_read_notification_leaves_the_bell_until_what_it_tells_changes()
+    {
+        var userId = await OnboardedAsync("ana@exemplo.test");
+        await CollectAsync(FakeJobSource.Job("1", "Desenvolvedor Python Junior"));
+        await ArrangeAsync(userId, db => db.Users.Where(u => u.Id == userId).ExecuteUpdateAsync(s => s.SetProperty(u => u.LastActivityAt, DateTimeOffset.UtcNow.AddHours(-2)), Ct));
+        using var browser = await SignedInAsync("ana@exemplo.test");
+
+        var highlight = Assert.Single(await ListAsync(browser), n => n.Kind == "highlights");
+        Assert.Equal(HttpStatusCode.NoContent, (await browser.PostAsJsonAsync("/notifications/read", new { ids = new[] { highlight.Id } }, Ct)).StatusCode);
+        Assert.DoesNotContain(await ListAsync(browser), n => n.Kind == "highlights");
+
+        // A newer highlight is news again.
+        await ArrangeAsync(userId, db => db.Jobs.ExecuteUpdateAsync(s => s.SetProperty(j => j.OpenedAt, DateTimeOffset.UtcNow.AddMinutes(1)), Ct));
+        Assert.Contains(await ListAsync(browser), n => n.Kind == "highlights");
+
+        Assert.Equal(HttpStatusCode.BadRequest, (await browser.PostAsJsonAsync("/notifications/read", new { ids = Array.Empty<string>() }, Ct)).StatusCode);
     }
 
     [Fact]
