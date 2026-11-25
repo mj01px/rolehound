@@ -8,6 +8,7 @@ import uiStyles from '../../ui/ui.module.css'
 import { onboardingKey, STEPS, type OnboardingStep } from './api'
 import { DossierStep } from './DossierStep'
 import { FinishStep } from './FinishStep'
+import { TermsAccept } from '../legal/TermsAccept'
 import { KeyStep } from './KeyStep'
 import { ModelsStep } from './ModelsStep'
 import styles from './onboarding.module.css'
@@ -68,6 +69,14 @@ export function OnboardingPage() {
         </button>
       </header>
       <main className={styles.main}>
+        {step === 'terms' && (
+          <div className={styles.column}>
+            <div className={styles.titles}>
+              <h1 className={styles.title}>Termos e privacidade</h1>
+            </div>
+            <TermsAccept onDone={next} />
+          </div>
+        )}
         {step === 'key' && <KeyStep onDone={next} />}
         {step === 'models' && <ModelsStep onDone={next} onBack={back} />}
         {step === 'dossier' && <DossierStep onDone={next} onBack={back} />}

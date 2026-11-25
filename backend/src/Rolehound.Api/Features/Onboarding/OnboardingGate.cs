@@ -10,9 +10,9 @@ namespace Rolehound.Api.Features.Onboarding;
 public sealed class AllowBeforeOnboardingAttribute : Attribute;
 
 /// <summary>
-/// FR-ONB-01: until onboarding is finished, the API refuses every endpoint
-/// except onboarding, profile and session ones. Closed by default: an endpoint
-/// is blocked unless it opts in with <see cref="AllowBeforeOnboarding{TBuilder}"/>.
+/// FR-ONB-01: until onboarding is finished and the current terms are accepted, the
+/// API refuses every endpoint except onboarding, profile and session ones. Closed by
+/// default: an endpoint is blocked unless it opts in with <see cref="AllowBeforeOnboarding{TBuilder}"/>.
 /// </summary>
 public static class OnboardingGate
 {
@@ -34,10 +34,16 @@ public static class OnboardingGate
 
             var db = context.RequestServices.GetRequiredService<RolehoundDbContext>();
             var id = Guid.Parse(userId);
-            var finished = await db.Users.AsNoTracking().AnyAsync(u => u.Id == id && u.OnboardingCompletedAt != null, context.RequestAborted);
-            if (!finished)
+            var state = await db.Users.AsNoTracking().Where(u => u.Id == id).Select(u => new { u.OnboardingCompletedAt, u.TermsVersion }).SingleOrDefaultAsync(context.RequestAborted);
+            if (state?.OnboardingCompletedAt is null)
             {
                 await Problems.Forbidden("onboarding_required", "Termine a configuração inicial para usar o rolehound.").ExecuteAsync(context);
+                return;
+            }
+
+            if (state.TermsVersion != Accounts.Profile.Terms.CurrentVersion)
+            {
+                await Problems.Forbidden("terms_required", "Aceite os termos de uso e a política de privacidade para continuar.").ExecuteAsync(context);
                 return;
             }
 

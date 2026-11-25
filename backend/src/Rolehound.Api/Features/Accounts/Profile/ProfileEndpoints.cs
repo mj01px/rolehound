@@ -14,6 +14,7 @@ internal static class ProfileEndpoints
         account.MapPost("/sessions/revoke", AccountSecurity.RevokeSessions);
         account.MapGet("/export", AccountData.Export);
         account.MapGet("/ai-usage", AccountData.Usage);
+        account.MapPost("/terms", Terms.Accept);
 
         // Sensitive actions (FR-ACC-12).
         var sensitive = account.MapGroup(string.Empty).RequireRecentReauthentication();

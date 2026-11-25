@@ -1,0 +1,147 @@
+.page {
+  min-height: 100vh;
+  box-sizing: border-box;
+  padding: 48px 16px 64px;
+  background: var(--bg);
+  color: var(--ink);
+}
+
+.column {
+  max-width: 720px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  align-self: flex-start;
+  color: var(--ink);
+  font: 600 16px var(--font-sans);
+  letter-spacing: -0.03em;
+  text-decoration: none;
+}
+
+.title {
+  margin: 0;
+  font: 600 28px/32px var(--font-sans);
+  letter-spacing: -0.02em;
+}
+
+.version {
+  margin: 4px 0 0;
+  font: 400 13px/18px var(--font-sans);
+  color: var(--muted);
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  font: 400 14px/22px var(--font-sans);
+  color: var(--muted);
+}
+
+.body h2 {
+  margin: 8px 0 0;
+  font: 600 15px/20px var(--font-sans);
+  color: var(--ink);
+}
+
+.body p,
+.body ul {
+  margin: 0;
+}
+
+.body ul {
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.body strong {
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.body a,
+.footer a {
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+  font: 400 13px var(--font-sans);
+  color: var(--faint);
+}
+
+/* Acceptance. */
+.accept {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.acceptText {
+  margin: 0;
+  font: 400 14px/20px var(--font-sans);
+  color: var(--muted);
+}
+
+.acceptLinks {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.acceptLinks li + li {
+  border-top: 1px solid var(--border);
+}
+
+.acceptLinks a {
+  display: block;
+  padding: 12px 16px;
+  color: var(--ink);
+  font: 500 14px var(--font-sans);
+  text-decoration: none;
+}
+
+.acceptLinks a:hover {
+  background: var(--surface);
+}
+
+.acceptLinks a:focus-visible,
+.check input:focus-visible {
+  outline: 2px solid var(--signal-bright);
+  outline-offset: 2px;
+}
+
+.check {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font: 400 14px/20px var(--font-sans);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.check input {
+  width: 18px;
+  height: 18px;
+  margin: 1px 0 0;
+  accent-color: var(--ink);
+}

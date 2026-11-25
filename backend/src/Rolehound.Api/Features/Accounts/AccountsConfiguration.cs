@@ -12,6 +12,7 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(u => u.Name).HasMaxLength(AdminUsers.NameMaxLength);
         builder.Property(u => u.Role).HasConversion<string>().HasMaxLength(16);
         builder.Property(u => u.TwoFactorMethod).HasConversion<string>().HasMaxLength(16);
+        builder.Property(u => u.TermsVersion).HasMaxLength(20);
         builder.Ignore(u => u.HasAccess);
     }
 }

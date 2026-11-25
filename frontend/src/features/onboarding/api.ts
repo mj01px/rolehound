@@ -1,7 +1,7 @@
-export type OnboardingStep = 'key' | 'models' | 'dossier' | 'profile' | 'scoring' | 'done'
+export type OnboardingStep = 'terms' | 'key' | 'models' | 'dossier' | 'profile' | 'scoring' | 'done'
 
-/** The five screens, in order (the password was set with the access link). */
-export const STEPS: Exclude<OnboardingStep, 'done'>[] = ['key', 'models', 'dossier', 'profile', 'scoring']
+/** The six screens, in order (the password was set with the access link). */
+export const STEPS: Exclude<OnboardingStep, 'done'>[] = ['terms', 'key', 'models', 'dossier', 'profile', 'scoring']
 
 export const onboardingKey = ['onboarding'] as const
 

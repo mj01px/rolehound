@@ -19,6 +19,11 @@ export function RequireAuth({ admin = false }: { admin?: boolean }) {
     return <Navigate to="/configuracao-inicial" replace />
   }
 
+  // New terms: the API refuses the app until they are accepted, so ask first.
+  if (me.data.onboarded && !me.data.termsAccepted && pathname !== '/aceite-termos') {
+    return <Navigate to="/aceite-termos" replace />
+  }
+
   if (admin && me.data.role !== 'admin') {
     return <Navigate to="/" replace />
   }

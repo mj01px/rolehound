@@ -23,6 +23,7 @@ public enum SecurityEventType
     AiKeyChanged,
     AiManagementKeyChanged,
     AiManagementKeyRemoved,
+    TermsAccepted,
 }
 
 /// <summary>Security audit trail, kept for 90 days (NFR-SEC-10). The admin reads it as each account's history, without the IP.</summary>

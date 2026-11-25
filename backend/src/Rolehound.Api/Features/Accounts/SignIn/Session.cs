@@ -5,7 +5,7 @@ using Rolehound.Api.Infrastructure.Http;
 
 namespace Rolehound.Api.Features.Accounts.SignIn;
 
-public sealed record MeResponse(Guid Id, string Email, string Username, string Role, string TwoFactorMethod, bool Onboarded);
+public sealed record MeResponse(Guid Id, string Email, string Username, string Role, string TwoFactorMethod, bool Onboarded, bool TermsAccepted = false, string TermsVersion = Profile.Terms.CurrentVersion);
 
 /// <summary>GET /auth/me and POST /auth/logout.</summary>
 internal static class Session
@@ -24,7 +24,8 @@ internal static class Session
             user.UserName!,
             user.Role.ToString().ToLowerInvariant(),
             Login.MethodName(user.TwoFactorMethod),
-            user.OnboardingCompletedAt is not null));
+            user.OnboardingCompletedAt is not null,
+            Profile.Terms.Accepted(user)));
     }
 
     public static async Task<NoContent> Logout(SignInManager<User> signIn)

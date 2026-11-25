@@ -35,6 +35,12 @@ internal static class OnboardingEndpoints
             return "done";
         }
 
+        // The terms come first: nothing of the person is stored before they are accepted.
+        if (!await db.Users.AsNoTracking().AnyAsync(u => u.Id == userId && u.TermsVersion == Accounts.Profile.Terms.CurrentVersion, ct))
+        {
+            return "terms";
+        }
+
         var ai = await db.AiSettings.AsNoTracking().SingleOrDefaultAsync(s => s.UserId == userId, ct);
         if (ai is not { HasKey: true })
         {

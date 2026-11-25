@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { Link } from 'react-router'
 import { Logo } from '../../ui/Logo'
 import styles from './auth.module.css'
 
@@ -27,6 +28,8 @@ export function AuthLayout({ title, subtitle, children }: AuthLayoutProps) {
       <footer className={styles.footer}>
         <span>rolehound</span>
         <span>Acesso só por convite</span>
+        <Link to="/termos">Termos</Link>
+        <Link to="/privacidade">Privacidade</Link>
       </footer>
     </div>
   )

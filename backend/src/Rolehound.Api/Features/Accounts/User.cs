@@ -41,6 +41,11 @@ public sealed class User : IdentityUser<Guid>
 
     public DateTimeOffset? LastLoginAt { get; set; }
 
+    /// <summary>The terms version the person accepted (<see cref="Profile.Terms.CurrentVersion"/>), and when.</summary>
+    public string? TermsVersion { get; set; }
+
+    public DateTimeOffset? TermsAcceptedAt { get; set; }
+
     /// <summary>Set when the person finishes onboarding (FR-ONB-01).</summary>
     public DateTimeOffset? OnboardingCompletedAt { get; set; }
 

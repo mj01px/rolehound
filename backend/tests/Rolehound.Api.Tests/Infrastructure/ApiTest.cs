@@ -59,7 +59,7 @@ public abstract class ApiTest(ApiFactory factory) : IAsyncLifetime
     }
 
     /// <summary>Creates an account directly in the database, optionally with a password already set.</summary>
-    protected async Task<User> CreateUserAsync(string email, UserRole role = UserRole.User, string? password = StrongPassword, bool onboarded = true)
+    protected async Task<User> CreateUserAsync(string email, UserRole role = UserRole.User, string? password = StrongPassword, bool onboarded = true, bool acceptedTerms = true)
     {
         await using var scope = Factory.Services.CreateAsyncScope();
         var users = scope.ServiceProvider.GetRequiredService<UserManager<User>>();
@@ -71,6 +71,8 @@ public abstract class ApiTest(ApiFactory factory) : IAsyncLifetime
             CreatedAt = DateTimeOffset.UtcNow,
             EmailConfirmed = true,
             OnboardingCompletedAt = onboarded ? DateTimeOffset.UtcNow : null,
+            TermsVersion = acceptedTerms ? Rolehound.Api.Features.Accounts.Profile.Terms.CurrentVersion : null,
+            TermsAcceptedAt = acceptedTerms ? DateTimeOffset.UtcNow : null,
         };
 
         var result = password is null ? await users.CreateAsync(user) : await users.CreateAsync(user, password);

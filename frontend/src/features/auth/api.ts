@@ -10,6 +10,10 @@ export interface Me {
   role: 'user' | 'admin'
   twoFactorMethod: TwoFactorMethod
   onboarded: boolean
+  /** Accepted the current terms of use and privacy policy. */
+  termsAccepted: boolean
+  /** The current version, sent back when accepting. */
+  termsVersion: string
 }
 
 export interface LoginResponse {
