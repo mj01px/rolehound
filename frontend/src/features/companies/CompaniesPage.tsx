@@ -1,4 +1,5 @@
 import { useMemo, useState, type FormEvent } from 'react'
+import { Link } from 'react-router'
 import { ApiError, errorMessage } from '../../lib/api'
 import { Alert, Notice } from '../../ui/Alert'
 import { Button } from '../../ui/Button'
@@ -100,7 +101,9 @@ function CompanyRow({ company }: { company: Company }) {
   return (
     <li className={styles.row}>
       <div className={styles.rowText}>
-        <span className={styles.name}>{company.name}</span>
+        <Link to={`/empresas/${company.id}`} className={`${styles.name} ${styles.nameLink}`}>
+          {company.name}
+        </Link>
         <span className={styles.meta}>
           {meta.join(' · ')}
           {company.paused && <span className={styles.paused}> · coleta pausada</span>}

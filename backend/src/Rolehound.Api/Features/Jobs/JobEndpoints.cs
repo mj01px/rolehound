@@ -160,7 +160,8 @@ internal static class JobEndpoints
     {
         var userId = principal.GetUserId();
         var since = await TouchVisitAsync(db, userId, time, ct);
-        var row = await Visible(db, userId).AsNoTracking().SingleOrDefaultAsync(r => r.Job.Id == id, ct);
+        var row = await Visible(db, userId).AsNoTracking().SingleOrDefaultAsync(r => r.Job.Id == id, ct)
+            ?? await FromCompanyPages(db, userId).AsNoTracking().SingleOrDefaultAsync(r => r.Job.Id == id, ct);
         if (row is null)
         {
             return Problems.NotFound("Vaga não encontrada.");
@@ -264,6 +265,20 @@ internal static class JobEndpoints
         db.UserJobs
             .Where(u => u.UserId == userId && (u.IsRelevant || u.AddedByUser || db.Applications.Any(a => a.UserId == userId && a.JobId == u.JobId)))
             .Join(db.Jobs, u => u.JobId, j => j.Id, (u, j) => new Row { Job = j, User = u, InFunnel = db.Applications.Any(a => a.UserId == userId && a.JobId == j.Id) });
+
+    /// <summary>
+    /// Any job a company page lists, even outside the person's profile: the company page shows them
+    /// all, so each one opens. Only the detail uses this; the lists stay what matches the person.
+    /// </summary>
+    private static IQueryable<Row> FromCompanyPages(RolehoundDbContext db, Guid userId) =>
+        db.UserJobs
+            .Where(u => u.UserId == userId)
+            .Join(db.Jobs.Where(j => db.SourceTargets.Any(t => t.Id == j.TargetId && t.Kind == TargetKind.Company)), u => u.JobId, j => j.Id, (u, j) => new Row
+            {
+                Job = j,
+                User = u,
+                InFunnel = db.Applications.Any(a => a.UserId == userId && a.JobId == j.Id),
+            });
 
     /// <summary>The list views leave out jobs in the person's funnel (BR-VIS-02, BR-FUN-03).</summary>
     private static IQueryable<Row> Listed(IQueryable<Row> rows) => rows.Where(r => !r.InFunnel);
@@ -379,6 +394,6 @@ internal static class JobEndpoints
 
     private static string Lower(string value) => value.ToLowerInvariant();
 
-    private static string EscapeLike(string value) =>
+    internal static string EscapeLike(string value) =>
         value.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("%", "\\%", StringComparison.Ordinal).Replace("_", "\\_", StringComparison.Ordinal);
 }

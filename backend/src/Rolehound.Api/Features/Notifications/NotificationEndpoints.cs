@@ -157,7 +157,7 @@ internal static class NotificationEndpoints
                 "company",
                 $"{news.Name}: {(news.Count == 1 ? "1 vaga nova" : $"{news.Count} vagas novas")} para você",
                 "Da empresa que você segue, combinando com o seu perfil, desde a sua última visita.",
-                $"/?busca={Uri.EscapeDataString(news.Search)}"));
+                $"/empresas/{news.TargetId}"));
         }
 
         var ids = result.Select(n => n.Id).ToList();

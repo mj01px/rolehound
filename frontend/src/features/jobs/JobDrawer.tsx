@@ -27,13 +27,14 @@ const tools: { value: Tool; label: string }[] = [
  */
 export function JobDrawer() {
   const { id = '' } = useParams()
-  const { search } = useLocation()
+  const { pathname, search } = useLocation()
   const navigate = useNavigate()
   const heading = useRef<HTMLHeadingElement>(null)
   // The job whose panel is sliding out; the address changes once the slide ends.
   const [closingId, setClosingId] = useState<string | null>(null)
   const closing = closingId === id
-  const leave = useCallback(() => navigate({ pathname: '/', search }), [navigate, search])
+  // Back to the list the panel opened over: the jobs list, or a company page.
+  const leave = useCallback(() => navigate({ pathname: pathname.replace(/\/?vagas\/[^/]+$/, '') || '/', search }), [navigate, pathname, search])
   const close = useCallback(() => {
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) leave()
     else setClosingId(id)

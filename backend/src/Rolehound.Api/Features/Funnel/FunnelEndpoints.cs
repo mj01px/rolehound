@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
+using Rolehound.Connectors;
 using Rolehound.Api.Features.Jobs;
 using Rolehound.Api.Infrastructure.Http;
 using Rolehound.Api.Infrastructure.Persistence;
@@ -94,7 +95,9 @@ internal static class FunnelEndpoints
         var userId = principal.GetUserId();
         var userJob = await db.UserJobs.SingleOrDefaultAsync(u => u.UserId == userId && u.JobId == jobId, ct);
         var job = await db.Jobs.AsNoTracking().SingleOrDefaultAsync(j => j.Id == jobId, ct);
-        if (userJob is null || job is null || !(userJob.IsRelevant || userJob.AddedByUser))
+        // A company page lists every job, so any of them can go to the funnel, even outside the profile.
+        var fromCompanyPage = job?.TargetId is { } targetId && await db.SourceTargets.AnyAsync(t => t.Id == targetId && t.Kind == TargetKind.Company, ct);
+        if (userJob is null || job is null || !(userJob.IsRelevant || userJob.AddedByUser || fromCompanyPage))
         {
             return Problems.NotFound("Vaga não encontrada.");
         }

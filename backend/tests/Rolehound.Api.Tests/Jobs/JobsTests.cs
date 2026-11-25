@@ -98,14 +98,18 @@ public sealed class JobsTests(ApiFactory factory) : ApiTest(factory)
     }
 
     [Fact]
-    public async Task A_job_someone_cannot_see_is_not_found()
+    public async Task A_search_job_outside_the_profile_is_not_found()
     {
         await OnboardedAsync("ana@exemplo.test");
         await CollectAsync(FakeJobSource.Job("3", "Recepcionista"));
         Guid id;
         await using (var scope = Factory.Services.CreateAsyncScope())
         {
-            id = await scope.ServiceProvider.GetRequiredService<RolehoundDbContext>().Jobs.Select(j => j.Id).SingleAsync(Ct);
+            var db = scope.ServiceProvider.GetRequiredService<RolehoundDbContext>();
+            id = await db.Jobs.Select(j => j.Id).SingleAsync(Ct);
+
+            // Company pages show every job; a general search only shows what matches.
+            await db.SourceTargets.ExecuteUpdateAsync(s => s.SetProperty(t => t.Kind, TargetKind.Search), Ct);
         }
 
         using var browser = await SignedInAsync("ana@exemplo.test");

@@ -15,6 +15,17 @@ public sealed record CompanyResponse(Guid Id, string Name, string Source, string
 
 public sealed record FollowLinkRequest(string? Url);
 
+/// <summary>
+/// One open job of a company page. <paramref name="Score"/> is set only when the job matches the
+/// person's profile; <paramref name="ForYou"/> uses the same rule as the companies list.
+/// </summary>
+public sealed record CompanyJob(Guid Id, string Title, string Location, string WorkMode, DateTimeOffset OpenedAt, int? Score, bool Highlight, bool ForYou, bool InFunnel);
+
+public sealed record CompanyJobsPage(IReadOnlyList<CompanyJob> Items, int Total, int Page, int PerPage);
+
+/// <summary>A place where a company has open jobs, as the source writes it, and how many.</summary>
+public sealed record CompanyCity(string Name, int Jobs);
+
 /// <summary><see cref="Added"/>: the company was new to Rolehound; <see cref="Listed"/>: open jobs it has now.</summary>
 /// <summary><see cref="Reading"/>: a new company is being read in the background; the person hears when it ends.</summary>
 public sealed record FollowLinkResponse(CompanyResponse Company, bool Added, bool AlreadyFollowing, int Listed, bool Reading);
@@ -36,6 +47,9 @@ internal static class CompanyEndpoints
     {
         var companies = endpoints.MapGroup("/companies").WithTags("Companies");
         companies.MapGet(string.Empty, List);
+        companies.MapGet("/{id:guid}", One);
+        companies.MapGet("/{id:guid}/jobs", Jobs);
+        companies.MapGet("/{id:guid}/cities", Cities);
         companies.MapPost("/follow-link", FollowLink);
         companies.MapPut("/{id:guid}/alert", Follow);
         companies.MapDelete("/{id:guid}/alert", Unfollow);
@@ -220,6 +234,105 @@ internal static class CompanyEndpoints
         _ => Problems.Problem(StatusCodes.Status422UnprocessableEntity, "company_not_found",
             "Não achamos página de vagas nesse endereço. Confira o link."),
     };
+
+    public const int JobsPerPage = 20;
+    public const int MaxSearchLength = 100;
+
+    private static async Task<Results<Ok<CompanyResponse>, ProblemHttpResult>> One(Guid id, ClaimsPrincipal principal, RolehoundDbContext db, CancellationToken ct)
+    {
+        var target = await db.SourceTargets.AsNoTracking().Where(IsCompany).SingleOrDefaultAsync(t => t.Id == id, ct);
+        if (target is null)
+        {
+            return Problems.NotFound("Empresa não encontrada.");
+        }
+
+        return TypedResults.Ok((await DescribeAsync(db, principal.GetUserId(), [target], ct))[0]);
+    }
+
+    /// <summary>
+    /// Every open job of a company, not only the ones that match the person: those come first,
+    /// by score, then the rest by arrival. Paged on the server; a company may list hundreds.
+    /// </summary>
+    private static async Task<Results<Ok<CompanyJobsPage>, ProblemHttpResult>> Jobs(
+        Guid id, ClaimsPrincipal principal, RolehoundDbContext db, string? search, string? city, int? page, CancellationToken ct)
+    {
+        if (!await db.SourceTargets.Where(IsCompany).AnyAsync(t => t.Id == id, ct))
+        {
+            return Problems.NotFound("Empresa não encontrada.");
+        }
+
+        var userId = principal.GetUserId();
+        var jobs = db.Jobs.AsNoTracking().Where(j => j.TargetId == id && j.Status == SourceStatus.Active);
+        var words = search?.Trim();
+        if (!string.IsNullOrEmpty(words))
+        {
+            var pattern = $"%{JobEndpoints.EscapeLike(words.Length > MaxSearchLength ? words[..MaxSearchLength] : words)}%";
+            jobs = jobs.Where(j => EF.Functions.ILike(j.Title, pattern, "\\"));
+        }
+
+        // The city filter takes a place exactly as the cities list gave it.
+        if (!string.IsNullOrEmpty(city))
+        {
+            jobs = jobs.Where(j => j.Location == city);
+        }
+
+        var rows = jobs.Select(j => new
+        {
+            Job = j,
+            User = db.UserJobs.FirstOrDefault(u => u.UserId == userId && u.JobId == j.Id),
+            InFunnel = db.Applications.Any(a => a.UserId == userId && a.JobId == j.Id),
+        });
+        var total = await rows.CountAsync(ct);
+        var current = Math.Max(1, page ?? 1);
+        var found = await rows
+            .OrderByDescending(r => r.User != null && r.User.IsRelevant && r.User.Score > 0 && r.User.ArchivedAt == null)
+            .ThenByDescending(r => r.User != null && r.User.IsRelevant ? r.User.Score : int.MinValue)
+            .ThenByDescending(r => r.Job.OpenedAt)
+            .ThenBy(r => r.Job.Id)
+            .Skip((current - 1) * JobsPerPage)
+            .Take(JobsPerPage)
+            .Select(r => new
+            {
+                r.Job.Id,
+                r.Job.Title,
+                r.Job.Location,
+                r.Job.WorkMode,
+                r.Job.OpenedAt,
+                Relevant = r.User != null && r.User.IsRelevant,
+                Score = r.User != null ? r.User.Score : 0,
+                Highlight = r.User != null && r.User.IsHighlight,
+                Archived = r.User != null && r.User.ArchivedAt != null,
+                r.InFunnel,
+            })
+            .ToListAsync(ct);
+        var items = found.Select(r => new CompanyJob(
+            r.Id,
+            r.Title,
+            r.Location,
+            r.WorkMode.ToString().ToLowerInvariant(),
+            r.OpenedAt,
+            r.Relevant ? r.Score : null,
+            r.Relevant && r.Highlight,
+            r.Relevant && r.Score > 0 && !r.Archived,
+            r.InFunnel)).ToList();
+        return TypedResults.Ok(new CompanyJobsPage(items, total, current, JobsPerPage));
+    }
+
+    /// <summary>Every place the company has open jobs in, most jobs first, for the city filter.</summary>
+    private static async Task<Results<Ok<List<CompanyCity>>, ProblemHttpResult>> Cities(Guid id, RolehoundDbContext db, CancellationToken ct)
+    {
+        if (!await db.SourceTargets.Where(IsCompany).AnyAsync(t => t.Id == id, ct))
+        {
+            return Problems.NotFound("Empresa não encontrada.");
+        }
+
+        var cities = await db.Jobs.AsNoTracking()
+            .Where(j => j.TargetId == id && j.Status == SourceStatus.Active && j.Location != string.Empty)
+            .GroupBy(j => j.Location)
+            .Select(g => new CompanyCity(g.Key, g.Count()))
+            .ToListAsync(ct);
+        return TypedResults.Ok(cities.OrderByDescending(c => c.Jobs).ThenBy(c => c.Name, StringComparer.Create(System.Globalization.CultureInfo.GetCultureInfo("pt-BR"), true)).ToList());
+    }
 
     private static async Task<List<CompanyResponse>> DescribeAsync(RolehoundDbContext db, Guid userId, IReadOnlyCollection<SourceTarget> targets, CancellationToken ct)
     {

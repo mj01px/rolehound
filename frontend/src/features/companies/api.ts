@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '../../lib/api'
 
 /** A company Rolehound reads jobs from, as the signed-in person sees it. */
@@ -70,4 +70,46 @@ export function followMessage(result: FollowLinkResult) {
   if (listed === 0) return `Você está seguindo a ${company.name}. Ela não tem vagas abertas agora; você é avisado quando abrir.`
   const reading = result.reading ? ' Já estamos lendo as vagas; você recebe uma notificação quando terminar.' : ''
   return `Você está seguindo a ${company.name}, que tem ${listed === 1 ? '1 vaga aberta' : `${listed} vagas abertas`}.${reading}`
+}
+
+/** One open job of a company page; `score` only when it matches the person's profile. */
+export interface CompanyJob {
+  id: string
+  title: string
+  location: string
+  workMode: string
+  openedAt: string
+  score: number | null
+  highlight: boolean
+  forYou: boolean
+  inFunnel: boolean
+}
+
+export interface CompanyJobsPage {
+  items: CompanyJob[]
+  total: number
+  page: number
+  perPage: number
+}
+
+export function useCompany(id: string) {
+  return useQuery({ queryKey: ['companies', id], queryFn: ({ signal }) => api.get<Company>(`/companies/${id}`, signal) })
+}
+
+/** A place where a company has open jobs, as the source writes it, and how many. */
+export interface CompanyCity {
+  name: string
+  jobs: number
+}
+
+export function useCompanyCities(id: string) {
+  return useQuery({ queryKey: ['companies', id, 'cities'], queryFn: ({ signal }) => api.get<CompanyCity[]>(`/companies/${id}/cities`, signal) })
+}
+
+export function useCompanyJobs(id: string, search: string, city: string, page: number) {
+  return useQuery({
+    queryKey: ['companies', id, 'jobs', search, city, page],
+    queryFn: ({ signal }) => api.get<CompanyJobsPage>(`/companies/${id}/jobs?${new URLSearchParams({ search, city, page: String(page) })}`, signal),
+    placeholderData: keepPreviousData,
+  })
 }

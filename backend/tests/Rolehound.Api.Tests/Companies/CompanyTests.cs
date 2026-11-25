@@ -197,13 +197,47 @@ public sealed class CompanyTests(ApiFactory factory) : ApiTest(factory)
         var notifications = (await browser.GetFromJsonAsync<List<Notification>>("/notifications", Ct))!;
         var news = Assert.Single(notifications, n => n.Kind == "company");
         Assert.Equal("Exemplo SA: 2 vagas novas para você", news.Title);
-        Assert.Equal("/?busca=Exemplo%20SA", news.Link);
+        Assert.Equal($"/empresas/{company}", news.Link);
 
         await using var scope = Factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<RolehoundDbContext>();
         var jobId = await db.Jobs.Where(j => j.Title == "Analista Python").Select(j => j.Id).SingleAsync(Ct);
         var detail = await ReadAsync<JobDetailResponse>(await browser.GetAsync(new Uri($"/jobs/{jobId}", UriKind.Relative), Ct));
         Assert.Equal(new JobCompany(company, "Exemplo SA", true), detail.Company);
+    }
+
+    [Fact]
+    public async Task A_company_page_lists_every_open_job_matching_ones_first_and_each_one_opens()
+    {
+        await OnboardedAsync("ana@exemplo.test");
+        var company = await AddTargetAsync(JobSource.Greenhouse, "exemplo", "Exemplo SA");
+        await CollectAsync(FakeJobSource.Job("1", "Contador") with { Location = "Porto Alegre, RS" }, FakeJobSource.Job("2", "Desenvolvedor Python Junior"), FakeJobSource.Job("3", "Auxiliar administrativo"));
+        using var browser = await SignedInAsync("ana@exemplo.test");
+
+        var one = await ReadAsync<CompanyResponse>(await browser.GetAsync(new Uri($"/companies/{company}", UriKind.Relative), Ct));
+        Assert.Equal(("Exemplo SA", 3, 1), (one.Name, one.OpenJobs, one.ForYou));
+
+        var page = await ReadAsync<CompanyJobsPage>(await browser.GetAsync(new Uri($"/companies/{company}/jobs", UriKind.Relative), Ct));
+        Assert.Equal(3, page.Total);
+        Assert.Equal("Desenvolvedor Python Junior", page.Items[0].Title);
+        Assert.True(page.Items[0].ForYou);
+        Assert.NotNull(page.Items[0].Score);
+        Assert.All(page.Items.Skip(1), job => Assert.Null(job.Score));
+
+        var search = await ReadAsync<CompanyJobsPage>(await browser.GetAsync(new Uri($"/companies/{company}/jobs?search=contad", UriKind.Relative), Ct));
+        Assert.Equal("Contador", Assert.Single(search.Items).Title);
+
+        var cities = await ReadAsync<List<CompanyCity>>(await browser.GetAsync(new Uri($"/companies/{company}/cities", UriKind.Relative), Ct));
+        Assert.Equal([new CompanyCity("São Paulo, SP", 2), new CompanyCity("Porto Alegre, RS", 1)], cities);
+        var inCity = await ReadAsync<CompanyJobsPage>(await browser.GetAsync(new Uri($"/companies/{company}/jobs?city={Uri.EscapeDataString("Porto Alegre, RS")}", UriKind.Relative), Ct));
+        Assert.Equal("Contador", Assert.Single(inCity.Items).Title);
+
+        // A job outside the profile still opens and can go to the funnel.
+        var outside = page.Items.Single(j => j.Title == "Contador").Id;
+        Assert.Equal(HttpStatusCode.OK, (await browser.GetAsync(new Uri($"/jobs/{outside}", UriKind.Relative), Ct)).StatusCode);
+        Assert.Equal(HttpStatusCode.Created, (await browser.PostAsJsonAsync($"/jobs/{outside}/application", new { }, Ct)).StatusCode);
+
+        Assert.Equal(HttpStatusCode.NotFound, (await browser.GetAsync(new Uri($"/companies/{Guid.NewGuid()}/jobs", UriKind.Relative), Ct)).StatusCode);
     }
 
     private static async Task<Notification> WaitForAsync(HttpClient browser, string kind)

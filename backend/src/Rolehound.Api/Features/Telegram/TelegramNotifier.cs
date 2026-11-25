@@ -91,7 +91,7 @@ public sealed class TelegramNotifier(RolehoundDbContext db, TelegramClient teleg
                 .Select(g =>
                 {
                     var search = g.GroupBy(r => r.Company).OrderByDescending(c => c.Count()).First().Key;
-                    return (Name: labels.GetValueOrDefault(g.Key) ?? search, Search: search, Count: g.Count());
+                    return (Name: labels.GetValueOrDefault(g.Key) ?? search, TargetId: g.Key, Count: g.Count());
                 })
                 .OrderByDescending(c => c.Count)
                 .ToList();
@@ -101,7 +101,7 @@ public sealed class TelegramNotifier(RolehoundDbContext db, TelegramClient teleg
             foreach (var company in companies.Take(MaxJobsPerMessage))
             {
                 text.Append(Br, $"\n<b>{TelegramEndpoints.Html(company.Name)}</b>: {(company.Count == 1 ? "1 vaga nova" : $"{company.Count} vagas novas")} para você");
-                buttons.Add([new TelegramButton($"Ver {Short(company.Name)}", Url: $"{BaseUrl}/?busca={Uri.EscapeDataString(company.Search)}")]);
+                buttons.Add([new TelegramButton($"Ver {Short(company.Name)}", Url: $"{BaseUrl}/empresas/{company.TargetId}")]);
             }
 
             await telegram.SendAsync(link.ChatId, text.ToString(), buttons, ct);
