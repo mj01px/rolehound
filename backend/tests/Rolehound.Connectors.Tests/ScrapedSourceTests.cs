@@ -108,7 +108,7 @@ public sealed class ScrapedSourceTests
     }
 
     /// <summary>Answers by the first route whose text the URL contains.</summary>
-    private sealed class Routes : HttpMessageHandler
+    internal sealed class Routes : HttpMessageHandler
     {
         private readonly List<(string Match, Func<(HttpStatusCode, string)> Answer)> _routes = [];
 

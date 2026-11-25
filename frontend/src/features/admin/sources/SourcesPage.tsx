@@ -9,13 +9,15 @@ import { kindLabels, kinds, plural, useCollections, useConnectorRequests, useRem
 import { AddSourceDialog } from './AddSourceDialog'
 import styles from './sources.module.css'
 
-const nameColumn: Record<SourceKind, string> = { inhire: 'Empresa', gupy: 'Termo', github: 'Repositório', greenhouse: 'Empresa', lever: 'Empresa' }
+const nameColumn: Record<SourceKind, string> = { inhire: 'Empresa', gupy: 'Termo', github: 'Repositório', greenhouse: 'Empresa', lever: 'Empresa', workday: 'Empresa', careersite: 'Site' }
 const searchHint: Record<SourceKind, string> = {
   inhire: 'Buscar empresa',
   gupy: 'Buscar termo',
   github: 'Buscar repositório',
   greenhouse: 'Buscar empresa',
   lever: 'Buscar empresa',
+  workday: 'Buscar empresa',
+  careersite: 'Buscar site',
 }
 
 const normalize = (text: string) => text.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase()

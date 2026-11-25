@@ -57,7 +57,7 @@ export function useFollowLink() {
   })
 }
 
-export const sourceNames: Record<string, string> = { inhire: 'InHire', greenhouse: 'Greenhouse', lever: 'Lever' }
+export const sourceNames: Record<string, string> = { inhire: 'InHire', greenhouse: 'Greenhouse', lever: 'Lever', workday: 'Workday', careersite: 'Site de carreiras' }
 
 /** What happened after following by link, in one sentence. */
 export function followMessage(result: FollowLinkResult) {

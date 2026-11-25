@@ -4,6 +4,8 @@ export const sourceLabels: Record<string, string> = {
   github: 'GitHub',
   inhire: 'InHire',
   gupy: 'Gupy',
+  workday: 'Workday',
+  careersite: 'Site de carreiras',
   emailalert: 'Alerta por e-mail',
   link: 'Link',
 }

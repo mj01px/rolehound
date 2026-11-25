@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '../../../lib/api'
 
-export type SourceKind = 'inhire' | 'gupy' | 'github' | 'greenhouse' | 'lever'
+export type SourceKind = 'inhire' | 'gupy' | 'github' | 'greenhouse' | 'lever' | 'workday' | 'careersite'
 
 export interface SourceTarget {
   id: string
@@ -135,9 +135,11 @@ export const kindLabels: Record<SourceKind, string> = {
   github: 'GitHub',
   greenhouse: 'Greenhouse',
   lever: 'Lever',
+  workday: 'Workday',
+  careersite: 'Sites de carreira',
 }
 
-export const kinds: SourceKind[] = ['inhire', 'gupy', 'github', 'greenhouse', 'lever']
+export const kinds: SourceKind[] = ['inhire', 'gupy', 'github', 'greenhouse', 'lever', 'workday', 'careersite']
 
 const time = (date: Date) => date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
 

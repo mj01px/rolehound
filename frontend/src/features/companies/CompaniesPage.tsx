@@ -120,7 +120,7 @@ function FollowByLink({ intro, onClose }: { intro: string; onClose?: (() => void
       <div className={styles.linkHead}>
         <div className={styles.linkHeading}>
           <span className={styles.linkTitle}>{intro}</span>
-          <span className={styles.linkHint}>Cole o link da página de vagas da empresa, ou o de uma vaga dela. Por enquanto o Rolehound lê InHire, Greenhouse e Lever.</span>
+          <span className={styles.linkHint}>Cole o link da página de vagas da empresa, ou o de uma vaga dela. O Rolehound lê InHire, Greenhouse, Lever e Workday, e sites de carreira que publicam as vagas para o Google.</span>
         </div>
         {onClose && (
           <button type="button" className={styles.close} aria-label="Fechar" onClick={onClose}>

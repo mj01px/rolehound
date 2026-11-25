@@ -28,7 +28,7 @@ public sealed record ConnectorRequestSummary(string Platform, int Requests, int 
 internal static class CompanyEndpoints
 {
     /// <summary>Sources whose targets are companies.</summary>
-    public static readonly JobSource[] Kinds = [JobSource.InHire, JobSource.Greenhouse, JobSource.Lever];
+    public static readonly JobSource[] Kinds = [JobSource.InHire, JobSource.Greenhouse, JobSource.Lever, JobSource.Workday, JobSource.CareerSite];
 
     public static readonly TimeSpan ProbeTimeout = TimeSpan.FromSeconds(25);
 
@@ -86,6 +86,7 @@ internal static class CompanyEndpoints
         RolehoundDbContext db,
         IEnumerable<ICompanyLinkReader> readers,
         IEnumerable<IJobConnector> connectors,
+        IEnumerable<ITargetProber> probers,
         CompanyLinkLimiter limiter,
         TimeProvider time,
         CancellationToken ct)
@@ -104,18 +105,24 @@ internal static class CompanyEndpoints
         }
 
         var found = readers.Select(r => (r.Source, Key: r.CompanyOf(url))).FirstOrDefault(r => r.Key is not null);
+        if (found.Key is null && CompanyLinks.UnsupportedPlatform(host) is { } platform)
+        {
+            db.ConnectorRequests.Add(new ConnectorRequest { Platform = platform, Host = host.Length > 255 ? host[..255] : host, UserId = userId, RequestedAt = time.GetUtcNow() });
+            await db.SaveChangesAsync(ct);
+            return Problems.Problem(StatusCodes.Status422UnprocessableEntity, "platform_unsupported",
+                $"Essa empresa usa o {platform}, que o Rolehound ainda não lê. O pedido ficou anotado para o admin.");
+        }
+
+        // Any other public careers site: read through the pages it publishes for search engines.
+        if (found.Key is null && CareerSiteConnector.HostOf(url) is { } careersHost && connectors.Any(c => c.Source == JobSource.CareerSite))
+        {
+            found = (JobSource.CareerSite, careersHost);
+        }
+
         if (found.Key is null)
         {
-            if (CompanyLinks.UnsupportedPlatform(host) is { } platform)
-            {
-                db.ConnectorRequests.Add(new ConnectorRequest { Platform = platform, Host = host.Length > 255 ? host[..255] : host, UserId = userId, RequestedAt = time.GetUtcNow() });
-                await db.SaveChangesAsync(ct);
-                return Problems.Problem(StatusCodes.Status422UnprocessableEntity, "platform_unsupported",
-                    $"Essa empresa usa o {platform}, que o Rolehound ainda não lê. O pedido ficou anotado para o admin.");
-            }
-
             return Problems.Problem(StatusCodes.Status422UnprocessableEntity, "site_unknown",
-                "Não reconhecemos esse site. Abra uma vaga da empresa e cole o link dela: se a empresa usa InHire, Greenhouse ou Lever, o link da vaga mostra isso.");
+                "Não reconhecemos esse site. Cole o link da página de vagas da empresa, começando com https://.");
         }
 
         var (source, key) = (found.Source, found.Key);
@@ -139,12 +146,14 @@ internal static class CompanyEndpoints
                 return Problems.Problem(StatusCodes.Status422UnprocessableEntity, "site_unknown", "Não reconhecemos esse site.");
             }
 
-            Snapshot snapshot;
+            SourceProbe probe;
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
             timeout.CancelAfter(ProbeTimeout);
             try
             {
-                snapshot = await connector.FetchAsync(key, EveryId.Instance, timeout.Token);
+                probe = probers.FirstOrDefault(p => p.Source == source) is { } prober
+                    ? await prober.ProbeAsync(key, timeout.Token)
+                    : ProbeOf(await connector.FetchAsync(key, EveryId.Instance, timeout.Token));
             }
             catch (ConnectorException ex)
             {
@@ -155,8 +164,7 @@ internal static class CompanyEndpoints
                 return ProbeFailed("source_unreachable");
             }
 
-            var name = snapshot.Jobs.Select(j => j.Company?.Trim()).Where(c => !string.IsNullOrEmpty(c))
-                .GroupBy(c => c).OrderByDescending(g => g.Count()).Select(g => g.Key).FirstOrDefault();
+            var name = probe.Company;
             target = new SourceTarget
             {
                 Source = source,
@@ -167,7 +175,7 @@ internal static class CompanyEndpoints
             };
             db.SourceTargets.Add(target);
             added = true;
-            listed = snapshot.Jobs.Count;
+            listed = probe.Jobs;
         }
 
         var already = !added && await db.CompanyAlerts.AnyAsync(a => a.UserId == userId && a.TargetId == target.Id, ct);
@@ -181,8 +189,18 @@ internal static class CompanyEndpoints
         return TypedResults.Ok(new FollowLinkResponse(company, added, already, added ? listed : company.OpenJobs));
     }
 
+    /// <summary>A probe made from a full read: the job count and the most common company name.</summary>
+    private static SourceProbe ProbeOf(Snapshot snapshot) => new(
+        snapshot.Jobs.Count,
+        snapshot.Jobs.Select(j => j.Company?.Trim()).Where(c => !string.IsNullOrEmpty(c))
+            .GroupBy(c => c).OrderByDescending(g => g.Count()).Select(g => g.Key).FirstOrDefault());
+
     private static ProblemHttpResult ProbeFailed(string code) => code switch
     {
+        "no_job_listing" => Problems.Problem(StatusCodes.Status422UnprocessableEntity, "site_unreadable",
+            "Esse site não publica a lista de vagas (o sitemap) que o Rolehound precisa para acompanhar a empresa."),
+        "no_job_postings" => Problems.Problem(StatusCodes.Status422UnprocessableEntity, "site_unreadable",
+            "As páginas desse site não publicam as vagas no formato que o Rolehound lê (o mesmo que o Google usa), então não dá para acompanhar."),
         "target_closed" => Problems.Problem(StatusCodes.Status422UnprocessableEntity, "page_closed",
             "Essa página de vagas é fechada (pede login), então não dá para acompanhar."),
         "source_unreachable" => Problems.Problem(StatusCodes.Status503ServiceUnavailable, "source_unavailable",

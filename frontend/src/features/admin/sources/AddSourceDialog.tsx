@@ -30,9 +30,19 @@ const fields: Record<Addable, { label: string; placeholder: string; help: string
     placeholder: 'dono/repositorio',
     help: 'Um repositório de vagas em issues, como backend-br/vagas.',
   },
+  workday: {
+    label: 'Site de vagas na Workday',
+    placeholder: 'https://empresa.wd5.myworkdayjobs.com/Site',
+    help: 'Cole o link do site de vagas ou de uma vaga. Só entram as vagas no Brasil.',
+  },
+  careersite: {
+    label: 'Site de carreiras',
+    placeholder: 'https://carreiras.empresa.com.br',
+    help: 'Qualquer site público que publique as vagas para o Google. O Rolehound lê o sitemap e respeita o robots.txt.',
+  },
 }
 
-const addable: Addable[] = ['inhire', 'greenhouse', 'lever', 'github']
+const addable: Addable[] = ['inhire', 'greenhouse', 'lever', 'workday', 'careersite', 'github']
 
 export function AddSourceDialog({ initial, onClose, onAdded }: { initial: SourceKind; onClose: () => void; onAdded: (target: SourceTarget) => void }) {
   const add = useAddSource()

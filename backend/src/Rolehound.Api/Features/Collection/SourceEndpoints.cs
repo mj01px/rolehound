@@ -34,7 +34,7 @@ public sealed record UpdateSourceTargetRequest(bool Enabled, string? Label);
 /// </summary>
 internal static partial class SourceEndpoints
 {
-    private static readonly JobSource[] Configurable = [JobSource.Greenhouse, JobSource.Lever, JobSource.GitHub, JobSource.InHire];
+    private static readonly JobSource[] Configurable = [JobSource.Greenhouse, JobSource.Lever, JobSource.GitHub, JobSource.InHire, JobSource.Workday, JobSource.CareerSite];
 
     public static IEndpointRouteBuilder MapSourceEndpoints(this IEndpointRouteBuilder endpoints)
     {
@@ -153,7 +153,7 @@ internal static partial class SourceEndpoints
         {
             return Problems.Validation("source", source == JobSource.Gupy
                 ? "Os termos do Gupy vêm dos perfis de score de quem usa o app."
-                : "Fonte inválida: use greenhouse, lever, github ou inhire.");
+                : "Fonte inválida: use greenhouse, lever, github, inhire, workday ou careersite.");
         }
 
         var key = request.Key?.Trim() ?? string.Empty;
@@ -162,8 +162,21 @@ internal static partial class SourceEndpoints
             key = key.ToLowerInvariant();
         }
 
+        // Workday and careers sites take the link as pasted; the target comes out of it.
+        if (source == JobSource.Workday)
+        {
+            key = WorkdayConnector.TargetOf(key) ?? string.Empty;
+        }
+        else if (source == JobSource.CareerSite)
+        {
+            var address = key.Contains("://", StringComparison.Ordinal) ? key : $"https://{key}";
+            key = Uri.TryCreate(address, UriKind.Absolute, out var url) ? CareerSiteConnector.HostOf(url) ?? string.Empty : string.Empty;
+        }
+
         var (valid, hint) = source switch
         {
+            JobSource.Workday => (key.Length > 0, "Cole o link do site de vagas na Workday, como empresa.wd5.myworkdayjobs.com/Site."),
+            JobSource.CareerSite => (key.Length > 0, "Cole o link ou o domínio do site de vagas, como carreiras.empresa.com.br (precisa ser https)."),
             JobSource.GitHub => (RepoPattern().IsMatch(key), "Use o formato dono/repositorio, como backend-br/vagas."),
             JobSource.InHire => (InHirePattern().IsMatch(key), "Use empresa ou empresa/pagina, como em empresa.inhire.app/pagina/vagas."),
             _ => (SlugPattern().IsMatch(key), "Use o identificador da empresa no endereço de vagas, como stone em job-boards.greenhouse.io/stone."),

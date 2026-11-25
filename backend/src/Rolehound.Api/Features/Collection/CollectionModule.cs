@@ -16,6 +16,10 @@ public static class CollectionModule
         services.AddHttpClient<GreenhouseConnector>(Configure);
         services.AddHttpClient<LeverConnector>(Configure);
         services.AddHttpClient<InHireConnector>(Configure);
+        services.AddHttpClient<WorkdayConnector>(Configure);
+
+        // Sites people add: only public internet addresses, with a size and time limit.
+        services.AddHttpClient<CareerSiteConnector>(Configure).ConfigurePrimaryHttpMessageHandler(SafeHttp.CreateHandler);
         services.AddHttpClient<GupyConnector>(client =>
         {
             client.Timeout = TimeSpan.FromSeconds(30);
@@ -44,15 +48,21 @@ public static class CollectionModule
         services.AddTransient<IJobConnector>(sp => sp.GetRequiredService<GitHubConnector>());
         services.AddTransient<IJobConnector>(sp => sp.GetRequiredService<InHireConnector>());
         services.AddTransient<IJobConnector>(sp => sp.GetRequiredService<GupyConnector>());
+        services.AddTransient<IJobConnector>(sp => sp.GetRequiredService<WorkdayConnector>());
+        services.AddTransient<IJobConnector>(sp => sp.GetRequiredService<CareerSiteConnector>());
 
         services.AddTransient<IJobLinkReader>(sp => sp.GetRequiredService<GreenhouseConnector>());
         services.AddTransient<IJobLinkReader>(sp => sp.GetRequiredService<LeverConnector>());
         services.AddTransient<IJobLinkReader>(sp => sp.GetRequiredService<GitHubConnector>());
         services.AddTransient<IJobLinkReader>(sp => sp.GetRequiredService<InHireConnector>());
+        services.AddTransient<IJobLinkReader>(sp => sp.GetRequiredService<WorkdayConnector>());
 
         services.AddTransient<ICompanyLinkReader>(sp => sp.GetRequiredService<InHireConnector>());
         services.AddTransient<ICompanyLinkReader>(sp => sp.GetRequiredService<GreenhouseConnector>());
         services.AddTransient<ICompanyLinkReader>(sp => sp.GetRequiredService<LeverConnector>());
+        services.AddTransient<ICompanyLinkReader>(sp => sp.GetRequiredService<WorkdayConnector>());
+        services.AddTransient<ITargetProber>(sp => sp.GetRequiredService<WorkdayConnector>());
+        services.AddTransient<ITargetProber>(sp => sp.GetRequiredService<CareerSiteConnector>());
         services.AddSingleton<Companies.CompanyLinkLimiter>();
 
         services.AddScoped<JobScoring>();

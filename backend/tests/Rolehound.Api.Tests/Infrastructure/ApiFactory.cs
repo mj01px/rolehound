@@ -37,6 +37,8 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
 
     public FakeJobSource Gupy { get; } = new(Rolehound.Connectors.JobSource.Gupy, authoritative: false);
 
+    public FakeJobSource CareerSite { get; } = new(Rolehound.Connectors.JobSource.CareerSite);
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
@@ -61,6 +63,8 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
             services.RemoveAll<Rolehound.Connectors.IJobConnector>();
             services.AddSingleton<Rolehound.Connectors.IJobConnector>(JobSource);
             services.AddSingleton<Rolehound.Connectors.IJobConnector>(Gupy);
+            services.AddSingleton<Rolehound.Connectors.IJobConnector>(CareerSite);
+            services.RemoveAll<Rolehound.Connectors.ITargetProber>();
             services.RemoveAll<Rolehound.Api.Features.Telegram.TelegramClient>();
             services.AddSingleton<Rolehound.Api.Features.Telegram.TelegramClient>(Telegram);
             services.RemoveAll<Rolehound.Connectors.IJobLinkReader>();

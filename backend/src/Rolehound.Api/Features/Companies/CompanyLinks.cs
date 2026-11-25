@@ -26,7 +26,6 @@ internal static class CompanyLinks
     private static readonly (string Domain, string Name)[] Unsupported =
     [
         ("gupy.io", "Gupy"),
-        ("myworkdayjobs.com", "Workday"),
         ("smartrecruiters.com", "SmartRecruiters"),
         ("ashbyhq.com", "Ashby"),
         ("breezy.hr", "Breezy"),

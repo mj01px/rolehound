@@ -23,12 +23,36 @@ internal static class HttpJson
         }
     }
 
-    public static async Task<string> GetTextAsync(
-        HttpClient http, Uri url, string subject, CancellationToken ct, IReadOnlyDictionary<string, string>? headers = null)
+    public static Task<string> GetTextAsync(
+        HttpClient http, Uri url, string subject, CancellationToken ct, IReadOnlyDictionary<string, string>? headers = null) =>
+        SendAsync(http, HttpMethod.Get, url, null, subject, headers, ct);
+
+    /// <summary>POST a JSON body and read JSON back, with the same retries and errors as a GET.</summary>
+    public static async Task<JsonDocument> PostAsync(
+        HttpClient http, Uri url, object body, string subject, CancellationToken ct, IReadOnlyDictionary<string, string>? headers = null)
+    {
+        var text = await SendAsync(http, HttpMethod.Post, url, JsonSerializer.Serialize(body), subject, headers, ct);
+        try
+        {
+            return JsonDocument.Parse(text);
+        }
+        catch (JsonException ex)
+        {
+            throw new ConnectorException("source_invalid", $"{subject}: resposta fora do formato esperado.", ex);
+        }
+    }
+
+    private static async Task<string> SendAsync(
+        HttpClient http, HttpMethod method, Uri url, string? json, string subject, IReadOnlyDictionary<string, string>? headers, CancellationToken ct)
     {
         for (var attempt = 1; ; attempt++)
         {
-            using var request = new HttpRequestMessage(HttpMethod.Get, url);
+            using var request = new HttpRequestMessage(method, url);
+            if (json is not null)
+            {
+                request.Content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+            }
+
             foreach (var (name, value) in headers ?? new Dictionary<string, string>())
             {
                 request.Headers.TryAddWithoutValidation(name, value);

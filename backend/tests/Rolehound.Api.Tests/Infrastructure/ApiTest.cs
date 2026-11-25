@@ -36,6 +36,7 @@ public abstract class ApiTest(ApiFactory factory) : IAsyncLifetime
         Factory.Emails.Clear();
         Factory.JobSource.Clear();
         Factory.Gupy.Clear();
+        Factory.CareerSite.Clear();
         Factory.Telegram.Clear();
     }
 

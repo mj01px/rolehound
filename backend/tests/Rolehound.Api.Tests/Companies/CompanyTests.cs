@@ -52,7 +52,7 @@ public sealed class CompanyTests(ApiFactory factory) : ApiTest(factory)
 
         Assert.Equal(HttpStatusCode.BadRequest, (await FollowAsync(browser, "tech6")).StatusCode);
         Assert.Equal("portal_closed", await ProblemCodeAsync(await FollowAsync(browser, "https://www.linkedin.com/company/exemplo/jobs/")));
-        Assert.Equal("site_unknown", await ProblemCodeAsync(await FollowAsync(browser, "https://carreiras.exemplo.com.br/vagas")));
+        Assert.Equal("site_unknown", await ProblemCodeAsync(await FollowAsync(browser, "http://carreiras.exemplo.com.br/vagas")));
         var unsupported = await FollowAsync(browser, "https://exemplo.gupy.io/");
         Assert.Equal(HttpStatusCode.UnprocessableEntity, unsupported.StatusCode);
         Assert.Equal("platform_unsupported", await ProblemCodeAsync(unsupported));
@@ -94,6 +94,21 @@ public sealed class CompanyTests(ApiFactory factory) : ApiTest(factory)
         var db = scope.ServiceProvider.GetRequiredService<RolehoundDbContext>();
         var target = await db.SourceTargets.SingleAsync(Ct);
         Assert.Equal(("nova", ana.Id), (target.Key, target.AddedByUserId!.Value));
+    }
+
+    [Fact]
+    public async Task Any_public_careers_site_is_tried_and_followed_by_its_domain()
+    {
+        await CreateUserAsync("ana@exemplo.test");
+        Factory.CareerSite.Lists("carreiras.acme.test", FakeJobSource.Job("https://carreiras.acme.test/job/1", "Dev Python"));
+        Factory.CareerSite.Rejects("carreiras.vazio.test", "no_job_postings");
+        using var browser = await SignedInAsync("ana@exemplo.test");
+
+        Assert.Equal("site_unreadable", await ProblemCodeAsync(await FollowAsync(browser, "https://carreiras.vazio.test/vagas")));
+
+        var followed = await ReadAsync<FollowLinkResponse>(await FollowAsync(browser, "https://Carreiras.Acme.test/job/1?origem=x"));
+        Assert.True(followed.Added);
+        Assert.Equal(("careersite", "carreiras.acme.test", 1), (followed.Company.Source, followed.Company.Key, followed.Listed));
     }
 
     [Fact]

@@ -12,6 +12,8 @@ public enum JobSource
     Gupy,
     EmailAlert,
     Link,
+    Workday,
+    CareerSite,
 }
 
 /// <summary>
@@ -71,6 +73,20 @@ public interface ICompanyLinkReader
 
     /// <summary>The target (company) the link belongs to, or null when it is not one of this source's pages.</summary>
     string? CompanyOf(Uri url);
+}
+
+/// <summary>What a quick check of a new target found: how many jobs it lists and whose they are.</summary>
+public sealed record SourceProbe(int Jobs, string? Company);
+
+/// <summary>
+/// Sources that can check a new target quickly, without reading every job,
+/// before it is added. Throws <see cref="ConnectorException"/> when it cannot be read.
+/// </summary>
+public interface ITargetProber
+{
+    JobSource Source { get; }
+
+    Task<SourceProbe> ProbeAsync(string target, CancellationToken ct);
 }
 
 /// <summary>
