@@ -1,2 +1,2 @@
 # Daily dump at 04:00 America/Sao_Paulo.
-0 4 * * * /usr/local/bin/backup.sh
+0 4 * * * /usr/local/bin/backup.sh >> /proc/1/fd/1 2>&1

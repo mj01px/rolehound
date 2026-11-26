@@ -1,8 +1,8 @@
-# Times are America/Sao_Paulo (TZ in compose.yaml).
+# Times are America/Sao_Paulo (TZ in compose.yaml). Output goes to the container log (PID 1).
 # Collection: the API runs only when the 09:00, 12:00, 15:00 or 18:00 slot has no run yet,
 # so calling every 15 minutes gives the four runs plus catch-up after any downtime.
-*/15 * * * * /usr/local/bin/task.sh collect-due
+*/15 * * * * /usr/local/bin/task.sh collect-due >> /proc/1/fd/1 2>&1
 # Overdue follow-ups on Telegram, once a day; repeated calls send nothing.
-0 9 * * * /usr/local/bin/task.sh notify-overdue
+0 9 * * * /usr/local/bin/task.sh notify-overdue >> /proc/1/fd/1 2>&1
 # Retention cleanup.
-30 3 * * * /usr/local/bin/task.sh cleanup
+30 3 * * * /usr/local/bin/task.sh cleanup >> /proc/1/fd/1 2>&1

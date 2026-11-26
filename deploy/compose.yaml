@@ -87,9 +87,12 @@ services:
       TASKS_KEY: ${Tasks__Key:?set Tasks__Key in .env}
       TZ: America/Sao_Paulo
     volumes:
-      - ./scheduler/crontab:/etc/crontabs/root:ro
+      - ./scheduler/crontab:/etc/rolehound/crontab:ro
       - ./scheduler/task.sh:/usr/local/bin/task.sh:ro
-    command: ["crond", "-f", "-l", "6"]
+    # busybox crond only reads a crontab owned by root, and a file mounted from the repository
+    # belongs to the VM user: it is installed as root's on start, then crond runs in the foreground.
+    # Job output goes to the container's own stdout, so "docker compose logs" shows every run.
+    command: ["sh", "-c", "install -o root -g root -m 0600 /etc/rolehound/crontab /etc/crontabs/root && exec crond -f -l 6"]
     mem_limit: 32m
 
   # Daily compressed dump kept on the VM disk for 7 days (see README, Backups).
@@ -104,9 +107,12 @@ services:
       TZ: America/Sao_Paulo
     volumes:
       - ./dump/backup.sh:/usr/local/bin/backup.sh:ro
-      - ./dump/crontab:/etc/crontabs/root:ro
+      - ./dump/crontab:/etc/rolehound/crontab:ro
       - backups:/backups
-    command: ["crond", "-f", "-l", "6"]
+    # busybox crond only reads a crontab owned by root, and a file mounted from the repository
+    # belongs to the VM user: it is installed as root's on start, then crond runs in the foreground.
+    # Job output goes to the container's own stdout, so "docker compose logs" shows every run.
+    command: ["sh", "-c", "install -o root -g root -m 0600 /etc/rolehound/crontab /etc/crontabs/root && exec crond -f -l 6"]
     mem_limit: 64m
 
 volumes:
