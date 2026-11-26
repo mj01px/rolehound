@@ -41,6 +41,7 @@ internal static class AccountSecurity
         UserManager<User> users,
         SignInManager<User> signIn,
         AccountEmails emails,
+        AccountRevocation revocation,
         SecurityLog log,
         RolehoundDbContext db,
         CancellationToken ct)
@@ -65,6 +66,7 @@ internal static class AccountSecurity
             return Problems.Validation("newPassword", result);
         }
 
+        await revocation.RevokeAsync(user.Id, null, ct);
         await db.SaveChangesAsync(ct);
         await Session.RefreshAsync(signIn, user, principal);
         await emails.SendNoticeAsync(user.Email!, "Sua senha do rolehound foi alterada.", ct);
@@ -75,6 +77,7 @@ internal static class AccountSecurity
         ClaimsPrincipal principal,
         UserManager<User> users,
         SignInManager<User> signIn,
+        AccountRevocation revocation,
         SecurityLog log,
         RolehoundDbContext db,
         CancellationToken ct)
@@ -82,6 +85,7 @@ internal static class AccountSecurity
         var user = await users.GetUserAsync(principal);
         if (user is not null)
         {
+            await revocation.RevokeAsync(user.Id, null, ct);
             log.Record(SecurityEventType.SessionsRevoked, user.Id);
             await users.UpdateSecurityStampAsync(user);
             await db.SaveChangesAsync(ct);
@@ -122,6 +126,10 @@ internal static class AccountSecurity
         log.Record(SecurityEventType.EmailChangeRequested, user.Id);
         await db.SaveChangesAsync(ct);
         await emails.SendEmailChangeLinkAsync(user, newEmail, token, ct);
+        await emails.SendNoticeAsync(
+            user.Email!,
+            $"Pediram para trocar o e-mail de acesso da sua conta do rolehound para {newEmail}. A troca só vale depois que o novo endereço confirmar. Se não foi você, troque sua senha agora.",
+            ct);
         return TypedResults.Accepted((string?)null);
     }
 }

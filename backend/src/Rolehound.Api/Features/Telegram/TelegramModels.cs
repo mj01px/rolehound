@@ -29,12 +29,15 @@ public sealed class TelegramLinkCode
 
 public sealed class TelegramOptions
 {
+    /// <summary>The webhook secret is the only thing that authenticates Telegram's calls; it must not be guessable.</summary>
+    public const int WebhookSecretMinLength = 32;
+
     public string? BotToken { get; set; }
 
     /// <summary>The bot's username, without @, for the t.me link.</summary>
     public string? BotUsername { get; set; }
 
-    /// <summary>Sent back by Telegram on every webhook call; 1 to 256 of A-Z, a-z, 0-9, _ and -.</summary>
+    /// <summary>Sent back by Telegram on every webhook call; 32 to 256 of A-Z, a-z, 0-9, _ and -.</summary>
     public string? WebhookSecret { get; set; }
 
     /// <summary>Public HTTPS address of POST /telegram/webhook; registered on start when set.</summary>

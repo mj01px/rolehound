@@ -20,17 +20,17 @@ public sealed class FakeTelegram() : TelegramClient(new HttpClient(), Options.Cr
         Answers.Clear();
     }
 
-    public override Task SendAsync(long chatId, string html, IReadOnlyList<IReadOnlyList<TelegramButton>>? buttons, CancellationToken ct)
+    public override Task<bool> SendAsync(long chatId, string html, IReadOnlyList<IReadOnlyList<TelegramButton>>? buttons, CancellationToken ct)
     {
         Messages.Enqueue(new Sent(chatId, html, buttons));
-        return Task.CompletedTask;
+        return Task.FromResult(true);
     }
 
-    public override Task AnswerCallbackAsync(string callbackId, string text, CancellationToken ct)
+    public override Task<bool> AnswerCallbackAsync(string callbackId, string text, CancellationToken ct)
     {
         Answers.Enqueue(text);
-        return Task.CompletedTask;
+        return Task.FromResult(true);
     }
 
-    public override Task SetWebhookAsync(string url, string secret, CancellationToken ct) => Task.CompletedTask;
+    public override Task<bool> SetWebhookAsync(string url, string secret, CancellationToken ct) => Task.FromResult(true);
 }

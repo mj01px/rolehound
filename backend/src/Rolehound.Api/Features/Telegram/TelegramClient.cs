@@ -11,7 +11,8 @@ public partial class TelegramClient(HttpClient http, IOptions<TelegramOptions> o
 {
     public const string HttpClientName = "telegram";
 
-    public virtual Task SendAsync(long chatId, string html, IReadOnlyList<IReadOnlyList<TelegramButton>>? buttons, CancellationToken ct)
+    /// <returns>Whether Telegram accepted the message.</returns>
+    public virtual Task<bool> SendAsync(long chatId, string html, IReadOnlyList<IReadOnlyList<TelegramButton>>? buttons, CancellationToken ct)
     {
         var body = new JsonObject
         {
@@ -31,13 +32,13 @@ public partial class TelegramClient(HttpClient http, IOptions<TelegramOptions> o
         return CallAsync("sendMessage", body, ct);
     }
 
-    public virtual Task AnswerCallbackAsync(string callbackId, string text, CancellationToken ct) =>
+    public virtual Task<bool> AnswerCallbackAsync(string callbackId, string text, CancellationToken ct) =>
         CallAsync("answerCallbackQuery", new JsonObject { ["callback_query_id"] = callbackId, ["text"] = text }, ct);
 
-    public virtual Task SetWebhookAsync(string url, string secret, CancellationToken ct) =>
+    public virtual Task<bool> SetWebhookAsync(string url, string secret, CancellationToken ct) =>
         CallAsync("setWebhook", new JsonObject { ["url"] = url, ["secret_token"] = secret, ["allowed_updates"] = new JsonArray("message", "callback_query") }, ct);
 
-    private async Task CallAsync(string method, JsonObject body, CancellationToken ct)
+    private async Task<bool> CallAsync(string method, JsonObject body, CancellationToken ct)
     {
         try
         {
@@ -46,10 +47,14 @@ public partial class TelegramClient(HttpClient http, IOptions<TelegramOptions> o
             {
                 LogFailed(logger, method, (int)response.StatusCode);
             }
+
+            return response.IsSuccessStatusCode;
         }
-        catch (HttpRequestException ex)
+        catch (Exception ex) when (!ct.IsCancellationRequested)
         {
+            // Network errors, the client timeout and anything else: a lost message never breaks the caller.
             LogUnreachable(logger, method, ex);
+            return false;
         }
     }
 

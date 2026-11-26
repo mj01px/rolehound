@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 using Rolehound.Api.Infrastructure.Http;
 using Rolehound.Api.Infrastructure.Persistence;
 
@@ -22,6 +23,9 @@ internal static class PasswordReset
     private const string Sent = "Se existir uma conta com esse e-mail, enviamos um link para criar uma senha nova.";
     private const string LinkInvalid = "Este link não vale mais. Peça um novo.";
 
+    /// <summary>Reset emails per account per hour; beyond that, requests are answered but send nothing.</summary>
+    public const int MaxEmailsPerHour = 3;
+
     public static async Task<Accepted<MessageResponse>> Forgot(
         ForgotPasswordRequest request,
         UserManager<User> users,
@@ -29,15 +33,16 @@ internal static class PasswordReset
         AccountEmails emails,
         SecurityLog log,
         RolehoundDbContext db,
+        TimeProvider time,
         CancellationToken ct)
     {
         var user = string.IsNullOrWhiteSpace(request.Email) ? null : await users.FindByEmailAsync(request.Email.Trim());
-        if (user is { IsActive: true, HasAccess: true })
+        if (user is { IsActive: true, HasAccess: true } && !await TooManyAsync(user.Id, db, time, ct))
         {
             var token = await tokens.IssueLinkAsync(user.Id, AccountTokenPurpose.PasswordReset, AccountTokens.PasswordResetLifetime, null, ct);
             log.Record(SecurityEventType.PasswordResetRequested, user.Id);
             await db.SaveChangesAsync(ct);
-            await emails.SendPasswordResetAsync(user, token, ct);
+            emails.QueuePasswordReset(user, token);
         }
 
         // Same answer whether or not the email exists.
@@ -56,6 +61,7 @@ internal static class PasswordReset
     public static async Task<Results<NoContent, ProblemHttpResult, ValidationProblem>> Reset(
         ResetPasswordRequest request,
         AccountTokens tokens,
+        AccountRevocation revocation,
         UserManager<User> users,
         AccountEmails emails,
         SecurityLog log,
@@ -86,11 +92,19 @@ internal static class PasswordReset
             return Problems.Validation("password", result);
         }
 
+        await revocation.RevokeAsync(user.Id, token.Id, ct);
         await users.SetLockoutEndDateAsync(user, null);
         await users.ResetAccessFailedCountAsync(user);
         await db.SaveChangesAsync(ct);
         await emails.SendNoticeAsync(user.Email!, "Sua senha do rolehound foi alterada.", ct);
         return TypedResults.NoContent();
+    }
+
+    private static async Task<bool> TooManyAsync(Guid userId, RolehoundDbContext db, TimeProvider time, CancellationToken ct)
+    {
+        var since = time.GetUtcNow().AddHours(-1);
+        var sent = await db.AccountTokens.CountAsync(t => t.UserId == userId && t.Purpose == AccountTokenPurpose.PasswordReset && t.CreatedAt > since, ct);
+        return sent >= MaxEmailsPerHour;
     }
 
     private static async Task<User?> FindUserAsync(string? raw, AccountTokens tokens, UserManager<User> users, CancellationToken ct)

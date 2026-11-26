@@ -14,6 +14,7 @@ internal static class ConfirmEmailChange
     public static async Task<Results<NoContent, ProblemHttpResult>> Handle(
         TokenRequest request,
         AccountTokens tokens,
+        AccountRevocation revocation,
         UserManager<User> users,
         AccountEmails emails,
         SecurityLog log,
@@ -44,6 +45,7 @@ internal static class ConfirmEmailChange
             return Problems.BadRequest("email_invalid", "Não foi possível trocar o e-mail.");
         }
 
+        await revocation.RevokeAsync(user.Id, token.Id, ct);
         user.EmailConfirmed = true;
         await users.UpdateAsync(user);
         await db.SaveChangesAsync(ct);

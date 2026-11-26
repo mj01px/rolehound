@@ -59,6 +59,27 @@ public sealed class AccountDataTests(ApiFactory factory) : ApiTest(factory)
     }
 
     [Fact]
+    public async Task Deleting_an_admin_account_keeps_what_they_did_in_other_peoples_history()
+    {
+        var ana = await CreateUserAsync("ana@exemplo.test");
+        await CreateUserAsync("rafael@exemplo.test", UserRole.Admin);
+        await CreateUserAsync("bia@exemplo.test", UserRole.Admin);
+        using (var rafael = await SignedInAsync("rafael@exemplo.test"))
+        {
+            await rafael.PostAsync(new Uri($"/admin/users/{ana.Id}/deactivate", UriKind.Relative), null, Ct);
+            await ReauthenticateAsync(rafael);
+            Assert.Equal(HttpStatusCode.NoContent, (await rafael.DeleteAsync(new Uri("/account", UriKind.Relative), Ct)).StatusCode);
+        }
+
+        using var bia = await SignedInAsync("bia@exemplo.test");
+        var history = await ReadAsync<Rolehound.Api.Features.Accounts.Admin.HistoryPage>(
+            await bia.GetAsync(new Uri($"/admin/users/{ana.Id}/history", UriKind.Relative), Ct));
+
+        var deactivated = Assert.Single(history.Items, e => e.Type == nameof(SecurityEventType.UserDeactivated));
+        Assert.Equal("Conta excluída", deactivated.Actor?.Name);
+    }
+
+    [Fact]
     public async Task The_last_active_admin_cannot_delete_their_account()
     {
         await CreateUserAsync("rafael@exemplo.test", UserRole.Admin);

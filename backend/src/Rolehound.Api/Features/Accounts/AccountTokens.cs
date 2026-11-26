@@ -24,12 +24,30 @@ public sealed class AccountTokens(RolehoundDbContext db, TimeProvider time)
         return raw;
     }
 
-    /// <summary>Issues a six-digit email code. The caller saves changes.</summary>
-    public async Task<string> IssueCodeAsync(Guid userId, CancellationToken ct)
+    /// <summary>
+    /// Issues a six-digit email code for one use (<paramref name="scope"/>, such as
+    /// signing in or turning on two-step verification); a code works only for that use.
+    /// The caller saves changes.
+    /// </summary>
+    public async Task<string> IssueCodeAsync(Guid userId, string scope, CancellationToken ct)
     {
         var code = RandomNumberGenerator.GetInt32(0, 1_000_000).ToString("D6", CultureInfo.InvariantCulture);
-        await IssueAsync(userId, AccountTokenPurpose.EmailCode, CodeKey(userId, code), EmailCodeLifetime, null, ct);
+        await IssueAsync(userId, AccountTokenPurpose.EmailCode, CodeKey(userId, scope, code), EmailCodeLifetime, null, ct);
         return code;
+    }
+
+    /// <summary>
+    /// Voids every open link and code of the person, except <paramref name="keep"/>.
+    /// Runs at once, outside the caller's unit of work: called when the password,
+    /// the email or the sessions change, and on deactivation, so a link sent
+    /// before that moment cannot be used after it.
+    /// </summary>
+    public Task RevokeAllAsync(Guid userId, Guid? keep, CancellationToken ct)
+    {
+        var now = time.GetUtcNow();
+        return db.AccountTokens
+            .Where(t => t.UserId == userId && t.UsedAt == null && t.RevokedAt == null && t.Id != keep)
+            .ExecuteUpdateAsync(s => s.SetProperty(t => t.RevokedAt, now), ct);
     }
 
     /// <summary>Finds a usable link token without consuming it.</summary>
@@ -48,31 +66,38 @@ public sealed class AccountTokens(RolehoundDbContext db, TimeProvider time)
     public void Consume(AccountToken token) => token.UsedAt = time.GetUtcNow();
 
     /// <summary>
-    /// Checks an email code against the latest one issued. Counts the attempt;
-    /// after <see cref="MaxCodeAttempts"/> the code stops working. The caller saves changes.
+    /// Checks an email code against the latest one issued for <paramref name="scope"/>.
+    /// Counts the attempt; after <see cref="MaxCodeAttempts"/> the code stops working.
+    /// Both the count and the single use are atomic updates, so parallel guesses
+    /// cannot go past the limit or use one code twice.
     /// </summary>
-    public async Task<bool> RedeemCodeAsync(Guid userId, string? code, CancellationToken ct)
+    public async Task<bool> RedeemCodeAsync(Guid userId, string scope, string? code, CancellationToken ct)
     {
         var now = time.GetUtcNow();
-        var token = await db.AccountTokens
+        var token = await db.AccountTokens.AsNoTracking()
             .Where(t => t.UserId == userId && t.Purpose == AccountTokenPurpose.EmailCode && t.UsedAt == null && t.RevokedAt == null)
             .OrderByDescending(t => t.CreatedAt)
+            .Select(t => new { t.Id, t.Hash, t.ExpiresAt })
             .FirstOrDefaultAsync(ct);
 
-        if (token is null || token.ExpiresAt <= now || token.Attempts >= MaxCodeAttempts)
+        if (token is null || token.ExpiresAt <= now)
         {
             return false;
         }
 
-        token.Attempts++;
+        var counted = await db.AccountTokens
+            .Where(t => t.Id == token.Id && t.Attempts < MaxCodeAttempts)
+            .ExecuteUpdateAsync(s => s.SetProperty(t => t.Attempts, t => t.Attempts + 1), ct);
         var normalized = (code ?? string.Empty).Trim();
-        if (normalized.Length != 6 || !CryptographicOperations.FixedTimeEquals(Hash(CodeKey(userId, normalized)), token.Hash))
+        if (counted == 0 || normalized.Length != 6 || !CryptographicOperations.FixedTimeEquals(Hash(CodeKey(userId, scope, normalized)), token.Hash))
         {
             return false;
         }
 
-        token.UsedAt = now;
-        return true;
+        var used = await db.AccountTokens
+            .Where(t => t.Id == token.Id && t.UsedAt == null)
+            .ExecuteUpdateAsync(s => s.SetProperty(t => t.UsedAt, now), ct);
+        return used == 1;
     }
 
     private async Task IssueAsync(Guid userId, AccountTokenPurpose purpose, string secret, TimeSpan lifetime, string? payload, CancellationToken ct)
@@ -93,9 +118,9 @@ public sealed class AccountTokens(RolehoundDbContext db, TimeProvider time)
         });
     }
 
-    // Codes are short, so the user id is part of what is hashed: a code is only
-    // ever compared with the latest code of the same person.
-    private static string CodeKey(Guid userId, string code) => $"{userId:N}:{code}";
+    // Codes are short, so the user id and the use are part of what is hashed: a code
+    // is only ever compared with the latest code of the same person, for the same use.
+    private static string CodeKey(Guid userId, string scope, string code) => $"{userId:N}:{scope}:{code}";
 
     private static byte[] Hash(string value) => SHA256.HashData(Encoding.UTF8.GetBytes(value));
 

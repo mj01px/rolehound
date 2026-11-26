@@ -3,6 +3,7 @@ using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using Rolehound.Api.Infrastructure.Http;
 using Rolehound.Api.Infrastructure.Persistence;
 
@@ -63,8 +64,10 @@ internal static partial class AdminUsers
 
     /// <summary>
     /// Edits name, email and username. A pending account gets the new email at
-    /// once plus a fresh access link there; an account in use keeps its email
-    /// until the person confirms the new one through the email change link.
+    /// once plus a fresh access link there. The email of an account in use is
+    /// the person's alone to change (from their profile, confirmed by both
+    /// addresses): an admin who could point it elsewhere could reset the
+    /// password and take the account over.
     /// </summary>
     public static async Task<Results<Ok<AdminUserResponse>, ProblemHttpResult, ValidationProblem>> Update(
         Guid id,
@@ -89,7 +92,11 @@ internal static partial class AdminUsers
         var username = request.Username?.Trim().ToLowerInvariant();
         var errors = Validate(name, email, username);
         var emailChanged = email is not null && !string.Equals(email, user.Email, StringComparison.OrdinalIgnoreCase);
-        if (emailChanged && !errors.ContainsKey("email") && await users.FindByEmailAsync(email!) is not null)
+        if (emailChanged && user.HasAccess)
+        {
+            errors["email"] = ["Só a própria pessoa troca o e-mail de uma conta em uso, pelo perfil."];
+        }
+        else if (emailChanged && !errors.ContainsKey("email") && await users.FindByEmailAsync(email!) is not null)
         {
             errors["email"] = ["Esse e-mail já está em uso."];
         }
@@ -116,8 +123,7 @@ internal static partial class AdminUsers
         }
 
         string? accessLink = null;
-        string? changeLink = null;
-        if (emailChanged && !user.HasAccess)
+        if (emailChanged)
         {
             var changed = await users.SetEmailAsync(user, email);
             if (!changed.Succeeded)
@@ -127,11 +133,6 @@ internal static partial class AdminUsers
 
             accessLink = await tokens.IssueLinkAsync(user.Id, AccountTokenPurpose.Access, AccountTokens.AccessLifetime, admin?.UserName, ct);
         }
-        else if (emailChanged)
-        {
-            changeLink = await tokens.IssueLinkAsync(user.Id, AccountTokenPurpose.EmailChange, AccountTokens.EmailChangeLifetime, email, ct);
-            log.Record(SecurityEventType.EmailChangeRequested, user.Id, admin?.Id);
-        }
 
         await users.UpdateAsync(user);
         log.Record(SecurityEventType.UserEdited, user.Id, admin?.Id);
@@ -140,10 +141,6 @@ internal static partial class AdminUsers
         if (accessLink is not null)
         {
             await emails.SendAccessLinkAsync(user, accessLink, ct);
-        }
-        else if (changeLink is not null)
-        {
-            await emails.SendEmailChangeLinkAsync(user, email!, changeLink, ct);
         }
 
         return TypedResults.Ok(ToResponse(user, await OpenLinksAsync(db, time, user.Id, ct)));
@@ -233,7 +230,10 @@ internal static partial class AdminUsers
             .Where(u => ids.Contains(u.Id))
             .ToDictionaryAsync(u => u.Id, u => new HistoryPerson(u.Id, u.Name.Length > 0 ? u.Name : u.UserName!), ct);
 
-        HistoryPerson? Person(Guid? personId) => personId is { } key && people.TryGetValue(key, out var person) ? person : null;
+        // A deleted account leaves its id behind in other people's history, with no name to show.
+        HistoryPerson? Person(Guid? personId) => personId is { } key
+            ? people.TryGetValue(key, out var person) ? person : new HistoryPerson(key, "Conta excluída")
+            : null;
 
         var items = events.Select(e => new HistoryEntry(
             e.Id,
@@ -267,8 +267,9 @@ internal static partial class AdminUsers
     }
 
     public static async Task<Results<NoContent, ProblemHttpResult>> Deactivate(
-        Guid id, ClaimsPrincipal principal, UserManager<User> users, SecurityLog log, RolehoundDbContext db, CancellationToken ct)
+        Guid id, ClaimsPrincipal principal, UserManager<User> users, AccountRevocation revocation, SecurityLog log, RolehoundDbContext db, CancellationToken ct)
     {
+        await using var transaction = await LockAdminsAsync(db, ct);
         var user = await users.FindByIdAsync(id.ToString());
         if (user is null)
         {
@@ -287,9 +288,11 @@ internal static partial class AdminUsers
 
         user.IsActive = false;
         log.Record(SecurityEventType.UserDeactivated, user.Id, principal.GetUserId());
-        // Rotating the stamp ends every session at the next request.
+        // Rotating the stamp ends every session at the next request; links and the Telegram chat end now.
+        await revocation.RevokeAsync(user.Id, null, ct);
         await users.UpdateSecurityStampAsync(user);
         await db.SaveChangesAsync(ct);
+        await transaction.CommitAsync(ct);
         return TypedResults.NoContent();
     }
 
@@ -317,6 +320,7 @@ internal static partial class AdminUsers
             return Problems.Validation("role", "Papel inválido.");
         }
 
+        await using var transaction = await LockAdminsAsync(db, ct);
         var user = await users.FindByIdAsync(id.ToString());
         if (user is null)
         {
@@ -338,7 +342,19 @@ internal static partial class AdminUsers
         // The role rides in the session; a new stamp makes the change apply at once.
         await users.UpdateSecurityStampAsync(user);
         await db.SaveChangesAsync(ct);
+        await transaction.CommitAsync(ct);
         return TypedResults.NoContent();
+    }
+
+    /// <summary>
+    /// Opens a transaction holding a lock every change to the set of active admins
+    /// takes first, so two of them cannot both pass the last-admin check and leave none.
+    /// </summary>
+    internal static async Task<IDbContextTransaction> LockAdminsAsync(RolehoundDbContext db, CancellationToken ct)
+    {
+        var transaction = await db.Database.BeginTransactionAsync(ct);
+        await db.Database.ExecuteSqlRawAsync("SELECT pg_advisory_xact_lock(7262001)", ct);
+        return transaction;
     }
 
     internal static async Task<bool> IsLastActiveAdminAsync(User user, RolehoundDbContext db, CancellationToken ct) =>

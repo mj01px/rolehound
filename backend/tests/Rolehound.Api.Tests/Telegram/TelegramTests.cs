@@ -42,6 +42,26 @@ public sealed class TelegramTests(ApiFactory factory) : ApiTest(factory)
     }
 
     [Fact]
+    public async Task Signing_out_everywhere_or_being_deactivated_disconnects_telegram()
+    {
+        var ana = await OnboardedAsync("ana@exemplo.test");
+        await LinkAsync(ana.Id);
+        using (var browser = await SignedInAsync("ana@exemplo.test"))
+        {
+            await browser.PostAsync(new Uri("/account/sessions/revoke", UriKind.Relative), null, Ct);
+        }
+
+        Assert.False(await LinkedAsync(ana.Id));
+
+        await CreateUserAsync("rafael@exemplo.test", Rolehound.Api.Features.Accounts.UserRole.Admin);
+        await LinkAsync(ana.Id);
+        using var admin = await SignedInAsync("rafael@exemplo.test");
+        await admin.PostAsync(new Uri($"/admin/users/{ana.Id}/deactivate", UriKind.Relative), null, Ct);
+
+        Assert.False(await LinkedAsync(ana.Id));
+    }
+
+    [Fact]
     public async Task The_webhook_refuses_a_wrong_secret()
     {
         using var client = Factory.CreateClient();
@@ -113,6 +133,12 @@ public sealed class TelegramTests(ApiFactory factory) : ApiTest(factory)
         using var request = new HttpRequestMessage(HttpMethod.Post, "/telegram/webhook") { Content = new StringContent(json, Encoding.UTF8, "application/json") };
         request.Headers.Add(TelegramEndpoints.SecretHeader, ApiFactory.TelegramSecret);
         return await client.SendAsync(request, Ct);
+    }
+
+    private async Task<bool> LinkedAsync(Guid userId)
+    {
+        await using var scope = Factory.Services.CreateAsyncScope();
+        return await scope.ServiceProvider.GetRequiredService<RolehoundDbContext>().TelegramLinks.AnyAsync(l => l.UserId == userId, Ct);
     }
 
     private async Task LinkAsync(Guid userId)

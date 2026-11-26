@@ -22,6 +22,10 @@ public sealed record RecoveryCodesResponse(IReadOnlyList<string> RecoveryCodes);
 internal static class TwoFactor
 {
     private const int RecoveryCodeCount = 10;
+
+    // Codes sent to turn on two-step verification by email; they never sign anyone in.
+    private const string SetupCodeScope = "TwoFactorSetup";
+
     private const string Issuer = "rolehound";
 
     public static async Task<Results<Ok<TotpSetupResponse>, ProblemHttpResult>> StartTotp(
@@ -100,7 +104,7 @@ internal static class TwoFactor
             return Problems.Conflict("two_factor_already_enabled", "Desative a verificação atual antes de trocar o método.");
         }
 
-        var code = await tokens.IssueCodeAsync(user.Id, ct);
+        var code = await tokens.IssueCodeAsync(user.Id, SetupCodeScope, ct);
         await db.SaveChangesAsync(ct);
         await emails.SendCodeAsync(user, code, ct);
         return TypedResults.NoContent();
@@ -128,8 +132,7 @@ internal static class TwoFactor
             return Problems.Conflict("two_factor_already_enabled", "A verificação em duas etapas já está ativa.");
         }
 
-        var valid = await tokens.RedeemCodeAsync(user.Id, LoginTwoFactor.Normalize(request.Code), ct);
-        await db.SaveChangesAsync(ct);
+        var valid = await tokens.RedeemCodeAsync(user.Id, SetupCodeScope, LoginTwoFactor.Normalize(request.Code), ct);
         if (!valid)
         {
             return Problems.Validation("code", "Código inválido ou expirado.");

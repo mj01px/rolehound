@@ -16,15 +16,13 @@ internal sealed class EmailCodeTokenProvider(AccountTokens tokens, RolehoundDbCo
 
     public async Task<string> GenerateAsync(string purpose, UserManager<User> manager, User user)
     {
-        var code = await tokens.IssueCodeAsync(user.Id, CancellationToken.None);
+        var code = await tokens.IssueCodeAsync(user.Id, purpose, CancellationToken.None);
         await db.SaveChangesAsync();
         return code;
     }
 
     public async Task<bool> ValidateAsync(string purpose, string token, UserManager<User> manager, User user)
     {
-        var valid = await tokens.RedeemCodeAsync(user.Id, token, CancellationToken.None);
-        await db.SaveChangesAsync();
-        return valid;
+        return await tokens.RedeemCodeAsync(user.Id, purpose, token, CancellationToken.None);
     }
 }

@@ -81,7 +81,7 @@ public sealed class AdminUserTests(ApiFactory factory) : ApiTest(factory)
     }
 
     [Fact]
-    public async Task Editing_the_email_of_a_person_in_use_waits_for_their_confirmation()
+    public async Task Only_the_person_changes_the_email_of_an_account_in_use()
     {
         await CreateUserAsync("rafael@exemplo.test", UserRole.Admin);
         var ana = await CreateUserAsync("ana@exemplo.test");
@@ -95,16 +95,10 @@ public sealed class AdminUserTests(ApiFactory factory) : ApiTest(factory)
         var taken = await admin.PutAsJsonAsync($"/admin/users/{ana.Id}", new { name = "Ana", email = "ana@exemplo.test", username = "carla" }, Ct);
         Assert.Equal(HttpStatusCode.BadRequest, taken.StatusCode);
 
-        var edited = await ReadAsync<AdminUserResponse>(
-            await admin.PutAsJsonAsync($"/admin/users/{ana.Id}", new { name = "Ana Souza", email = "ana.souza@exemplo.test", username = "ana" }, Ct));
-
-        Assert.Equal("Ana Souza", edited.Name);
-        Assert.Equal("a***a@exemplo.test", edited.Email);
-        Assert.Equal("a***a@exemplo.test", edited.PendingEmail);
-
-        using var anaBrowser = Factory.CreateBrowser();
-        var confirmed = await anaBrowser.PostAsJsonAsync("/auth/email/confirm", new { token = Factory.Emails.LastToken("ana.souza@exemplo.test") }, Ct);
-        Assert.Equal(HttpStatusCode.NoContent, confirmed.StatusCode);
+        // An admin who could point the email elsewhere could reset the password and take the account.
+        var redirected = await admin.PutAsJsonAsync($"/admin/users/{ana.Id}", new { name = "Ana Souza", email = "ana.souza@exemplo.test", username = "ana" }, Ct);
+        Assert.Equal(HttpStatusCode.BadRequest, redirected.StatusCode);
+        Assert.Empty(Factory.Emails.To("ana.souza@exemplo.test"));
         var after = await ReadAsync<AdminUserResponse>(await admin.GetAsync(new Uri($"/admin/users/{ana.Id}", UriKind.Relative), Ct));
         Assert.Equal("a***a@exemplo.test", after.Email);
         Assert.Null(after.PendingEmail);

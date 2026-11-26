@@ -117,6 +117,7 @@ internal static class AccountData
         ClaimsPrincipal principal, RolehoundDbContext db, RolehoundSignInManager signIn, CancellationToken ct)
     {
         var userId = principal.GetUserId();
+        await using var transaction = await AdminUsers.LockAdminsAsync(db, ct);
         var user = await db.Users.SingleAsync(u => u.Id == userId, ct);
         if (await AdminUsers.IsLastActiveAdminAsync(user, db, ct))
         {
@@ -124,9 +125,12 @@ internal static class AccountData
         }
 
         // Every table keyed by the person cascades from users; the security log has no key, so it goes by hand.
-        await db.SecurityEvents.Where(e => e.UserId == userId || e.ActorId == userId).ExecuteDeleteAsync(ct);
+        // Events about other accounts stay: they are those people's history. Their actor becomes an id
+        // that no longer points to anyone, shown as a deleted account.
+        await db.SecurityEvents.Where(e => e.UserId == userId).ExecuteDeleteAsync(ct);
         db.Users.Remove(user);
         await db.SaveChangesAsync(ct);
+        await transaction.CommitAsync(ct);
         await signIn.SignOutAsync();
         return TypedResults.NoContent();
     }

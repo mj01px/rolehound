@@ -158,7 +158,8 @@ internal static class TelegramEndpoints
             return;
         }
 
-        var link = await db.TelegramLinks.AsNoTracking().SingleOrDefaultAsync(l => l.ChatId == chatId, ct);
+        var link = await db.TelegramLinks.AsNoTracking()
+            .SingleOrDefaultAsync(l => l.ChatId == chatId && db.Users.Any(u => u.Id == l.UserId && u.IsActive), ct);
         if (link is null || data is null || !data.StartsWith("archive:", StringComparison.Ordinal) || !Guid.TryParseExact(data["archive:".Length..], "N", out var jobId))
         {
             await telegram.AnswerCallbackAsync(id, "Não deu para fazer isso daqui.", ct);

@@ -4,8 +4,11 @@ using Rolehound.Api.Infrastructure.Email;
 
 namespace Rolehound.Api.Tests.Infrastructure;
 
-/// <summary>Keeps every email the API sends, so tests can follow links and codes.</summary>
-public sealed partial class CapturedEmails : IEmailSender
+/// <summary>
+/// Keeps every email the API sends, so tests can follow links and codes. Also
+/// stands in for the outbox, so queued emails arrive before the request returns.
+/// </summary>
+public sealed partial class CapturedEmails : IEmailSender, IEmailOutbox
 {
     private readonly ConcurrentQueue<EmailMessage> _messages = new();
 
@@ -14,6 +17,8 @@ public sealed partial class CapturedEmails : IEmailSender
         _messages.Enqueue(message);
         return Task.CompletedTask;
     }
+
+    public void Enqueue(EmailMessage message) => _messages.Enqueue(message);
 
     public void Clear() => _messages.Clear();
 

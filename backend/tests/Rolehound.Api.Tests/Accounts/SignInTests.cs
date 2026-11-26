@@ -106,6 +106,21 @@ public sealed class SignInTests(ApiFactory factory) : ApiTest(factory)
     }
 
     [Fact]
+    public async Task Forgot_password_sends_at_most_a_few_emails_per_hour_to_one_account()
+    {
+        await CreateUserAsync("ana@exemplo.test");
+        using var browser = Factory.CreateBrowser();
+
+        for (var i = 0; i < PasswordReset.MaxEmailsPerHour + 2; i++)
+        {
+            var response = await browser.PostAsJsonAsync("/auth/password/forgot", new { email = "ana@exemplo.test" }, Ct);
+            Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
+        }
+
+        Assert.Equal(PasswordReset.MaxEmailsPerHour, Factory.Emails.To("ana@exemplo.test").Count);
+    }
+
+    [Fact]
     public async Task Reset_link_changes_the_password_ends_sessions_and_a_new_link_voids_the_old()
     {
         await CreateUserAsync("ana@exemplo.test");

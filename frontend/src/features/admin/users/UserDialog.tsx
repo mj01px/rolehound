@@ -14,12 +14,15 @@ function DraftFields({
   onChange,
   error,
   currentEmail,
+  emailLocked = false,
 }: {
   draft: UserDraft
   onChange: (draft: UserDraft) => void
   error: ApiError | null
   /** When editing: the masked address on file; the field then takes a new one, empty keeps it. */
   currentEmail?: string
+  /** The account is in use: only the person changes its email, from their profile. */
+  emailLocked?: boolean
 }) {
   return (
     <>
@@ -32,15 +35,19 @@ function DraftFields({
         error={error?.field('name')}
         autoFocus
       />
-      <Field
-        label={currentEmail ? 'Novo e-mail' : 'E-mail'}
-        type="email"
-        value={draft.email}
-        onChange={(e) => onChange({ ...draft, email: e.target.value })}
-        placeholder="usuario@email.com"
-        help={currentEmail ? `Atual: ${currentEmail}. Deixe em branco para manter.` : undefined}
-        error={error?.field('email')}
-      />
+      {emailLocked ? (
+        <p className={styles.noteQuiet}>E-mail: {currentEmail}. Numa conta em uso, só a própria pessoa troca o e-mail, pelo perfil.</p>
+      ) : (
+        <Field
+          label={currentEmail ? 'Novo e-mail' : 'E-mail'}
+          type="email"
+          value={draft.email}
+          onChange={(e) => onChange({ ...draft, email: e.target.value })}
+          placeholder="usuario@email.com"
+          help={currentEmail ? `Atual: ${currentEmail}. Deixe em branco para manter.` : undefined}
+          error={error?.field('email')}
+        />
+      )}
       <Field
         label="Usuário"
         value={draft.username}
@@ -123,7 +130,9 @@ export function EditUserDialog({ user, onClose }: { user: AdminUser; onClose: ()
     username: user.username,
   })
   const error = update.error instanceof ApiError ? update.error : null
-  const emailChanged = draft.email.trim() !== ''
+  // Changing the email of an account in use would let an admin reset its password and take it over.
+  const emailLocked = user.status !== 'pending'
+  const emailChanged = !emailLocked && draft.email.trim() !== ''
 
   const submit = (event: FormEvent) => {
     event.preventDefault()
@@ -134,18 +143,10 @@ export function EditUserDialog({ user, onClose }: { user: AdminUser; onClose: ()
     <Modal titleId="edit-user-title" onClose={onClose}>
       <form className={styles.dialogForm} onSubmit={submit} noValidate>
         <ModalHead id="edit-user-title" title={`Editar ${user.name || user.username}`} text="Papel e acesso ficam no detalhe da pessoa." onClose={onClose} />
-        <DraftFields draft={draft} onChange={setDraft} error={error} currentEmail={user.email} />
+        <DraftFields draft={draft} onChange={setDraft} error={error} currentEmail={user.email} emailLocked={emailLocked} />
         {emailChanged && draft.email.includes('@') && (
           <p className={styles.note} role="note">
-            {user.status === 'active' || user.status === 'deactivated' ? (
-              <>
-                O e-mail novo só passa a valer quando a pessoa confirmar pelo link enviado a <strong>{draft.email.trim()}</strong>. Até lá ela entra com o atual.
-              </>
-            ) : (
-              <>
-                O convite atual deixa de valer e um novo vai para <strong>{draft.email.trim()}</strong>.
-              </>
-            )}
+            O convite atual deixa de valer e um novo vai para <strong>{draft.email.trim()}</strong>.
           </p>
         )}
         {draft.username !== user.username && <p className={styles.noteQuiet}>Trocar o usuário muda como a pessoa entra. Avise antes.</p>}

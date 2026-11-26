@@ -31,7 +31,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
 
     public FakeJobSource JobSource { get; } = new(Rolehound.Connectors.JobSource.Greenhouse);
 
-    public const string TelegramSecret = "test-webhook-secret-0001";
+    public const string TelegramSecret = "test-webhook-secret-0001-abcdefghijklmnop";
 
     public FakeTelegram Telegram { get; } = new();
 
@@ -58,6 +58,8 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
         {
             services.RemoveAll<IEmailSender>();
             services.AddSingleton<IEmailSender>(Emails);
+            services.RemoveAll<IEmailOutbox>();
+            services.AddSingleton<IEmailOutbox>(Emails);
             services.AddHttpClient(BreachedPasswordValidator.HttpClientName)
                 .ConfigurePrimaryHttpMessageHandler(() => PwnedPasswords);
             services.RemoveAll<Rolehound.Connectors.IJobConnector>();

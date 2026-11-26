@@ -137,11 +137,30 @@ public sealed class ProfileTests(ApiFactory factory) : ApiTest(factory)
 
         var requested = await browser.PostAsJsonAsync("/account/email", new { newEmail = "ana.nova@exemplo.test" }, Ct);
         Assert.Equal(HttpStatusCode.Accepted, requested.StatusCode);
+        Assert.Contains("Pediram para trocar", Factory.Emails.Last("ana@exemplo.test").Body, StringComparison.Ordinal);
 
         var confirmed = await browser.PostAsJsonAsync("/auth/email/confirm", new { token = Factory.Emails.LastToken("ana.nova@exemplo.test") }, Ct);
         Assert.Equal(HttpStatusCode.NoContent, confirmed.StatusCode);
 
         Assert.Contains("ana.nova@exemplo.test", Factory.Emails.Last("ana@exemplo.test").Body, StringComparison.Ordinal);
         using var withNewEmail = await SignedInAsync("ana.nova@exemplo.test");
+    }
+
+    [Fact]
+    public async Task A_password_reset_voids_a_pending_email_change()
+    {
+        await CreateUserAsync("ana@exemplo.test");
+        using var browser = await SignedInAsync("ana@exemplo.test");
+        await ReauthenticateAsync(browser);
+        await browser.PostAsJsonAsync("/account/email", new { newEmail = "outra@exemplo.test" }, Ct);
+        var changeLink = Factory.Emails.LastToken("outra@exemplo.test");
+
+        using var anonymous = Factory.CreateBrowser();
+        await anonymous.PostAsJsonAsync("/auth/password/forgot", new { email = "ana@exemplo.test" }, Ct);
+        var reset = await anonymous.PostAsJsonAsync("/auth/password/reset", new { token = Factory.Emails.LastToken("ana@exemplo.test"), password = OtherStrongPassword }, Ct);
+        Assert.Equal(HttpStatusCode.NoContent, reset.StatusCode);
+
+        var confirmed = await anonymous.PostAsJsonAsync("/auth/email/confirm", new { token = changeLink }, Ct);
+        Assert.Equal("link_invalid", await ProblemCodeAsync(confirmed));
     }
 }

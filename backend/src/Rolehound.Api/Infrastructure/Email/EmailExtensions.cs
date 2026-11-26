@@ -23,6 +23,9 @@ internal static class EmailExtensions
             throw new InvalidOperationException("Email:SmtpHost is required outside Development.");
         }
 
+        services.AddSingleton<EmailOutbox>();
+        services.AddSingleton<IEmailOutbox>(provider => provider.GetRequiredService<EmailOutbox>());
+        services.AddHostedService(provider => provider.GetRequiredService<EmailOutbox>());
         return services;
     }
 }

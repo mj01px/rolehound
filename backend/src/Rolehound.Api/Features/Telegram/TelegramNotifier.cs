@@ -16,6 +16,9 @@ public sealed class TelegramNotifier(RolehoundDbContext db, TelegramClient teleg
 {
     public const int MaxJobsPerMessage = 10;
 
+    private const int TitleMax = 150;
+    private const int CompanyMax = 80;
+
     private static readonly System.Globalization.CultureInfo Br = System.Globalization.CultureInfo.GetCultureInfo("pt-BR");
 
     /// <summary>FR-NOT-02: after a run, one message per person with new highlights, best score first.</summary>
@@ -26,7 +29,7 @@ public sealed class TelegramNotifier(RolehoundDbContext db, TelegramClient teleg
             return;
         }
 
-        var links = await db.TelegramLinks.AsNoTracking().ToListAsync(ct);
+        var links = await ActiveLinks.AsNoTracking().ToListAsync(ct);
         foreach (var link in links)
         {
             var jobs = await db.UserJobs.AsNoTracking()
@@ -44,8 +47,8 @@ public sealed class TelegramNotifier(RolehoundDbContext db, TelegramClient teleg
             var buttons = new List<IReadOnlyList<TelegramButton>>();
             foreach (var job in jobs.Take(MaxJobsPerMessage))
             {
-                var company = string.IsNullOrWhiteSpace(job.Company) ? string.Empty : $" · {TelegramEndpoints.Html(job.Company)}";
-                text.Append(Br, $"\n<b>{job.Score}</b>  {TelegramEndpoints.Html(job.Title)}{company}");
+                var company = string.IsNullOrWhiteSpace(job.Company) ? string.Empty : $" · {TelegramEndpoints.Html(Clip(job.Company, CompanyMax))}";
+                text.Append(Br, $"\n<b>{job.Score}</b>  {TelegramEndpoints.Html(Clip(job.Title, TitleMax))}{company}");
                 buttons.Add([
                     new TelegramButton($"Abrir: {Short(job.Title)}", Url: $"{BaseUrl}/vagas/{job.Id}"),
                     new TelegramButton("Sem interesse", CallbackData: $"archive:{job.Id:N}"),
@@ -69,7 +72,7 @@ public sealed class TelegramNotifier(RolehoundDbContext db, TelegramClient teleg
             return;
         }
 
-        var links = await db.TelegramLinks.AsNoTracking().ToListAsync(ct);
+        var links = await ActiveLinks.AsNoTracking().ToListAsync(ct);
         foreach (var link in links)
         {
             var followed = db.CompanyAlerts.Where(a => a.UserId == link.UserId).Select(a => a.TargetId);
@@ -100,7 +103,7 @@ public sealed class TelegramNotifier(RolehoundDbContext db, TelegramClient teleg
             var buttons = new List<IReadOnlyList<TelegramButton>>();
             foreach (var company in companies.Take(MaxJobsPerMessage))
             {
-                text.Append(Br, $"\n<b>{TelegramEndpoints.Html(company.Name)}</b>: {(company.Count == 1 ? "1 vaga nova" : $"{company.Count} vagas novas")} para você");
+                text.Append(Br, $"\n<b>{TelegramEndpoints.Html(Clip(company.Name, CompanyMax))}</b>: {(company.Count == 1 ? "1 vaga nova" : $"{company.Count} vagas novas")} para você");
                 buttons.Add([new TelegramButton($"Ver {Short(company.Name)}", Url: $"{BaseUrl}/empresas/{company.TargetId}")]);
             }
 
@@ -116,7 +119,7 @@ public sealed class TelegramNotifier(RolehoundDbContext db, TelegramClient teleg
             return;
         }
 
-        var link = await db.TelegramLinks.AsNoTracking().SingleOrDefaultAsync(l => l.UserId == person, ct);
+        var link = await ActiveLinks.AsNoTracking().SingleOrDefaultAsync(l => l.UserId == person, ct);
         if (link is null)
         {
             return;
@@ -141,7 +144,7 @@ public sealed class TelegramNotifier(RolehoundDbContext db, TelegramClient teleg
             .Where(r => people.Contains(r.UserId) && r.Platform == platform && r.Announced)
             .Select(r => new { r.UserId, r.Host })
             .ToListAsync(ct);
-        foreach (var link in await db.TelegramLinks.AsNoTracking().Where(l => people.Contains(l.UserId)).ToListAsync(ct))
+        foreach (var link in await ActiveLinks.AsNoTracking().Where(l => people.Contains(l.UserId)).ToListAsync(ct))
         {
             var mine = hosts.Where(h => h.UserId == link.UserId).Select(h => h.Host).Distinct().ToList();
             var text = $"<b>{TelegramEndpoints.Html(Companies.ConnectorRequestEndpoints.ReadyTitle(platform))}</b>\n{TelegramEndpoints.Html(Companies.ConnectorRequestEndpoints.ReadyDetail(mine))}";
@@ -158,13 +161,13 @@ public sealed class TelegramNotifier(RolehoundDbContext db, TelegramClient teleg
         }
 
         var admins = await db.Users.AsNoTracking().Where(u => u.Role == Accounts.UserRole.Admin && u.IsActive).Select(u => u.Id).ToListAsync(ct);
-        var links = await db.TelegramLinks.AsNoTracking().Where(l => admins.Contains(l.UserId)).ToListAsync(ct);
+        var links = await ActiveLinks.AsNoTracking().Where(l => admins.Contains(l.UserId)).ToListAsync(ct);
         foreach (var link in links)
         {
             var text = new StringBuilder("<b>Fontes com problema</b>\n");
             foreach (var target in targets.Take(MaxJobsPerMessage))
             {
-                text.Append(Br, $"\n<b>{TelegramEndpoints.Html(target.Label ?? target.Key)}</b>: {TelegramEndpoints.Html(Collection.SourceHealth.Detail(target.HealthIssue!, target.LastError))}");
+                text.Append(Br, $"\n<b>{TelegramEndpoints.Html(Clip(target.Label ?? target.Key, CompanyMax))}</b>: {TelegramEndpoints.Html(Clip(Collection.SourceHealth.Detail(target.HealthIssue!, target.LastError), TitleMax))}");
             }
 
             await telegram.SendAsync(link.ChatId, text.ToString(), [[new TelegramButton("Abrir Fontes", Url: $"{BaseUrl}/admin/fontes")]], ct);
@@ -180,7 +183,7 @@ public sealed class TelegramNotifier(RolehoundDbContext db, TelegramClient teleg
         }
 
         var today = FunnelEndpoints.Today(time);
-        var links = await db.TelegramLinks.Where(l => l.LastOverdueDigestOn == null || l.LastOverdueDigestOn < today).ToListAsync(ct);
+        var links = await ActiveLinks.Where(l => l.LastOverdueDigestOn == null || l.LastOverdueDigestOn < today).ToListAsync(ct);
         var sent = 0;
         foreach (var link in links)
         {
@@ -191,21 +194,25 @@ public sealed class TelegramNotifier(RolehoundDbContext db, TelegramClient teleg
                 .OrderBy(a => a.NextStepOn)
                 .ToListAsync(ct);
 
-            link.LastOverdueDigestOn = today;
             if (overdue.Count == 0)
             {
+                link.LastOverdueDigestOn = today;
                 continue;
             }
 
             var text = new StringBuilder($"<b>{(overdue.Count == 1 ? "1 follow-up atrasado" : $"{overdue.Count} follow-ups atrasados")}</b>\n");
             foreach (var item in overdue.Take(MaxJobsPerMessage))
             {
-                var step = string.IsNullOrWhiteSpace(item.NextStep) ? string.Empty : $": {TelegramEndpoints.Html(item.NextStep)}";
-                text.Append(Br, $"\n{item.NextStepOn:dd/MM}  {TelegramEndpoints.Html(item.Title)}{step}");
+                var step = string.IsNullOrWhiteSpace(item.NextStep) ? string.Empty : $": {TelegramEndpoints.Html(Clip(item.NextStep, TitleMax))}";
+                text.Append(Br, $"\n{item.NextStepOn:dd/MM}  {TelegramEndpoints.Html(Clip(item.Title, TitleMax))}{step}");
             }
 
-            await telegram.SendAsync(link.ChatId, text.ToString(), [[new TelegramButton("Abrir o funil", Url: $"{BaseUrl}/funil")]], ct);
-            sent++;
+            // A digest that did not reach Telegram is tried again at the next call of the day.
+            if (await telegram.SendAsync(link.ChatId, text.ToString(), [[new TelegramButton("Abrir o funil", Url: $"{BaseUrl}/funil")]], ct))
+            {
+                link.LastOverdueDigestOn = today;
+                sent++;
+            }
         }
 
         await db.SaveChangesAsync(ct);
@@ -216,5 +223,28 @@ public sealed class TelegramNotifier(RolehoundDbContext db, TelegramClient teleg
 
     private string BaseUrl => web.Value.BaseUrl.TrimEnd('/');
 
-    private static string Short(string title) => title.Length > 24 ? $"{title[..23]}…" : title;
+    // Deactivated people keep no channel: their chats get nothing even if a link row is left.
+    private IQueryable<TelegramLink> ActiveLinks => db.TelegramLinks.Where(l => db.Users.Any(u => u.Id == l.UserId && u.IsActive));
+
+    private static string Short(string title) => Clip(title, 24);
+
+    /// <summary>
+    /// Shortens third-party text so a full message stays far below Telegram's 4096
+    /// characters, without splitting a character made of two UTF-16 units.
+    /// </summary>
+    internal static string Clip(string text, int max)
+    {
+        if (text.Length <= max)
+        {
+            return text;
+        }
+
+        var cut = max - 1;
+        if (char.IsHighSurrogate(text[cut - 1]))
+        {
+            cut--;
+        }
+
+        return $"{text[..cut]}…";
+    }
 }

@@ -95,6 +95,7 @@ public static class AccountsModule
             .AddPolicy(AdminPolicy, policy => policy.RequireRole(nameof(UserRole.Admin)));
 
         services.AddScoped<AccountTokens>();
+        services.AddScoped<AccountRevocation>();
         services.AddScoped<AccountEmails>();
         services.AddScoped<SecurityLog>();
         services.AddScoped<AdminSeeder>();
