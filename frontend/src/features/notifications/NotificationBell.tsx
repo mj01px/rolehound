@@ -118,7 +118,14 @@ export function NotificationBell() {
             )}
           </div>
           {items.length === 0 ? (
-            <p className={styles.empty}>{notifications.isError ? 'Não deu para carregar agora.' : 'Tudo em dia.'}</p>
+            notifications.isError ? (
+              <p className={styles.empty}>Não deu para carregar as notificações agora. Tente de novo em instantes.</p>
+            ) : (
+              <div className={styles.emptyState}>
+                <p className={styles.emptyTitle}>Nenhuma notificação</p>
+                <p className={styles.emptyText}>Aqui aparecem destaques novos, follow-ups atrasados e avisos das suas fontes e da IA.</p>
+              </div>
+            )
           ) : (
             <ul className={styles.list}>
               {items.map((item) => (
