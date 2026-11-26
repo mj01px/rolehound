@@ -1596,6 +1596,11 @@ namespace Rolehound.Api.Infrastructure.Persistence.Migrations
                     b.HasIndex("JobId")
                         .HasDatabaseName("ix_resume_generations_job_id");
 
+                    b.HasIndex("UserId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_resume_generations_one_in_progress")
+                        .HasFilter("status IN ('Queued', 'Running')");
+
                     b.HasIndex("Status", "CreatedAt")
                         .HasDatabaseName("ix_resume_generations_status_created_at");
 

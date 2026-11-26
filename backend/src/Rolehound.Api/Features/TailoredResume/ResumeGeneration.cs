@@ -72,6 +72,12 @@ internal sealed class ResumeGenerationConfiguration : IEntityTypeConfiguration<R
         builder.HasIndex(g => new { g.Status, g.CreatedAt });
         builder.HasIndex(g => new { g.UserId, g.JobId });
         builder.HasIndex(g => g.JobId);
+
+        // FR-AI-11, enforced by the database: at most one queued or running generation per person.
+        builder.HasIndex(g => g.UserId)
+            .IsUnique()
+            .HasFilter("status IN ('Queued', 'Running')")
+            .HasDatabaseName("ux_resume_generations_one_in_progress");
         builder.HasOne<User>().WithMany().HasForeignKey(g => g.UserId).OnDelete(DeleteBehavior.Cascade);
         builder.HasOne<Job>().WithMany().HasForeignKey(g => g.JobId).OnDelete(DeleteBehavior.Cascade);
     }

@@ -165,6 +165,18 @@ public sealed class TailoredResumeTests(ApiFactory factory) : ApiTest(factory)
         browser.Dispose();
     }
 
+    [Fact]
+    public async Task Parallel_requests_queue_only_one_generation()
+    {
+        var (browser, jobId) = await ReadyAsync();
+
+        var responses = await Task.WhenAll(Enumerable.Range(0, 8)
+            .Select(_ => browser.PostAsJsonAsync($"/jobs/{jobId}/resumes", new { language = "pt" }, Ct)));
+
+        Assert.Single(responses, r => r.StatusCode == HttpStatusCode.Accepted);
+        Assert.All(responses.Where(r => r.StatusCode != HttpStatusCode.Accepted), r => Assert.Equal(HttpStatusCode.Conflict, r.StatusCode));
+    }
+
     private async Task<bool> ProcessAsync()
     {
         await using var scope = Factory.Services.CreateAsyncScope();

@@ -75,11 +75,11 @@ public sealed class AiUsage
 
     public required string Model { get; init; }
 
-    public int PromptTokens { get; init; }
+    public int PromptTokens { get; set; }
 
-    public int CompletionTokens { get; init; }
+    public int CompletionTokens { get; set; }
 
-    public bool Succeeded { get; init; }
+    public bool Succeeded { get; set; }
 
     public DateTimeOffset At { get; init; }
 }

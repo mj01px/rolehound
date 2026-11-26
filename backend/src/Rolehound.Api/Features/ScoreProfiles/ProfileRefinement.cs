@@ -58,7 +58,7 @@ internal static class ProfileRefinement
         ChatMessage[] messages =
         [
             new("system", Instructions),
-            new("user", $"<profile>\n{JsonSerializer.Serialize(current, ScoreProfileEndpoints.Json)}\n</profile>\n\n<request>\n{instruction}\n</request>\n\n<dossier>\n{dossier.Value.Excerpt}\n</dossier>"),
+            new("user", $"{PromptBlock.Wrap("profile", JsonSerializer.Serialize(current, ScoreProfileEndpoints.Json))}\n\n{PromptBlock.Wrap("request", instruction)}\n\n{PromptBlock.Wrap("dossier", dossier.Value.Excerpt)}"),
         ];
 
         ProfileDocument? revised;

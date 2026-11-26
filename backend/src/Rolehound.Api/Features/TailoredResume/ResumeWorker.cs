@@ -80,8 +80,8 @@ public sealed partial class ResumeProcessor(RolehoundDbContext db, AiGateway ai,
         ChatMessage[] messages =
         [
             new("system", Instructions(generation.Language)),
-            new("user", $"<dossier>\n{ForModel(dossier.Content)}\n</dossier>"),
-            new("user", $"<job>\nTitle: {job.Title}\nCompany: {job.Company}\n\n{(job.Description.Length > MaxJobText ? job.Description[..MaxJobText] : job.Description)}\n</job>"),
+            new("user", PromptBlock.Wrap("dossier", ForModel(dossier.Content))),
+            new("user", PromptBlock.Wrap("job", $"Title: {job.Title}\nCompany: {job.Company}\n\n{(job.Description.Length > MaxJobText ? job.Description[..MaxJobText] : job.Description)}")),
         ];
 
         var answer = await ai.CompleteAsync(generation.UserId, AiSlot.Resume, AiFeature.Resume, messages, "tailored_resume", Schema, 6_000, ct);

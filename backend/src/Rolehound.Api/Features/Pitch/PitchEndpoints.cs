@@ -84,12 +84,12 @@ internal static class PitchEndpoints
         var messages = new List<ChatMessage>
         {
             new("system", Instructions(language)),
-            new("user", $"<dossier>\n{Excerpt(dossier.Content)}\n</dossier>"),
-            new("user", $"<job>\nTitle: {job.Title}\nCompany: {job.Company}\nLocation: {job.Location}\n\n{Cut(job.Description, MaxJobText)}\n</job>"),
+            new("user", PromptBlock.Wrap("dossier", Excerpt(dossier.Content))),
+            new("user", PromptBlock.Wrap("job", $"Title: {job.Title}\nCompany: {job.Company}\nLocation: {job.Location}\n\n{Cut(job.Description, MaxJobText)}")),
         };
         if (!string.IsNullOrEmpty(instruction))
         {
-            messages.Add(new("user", $"<style_request>\n{instruction}\n</style_request>"));
+            messages.Add(new("user", PromptBlock.Wrap("style_request", instruction)));
         }
 
         AiAnswer answer;

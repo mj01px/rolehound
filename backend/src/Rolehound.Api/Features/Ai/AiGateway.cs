@@ -47,13 +47,11 @@ public sealed class AiGateway(
         }
 
         var model = settings.ModelFor(slot) ?? throw new AiException("ai_model_missing", "Escolha os modelos de IA primeiro.");
-        await EnsureWithinHourlyLimitAsync(userId, ct);
-
         var apiKey = KeyProtector.Unprotect(settings.EncryptedKey);
         var result = await CallAndLogAsync(userId, feature, apiKey, model, messages, schemaName, schema, maxTokens, ct);
         var (promptTokens, completionTokens) = (result.PromptTokens, result.CompletionTokens);
 
-        // Truncated output: one retry with twice the room, then give up (PRD 10.1).
+        // Truncated output: one retry with twice the room, then give up (PRD 10.1). The retry counts against the limit too.
         if (result.FinishReason == "length")
         {
             result = await CallAndLogAsync(userId, feature, apiKey, model, messages, schemaName, schema, maxTokens * 2, ct);
@@ -71,25 +69,38 @@ public sealed class AiGateway(
     /// <summary>A tiny call that proves the key reaches the model. Costs a handful of tokens on the person's key.</summary>
     public async Task TestModelAsync(Guid userId, string apiKey, string model, CancellationToken ct)
     {
-        await EnsureWithinHourlyLimitAsync(userId, ct);
         await CallAndLogAsync(userId, AiFeature.ModelTest, apiKey, model, [new ChatMessage("user", "Responda apenas: ok")], null, null, 16, ct);
     }
 
     public string Unprotect(string encryptedKey) => KeyProtector.Unprotect(encryptedKey);
 
-    private async Task EnsureWithinHourlyLimitAsync(Guid userId, CancellationToken ct)
+    /// <summary>
+    /// Checks the hourly limit and books the call in one step, under a lock per person,
+    /// so parallel requests cannot all pass the check before any of them is counted.
+    /// The booking is the usage row; the call fills it in when it ends.
+    /// </summary>
+    private async Task<AiUsage> ReserveAsync(Guid userId, AiFeature feature, string model, CancellationToken ct)
     {
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        await db.Database.ExecuteSqlAsync($"SELECT pg_advisory_xact_lock(hashtextextended({userId.ToString()}, 7262002))", ct);
         var since = time.GetUtcNow().AddHours(-1);
         var calls = await db.AiUsage.CountAsync(u => u.UserId == userId && u.At > since, ct);
         if (calls >= options.Value.RequestsPerHour)
         {
             throw new AiException("ai_hourly_limit", $"Limite de {options.Value.RequestsPerHour} pedidos de IA por hora atingido. Tente mais tarde.");
         }
+
+        var usage = new AiUsage { UserId = userId, Feature = feature, Model = model, Succeeded = false, At = time.GetUtcNow() };
+        db.AiUsage.Add(usage);
+        await db.SaveChangesAsync(ct);
+        await transaction.CommitAsync(ct);
+        return usage;
     }
 
     private async Task<ChatResult> CallAndLogAsync(
         Guid userId, AiFeature feature, string apiKey, string model, IReadOnlyList<ChatMessage> messages, string? schemaName, JsonNode? schema, int maxTokens, CancellationToken ct)
     {
+        var usage = await ReserveAsync(userId, feature, model, ct);
         ChatResult? result = null;
         try
         {
@@ -98,16 +109,9 @@ public sealed class AiGateway(
         }
         finally
         {
-            db.AiUsage.Add(new AiUsage
-            {
-                UserId = userId,
-                Feature = feature,
-                Model = model,
-                PromptTokens = result?.PromptTokens ?? 0,
-                CompletionTokens = result?.CompletionTokens ?? 0,
-                Succeeded = result is not null,
-                At = time.GetUtcNow(),
-            });
+            usage.PromptTokens = result?.PromptTokens ?? 0;
+            usage.CompletionTokens = result?.CompletionTokens ?? 0;
+            usage.Succeeded = result is not null;
             await db.SaveChangesAsync(CancellationToken.None);
         }
     }

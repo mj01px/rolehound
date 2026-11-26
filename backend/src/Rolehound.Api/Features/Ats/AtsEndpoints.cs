@@ -71,8 +71,8 @@ internal static class AtsEndpoints
         ChatMessage[] messages =
         [
             new("system", Instructions),
-            new("user", $"<resume>\n{resume.Text}\n</resume>"),
-            new("user", $"<job>\nTitle: {job.Title}\nCompany: {job.Company}\nLocation: {job.Location}\n\n{(job.Description.Length > MaxJobText ? job.Description[..MaxJobText] : job.Description)}\n</job>"),
+            new("user", PromptBlock.Wrap("resume", resume.Text)),
+            new("user", PromptBlock.Wrap("job", $"Title: {job.Title}\nCompany: {job.Company}\nLocation: {job.Location}\n\n{(job.Description.Length > MaxJobText ? job.Description[..MaxJobText] : job.Description)}")),
         ];
 
         AiAnswer answer;

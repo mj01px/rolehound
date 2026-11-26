@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Text.RegularExpressions;
 
 namespace Rolehound.Api.Features.TailoredResume;
 
@@ -27,8 +28,12 @@ public sealed record ResumeEducation(string Institution, string Degree, string? 
 
 public sealed record ResumeVolunteering(string Organization, string Role, string? Start, string? End);
 
-/// <summary>Reworded text next to the Dossier text it came from (FR-AI-09).</summary>
-public sealed record ResumeChange(string Section, string Label, string Original, string Rewritten);
+/// <summary>
+/// Reworded text next to the Dossier text it came from (FR-AI-09). <see cref="NotInDossier"/>
+/// lists numbers, links and emails the rewording has that the Dossier never mentions:
+/// code cannot judge free text, so these are pointed out for the person to check.
+/// </summary>
+public sealed record ResumeChange(string Section, string Label, string Original, string Rewritten, IReadOnlyList<string>? NotInDossier = null);
 
 /// <summary>Something in the Dossier the resume left out (BR-AI-04).</summary>
 public sealed record ResumeCut(string Section, string Item);
@@ -43,7 +48,7 @@ public sealed record BuildResult(ResumeDocument? Document, IReadOnlyList<ResumeC
 /// every skill must exist in the Dossier; anything left out is a cut (BR-AI-04).
 /// Contact details are not part of it: the PDF takes them from the Dossier (BR-AI-05).
 /// </summary>
-public static class ResumeBuilder
+public static partial class ResumeBuilder
 {
     public const int MaxText = 1_500;
 
@@ -223,7 +228,9 @@ public static class ResumeBuilder
             certifications,
             courses,
             volunteering);
-        return new BuildResult(document, changes, cuts, null);
+        var facts = FactsOf(dossier);
+        var checkedChanges = changes.Select(c => Unsupported(c.Rewritten, facts) is { Count: > 0 } extra ? c with { NotInDossier = extra } : c).ToList();
+        return new BuildResult(document, checkedChanges, cuts, null);
     }
 
     private static List<T> Pick<T>(JsonNode? picked, JsonNode? dossierSection, string what, List<ResumeCut> cuts, string section, Func<JsonObject, string> label, Func<JsonObject, T> map)
@@ -321,6 +328,49 @@ public static class ResumeBuilder
     };
 
     private static BuildResult Fail(string error) => new(null, [], [], error);
+
+    /// <summary>Numbers, links and emails in <paramref name="text"/> that appear nowhere in the Dossier.</summary>
+    internal static List<string> Unsupported(string text, string facts) =>
+        FactPattern().Matches(text)
+            .Select(m => m.Value.TrimEnd('.', ',', ';', ':', ')', '!', '?'))
+            .Where(v => v.Length > 0 && !facts.Contains(v, StringComparison.OrdinalIgnoreCase))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+    /// <summary>Every text and number value in the Dossier, one per line.</summary>
+    private static string FactsOf(JsonNode? node)
+    {
+        var values = new List<string>();
+        void Walk(JsonNode? current)
+        {
+            switch (current)
+            {
+                case JsonObject obj:
+                    foreach (var (_, child) in obj)
+                    {
+                        Walk(child);
+                    }
+
+                    break;
+                case JsonArray array:
+                    foreach (var child in array)
+                    {
+                        Walk(child);
+                    }
+
+                    break;
+                case JsonValue value:
+                    values.Add(value.ToString());
+                    break;
+            }
+        }
+
+        Walk(node);
+        return string.Join('\n', values);
+    }
+
+    [GeneratedRegex(@"https?://\S+|www\.\S+|[^\s@]+@[^\s@]+\.[^\s@]+|\d+(?:[.,]\d+)*%?", RegexOptions.IgnoreCase | RegexOptions.NonBacktracking, 1000)]
+    private static partial Regex FactPattern();
 
     private sealed class InvalidResumeException(string message) : Exception(message);
 }

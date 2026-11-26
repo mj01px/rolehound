@@ -171,3 +171,12 @@
   opacity: 0.4;
   cursor: not-allowed;
 }
+
+.notInDossier {
+  margin: 6px 0 0;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--amber) 14%, transparent);
+  color: var(--amber);
+  font-size: 0.8125rem;
+}

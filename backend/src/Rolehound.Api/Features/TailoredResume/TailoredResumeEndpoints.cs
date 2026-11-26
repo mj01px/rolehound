@@ -83,7 +83,15 @@ internal static class TailoredResumeEndpoints
 
         var generation = new ResumeGeneration { UserId = userId, JobId = jobId, Language = language, Status = GenerationStatus.Queued, CreatedAt = time.GetUtcNow() };
         db.ResumeGenerations.Add(generation);
-        await db.SaveChangesAsync(ct);
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is Npgsql.PostgresException { SqlState: Npgsql.PostgresErrorCodes.UniqueViolation })
+        {
+            // A parallel request queued one between the check above and this insert.
+            return Problems.Conflict("generation_in_progress", "Já tem um currículo sendo gerado. Espere ele terminar.");
+        }
         return TypedResults.Accepted($"/resumes/{generation.Id}", ToResponse(generation, withReview: false));
     }
 

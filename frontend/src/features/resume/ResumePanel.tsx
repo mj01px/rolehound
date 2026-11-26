@@ -11,6 +11,8 @@ interface Change {
   label: string
   original: string
   rewritten: string
+  /** Numbers, links and emails in the rewording that the Dossier never mentions. */
+  notInDossier?: string[] | null
 }
 
 interface Cut {
@@ -72,7 +74,9 @@ export function ResumePanel({ jobId }: { jobId: string }) {
       <h2 id="resume-title" className={styles.sectionTitle}>
         Currículo adaptado
       </h2>
-      <p className={styles.muted}>Feito do seu Dossier para essa vaga. Empresas, cargos, datas e formação são copiados do Dossier; a IA só escolhe o que entra e reescreve frases.</p>
+      <p className={styles.muted}>
+        Feito do seu Dossier para essa vaga. Empresas, cargos, datas e formação são copiados do Dossier; a IA só escolhe o que entra e reescreve frases.
+      </p>
 
       <div className={styles.controls}>
         <Select variant="compact" label="Idioma do currículo" value={language} options={languages} onChange={setLanguage} />
@@ -147,6 +151,11 @@ function GenerationView({ generation }: { generation: Generation }) {
                     {change.rewritten}
                   </span>
                 </span>
+                {change.notInDossier && change.notInDossier.length > 0 && (
+                  <p className={styles.notInDossier} role="note">
+                    Confira: {change.notInDossier.join(', ')} não aparece no seu Dossier.
+                  </p>
+                )}
               </li>
             ))}
           </ul>
