@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { QRCodeSVG } from 'qrcode.react'
 import { useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { ApiError, api, apiUrl, errorMessage } from '../../lib/api'
@@ -380,11 +381,27 @@ export function TelegramSection() {
             )}
           </div>
           {link && !data.connected && (
-            <div className={styles.actions}>
+            <div className={styles.telegramLink}>
+              <ol className={styles.telegramSteps}>
+                <li>Abra o bot no Telegram: pelo botão, se o Telegram está neste aparelho, ou apontando a câmera do celular para o QR code.</li>
+                <li>
+                  Toque em <strong>Começar</strong> na conversa com o bot.
+                </li>
+                <li>Pronto: esta tela mostra "Conectado" sozinha em alguns segundos.</li>
+              </ol>
               <a className={styles.buttonLink} href={link.url} target="_blank" rel="noopener noreferrer">
                 Abrir no Telegram
               </a>
-              <span className={styles.muted}>Toque em Começar no bot. O link vale até {new Date(link.expiresAt).toLocaleTimeString('pt-BR', { timeStyle: 'short' })}.</span>
+              <div className={styles.telegramQr}>
+                <div className={styles.qr}>
+                  {/* Fixed dark on light: scanners need that contrast, whatever the theme. */}
+                  <QRCodeSVG value={link.url} size={168} marginSize={2} bgColor="#fafafa" fgColor="#09090b" title="QR code para abrir o bot do rolehound no Telegram" />
+                </div>
+                <span className={styles.muted}>
+                  O link e o QR code valem até {new Date(link.expiresAt).toLocaleTimeString('pt-BR', { timeStyle: 'short' })} e só funcionam uma vez. Se vencer, toque em Conectar
+                  de novo.
+                </span>
+              </div>
             </div>
           )}
           {(start.isError || stop.isError) && <Alert>{errorMessage(start.error ?? stop.error)}</Alert>}
