@@ -85,6 +85,9 @@ public sealed class RolehoundDbContext(DbContextOptions<RolehoundDbContext> opti
     {
         base.OnModelCreating(builder);
 
+        // Accent-insensitive search: "itau" finds "Itaú" (unaccent ships with PostgreSQL's contrib modules).
+        builder.HasPostgresExtension("unaccent");
+
         builder.Entity<IdentityUserClaim<Guid>>().ToTable("user_claims");
         builder.Entity<IdentityUserLogin<Guid>>().ToTable("user_logins");
         builder.Entity<IdentityUserToken<Guid>>().ToTable("user_tokens");

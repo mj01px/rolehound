@@ -111,7 +111,9 @@ internal static class JobEndpoints
         if (!string.IsNullOrWhiteSpace(q))
         {
             var pattern = $"%{EscapeLike(q.Trim())}%";
-            filtered = filtered.Where(r => EF.Functions.ILike(r.Job.Title, pattern, "\\") || EF.Functions.ILike(r.Job.Company, pattern, "\\"));
+            // Case and accents do not matter: "itau" finds "Itaú", "seguranca" finds "Segurança".
+            filtered = filtered.Where(r => EF.Functions.ILike(EF.Functions.Unaccent(r.Job.Title), EF.Functions.Unaccent(pattern), "\\")
+                || EF.Functions.ILike(EF.Functions.Unaccent(r.Job.Company), EF.Functions.Unaccent(pattern), "\\"));
         }
 
         if (Validation.TryEnum<JobSource>(source, out var sourceValue))

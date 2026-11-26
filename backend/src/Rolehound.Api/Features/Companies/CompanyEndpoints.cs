@@ -297,7 +297,7 @@ internal static class CompanyEndpoints
         if (!string.IsNullOrEmpty(words))
         {
             var pattern = $"%{JobEndpoints.EscapeLike(words.Length > MaxSearchLength ? words[..MaxSearchLength] : words)}%";
-            jobs = jobs.Where(j => EF.Functions.ILike(j.Title, pattern, "\\"));
+            jobs = jobs.Where(j => EF.Functions.ILike(EF.Functions.Unaccent(j.Title), EF.Functions.Unaccent(pattern), "\\"));
         }
 
         // The city filter takes a place exactly as the cities list gave it.

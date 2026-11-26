@@ -191,6 +191,17 @@ public sealed class JobsTests(ApiFactory factory) : ApiTest(factory)
     }
 
     [Fact]
+    public async Task Search_ignores_accents_and_case()
+    {
+        await OnboardedAsync("ana@exemplo.test");
+        await CollectAsync(FakeJobSource.Job("1", "Dev Python de Segurança"), FakeJobSource.Job("2", "Analista Python"));
+
+        using var browser = await SignedInAsync("ana@exemplo.test");
+        Assert.Equal("Dev Python de Segurança", Assert.Single((await ListAsync(browser, "all", "&q=SEGURANCA")).Items).Title);
+        Assert.Equal(2, (await ListAsync(browser, "all", "&q=empresa exemplo")).Items.Count);
+    }
+
+    [Fact]
     public async Task Search_and_filters_narrow_the_list()
     {
         await OnboardedAsync("ana@exemplo.test");
