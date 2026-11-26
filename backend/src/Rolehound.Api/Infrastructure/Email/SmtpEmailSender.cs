@@ -15,7 +15,7 @@ internal sealed class SmtpEmailSender(IOptions<EmailOptions> options) : IEmailSe
         mime.From.Add(new MailboxAddress(_options.FromName, _options.From));
         mime.To.Add(MailboxAddress.Parse(message.To));
         mime.Subject = message.Subject;
-        mime.Body = new TextPart("plain") { Text = message.Body };
+        mime.Body = new BodyBuilder { TextBody = message.Body, HtmlBody = message.Html }.ToMessageBody();
 
         var host = _options.SmtpHost ?? throw new InvalidOperationException("Email:SmtpHost is not configured.");
 
