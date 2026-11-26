@@ -1,11 +1,34 @@
 # HTTPS certificates are issued and renewed by Caddy (Let's Encrypt).
 {$API_DOMAIN} {
 	encode zstd gzip
-	reverse_proxy api:8080 {
-		health_uri /health/live
+
+	# Called directly: Telegram (guarded by its own webhook secret) and health checks.
+	@direct path /telegram/webhook /health/live /health/ready
+	handle @direct {
+		reverse_proxy api:8080
 	}
+
+	# Everything else arrives only through the web app's proxy on Cloudflare Pages,
+	# which sends the shared secret and the visitor's address.
+	@proxied header X-Rolehound-Proxy {$PROXY_SECRET}
+	handle @proxied {
+		reverse_proxy api:8080 {
+			health_uri /health/live
+			header_up X-Forwarded-For {header.X-Rolehound-Client-Ip}
+			header_up -X-Rolehound-Proxy
+			header_up -X-Rolehound-Client-Ip
+		}
+	}
+
+	handle {
+		respond 404
+	}
+
 	log {
 		output stdout
-		format json
+		format filter {
+			request>headers>X-Rolehound-Proxy delete
+			wrap json
+		}
 	}
 }

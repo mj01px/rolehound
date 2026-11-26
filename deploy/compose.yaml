@@ -67,6 +67,7 @@ services:
       - "443:443"
     environment:
       API_DOMAIN: ${API_DOMAIN:?set API_DOMAIN in .env}
+      PROXY_SECRET: ${PROXY_SECRET:?set PROXY_SECRET in .env}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data

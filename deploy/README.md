@@ -5,13 +5,20 @@ scheduler and daily backups (`compose.yaml`). The web app runs on Cloudflare
 Pages. CI builds the API image and pushes it to the GitHub Container Registry,
 so the VM never compiles .NET.
 
+No custom domain is needed. The browser only talks to the Pages site; a Pages
+Function forwards `/api/*` to the VM, so the session cookie stays first party.
+The VM gets a free DuckDNS name for its HTTPS certificate.
+
 ```
-browser ── app.example.com (Cloudflare Pages)
-   └────── api.example.com ── Caddy ── API ── PostgreSQL
-                                        └── scheduler, backup (same VM)
+browser ── rolehound.pages.dev (Cloudflare Pages)
+              └── /api/* (Pages Function, shared secret)
+                    └── rolehound-api.duckdns.org ── Caddy ── API ── PostgreSQL
+                                                             └── scheduler, backup (same VM)
+Telegram ──────────── rolehound-api.duckdns.org/telegram/webhook
 ```
 
-Replace `example.com` with your domain throughout.
+Replace `rolehound.pages.dev` and `rolehound-api.duckdns.org` with your names
+throughout.
 
 ## 1. Google Cloud
 
@@ -77,8 +84,14 @@ base64 -w0 dp.pfx   # value of DataProtection__CertificateBase64
 rm dp.key dp.crt    # keep dp.pfx outside the VM
 ```
 
-**Email.** Create a Brevo account, verify the sender address, and use the SMTP
-login and key from Brevo › SMTP & API. Port 2525.
+**Proxy secret.** `PROXY_SECRET` is a random value (command above). The same
+value goes into the Cloudflare Pages project (section 5).
+
+**Email.** Use a Gmail account made for the app. Turn on 2-Step Verification,
+create an app password (Google Account › Security › App passwords), and fill
+`Email__SmtpUser` and `Email__From` with the address and `Email__SmtpPassword`
+with the app password. Host `smtp.gmail.com`, port 587 (STARTTLS); Google
+Cloud blocks only port 25.
 
 **Telegram (optional).** Talk to @BotFather, send `/newbot`, and put the token
 and the bot's username in `.env`. `Telegram__WebhookSecret` is any random value
@@ -89,15 +102,21 @@ of letters, digits, `_` and `-`. The API registers the webhook when it starts.
 1. After CI has pushed the image once, make it public so the VM can pull it
    without credentials: GitHub › Packages › `rolehound-api` › Package settings ›
    Change visibility › Public. The code is already public, so nothing new is exposed.
-2. Point `api.example.com` (A record) to the VM's static address.
+2. Sign in at https://www.duckdns.org, create the subdomain (for example
+   `rolehound-api`) and set its address to the VM's static address.
+   `duckdns.org` is on the Public Suffix List, so Let's Encrypt treats each
+   subdomain as its own domain.
 3. Start everything; Caddy obtains the HTTPS certificate on first request:
 
    ```bash
    docker compose pull
    docker compose up -d
    docker compose ps
-   curl -s https://api.example.com/health/ready
+   curl -s https://rolehound-api.duckdns.org/health/ready
    ```
+
+   Any other path called directly returns 404: only the Pages proxy may reach
+   the API.
 
 4. The first admin (`Admin__Email`) receives an access link by email.
 
@@ -110,12 +129,18 @@ Create a Pages project from the GitHub repository:
 | Root directory | `frontend` |
 | Build command | `npm ci && npm run build` |
 | Output directory | `dist` |
-| Environment variable | `VITE_API_URL=https://api.example.com` |
+| Variable | `API_ORIGIN=https://rolehound-api.duckdns.org` |
+| Secret | `PROXY_SECRET`, the same value as in `.env` (type Secret) |
 
-Node comes from `frontend/.nvmrc`. Add the custom domain `app.example.com`.
-`Web__BaseUrl` in `.env` must be exactly that address (CORS and email links).
-After the first deploy, open a deep link such as `https://app.example.com/funil`
-directly to confirm Pages serves the app for every path.
+Do not set `VITE_API_URL`: the app calls `/api` on its own site, and
+`frontend/functions/api/[[path]].ts` forwards it to the VM. Node comes from
+`frontend/.nvmrc`. `Web__BaseUrl` in `.env` must be exactly the Pages address
+(CORS and email links). Pages Functions share the Workers Free quota of
+100,000 requests a day; static files do not count.
+
+After the first deploy, open a deep link such as
+`https://rolehound.pages.dev/funil` directly to confirm Pages serves the app
+for every path, then sign in to confirm the proxy and the session cookie.
 
 ## Updating
 
@@ -160,5 +185,5 @@ docker compose exec -T postgres pg_restore -U rolehound -d rolehound --clean --i
 ```bash
 docker compose ps                        # all services healthy
 docker stats --no-stream                 # memory per container
-curl -s https://api.example.com/health/ready
+curl -s https://rolehound-api.duckdns.org/health/ready
 ```
