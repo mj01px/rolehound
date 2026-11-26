@@ -32,6 +32,30 @@ public sealed class ModelCatalogTests(ApiFactory factory) : ApiTest(factory)
     }
 
     [Fact]
+    public void The_catalog_keeps_what_each_model_accepts_so_temperature_goes_only_where_it_is_taken()
+    {
+        using var document = System.Text.Json.JsonDocument.Parse("""
+            {"data":[
+              {"id":"a/reasoner","name":"Reasoner","architecture":{"output_modalities":["text"]},"pricing":{"prompt":"0","completion":"0"},"supported_parameters":["max_tokens","response_format","structured_outputs"]},
+              {"id":"a/chat","name":"Chat","architecture":{"output_modalities":["text"]},"pricing":{"prompt":"0","completion":"0"},"supported_parameters":["max_tokens","response_format","structured_outputs","temperature"]}
+            ]}
+            """);
+
+        var models = ModelCatalog.Parse(document.RootElement).ToDictionary(m => m.Id);
+
+        Assert.DoesNotContain("temperature", models["a/reasoner"].Parameters);
+        Assert.Contains("temperature", models["a/chat"].Parameters);
+    }
+
+    [Theory]
+    [InlineData(null, "low")]
+    [InlineData("max,high,low,none", "low")]
+    [InlineData("high,medium", "medium")]
+    [InlineData("none", null)]
+    public void Reasoning_runs_at_the_lowest_effort_a_model_accepts(string? efforts, string? expected) =>
+        Assert.Equal(expected, ModelCatalog.LowestEffort(efforts?.Split(',')));
+
+    [Fact]
     public async Task The_catalog_is_fetched_once_and_then_served_from_memory()
     {
         ForgetCatalog();

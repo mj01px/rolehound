@@ -101,9 +101,7 @@ internal static class PitchEndpoints
         }
         catch (AiException ex)
         {
-            return ex.Code == "ai_invalid_output"
-                ? Problems.Problem(StatusCodes.Status502BadGateway, ex.Code, ex.Message)
-                : AiProblems.From(ex);
+            return AiProblems.From(ex);
         }
 
         var now = time.GetUtcNow();

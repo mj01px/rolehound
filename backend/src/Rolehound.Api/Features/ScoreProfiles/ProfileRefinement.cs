@@ -73,7 +73,7 @@ internal static class ProfileRefinement
 
         if (revised is null)
         {
-            return Problems.Problem(StatusCodes.Status502BadGateway, "ai_invalid_output", "O modelo não devolveu um perfil válido. Tente de novo, explique de outro jeito ou troque o modelo.");
+            return Problems.Problem(StatusCodes.Status422UnprocessableEntity, "ai_invalid_output", "O modelo não devolveu um perfil válido. Tente de novo, explique de outro jeito ou troque o modelo.");
         }
 
         var impact = await scoring.CompareAsync(current.ToEngineProfile(), revised.ToEngineProfile(), ct);

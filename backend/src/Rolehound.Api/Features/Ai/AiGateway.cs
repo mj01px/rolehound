@@ -16,8 +16,13 @@ public sealed class AiGateway(
     OpenRouterClient openRouter,
     IDataProtectionProvider dataProtection,
     IOptions<AiOptions> options,
+    ModelCatalog catalog,
     TimeProvider time)
 {
+    // The model test asks for a tiny JSON answer, so a model that cannot honour a schema fails there,
+    // when it is chosen, not later in the middle of a feature.
+    private static readonly JsonNode TestSchema = JsonNode.Parse("""{"type":"object","properties":{"ok":{"type":"boolean"}},"required":["ok"],"additionalProperties":false}""")!;
+
     private const string KeyPurpose = "Rolehound.Ai.OpenRouterKey.v1";
 
     private const string ManagementKeyPurpose = "Rolehound.Ai.OpenRouterManagementKey.v1";
@@ -69,7 +74,7 @@ public sealed class AiGateway(
     /// <summary>A tiny call that proves the key reaches the model. Costs a handful of tokens on the person's key.</summary>
     public async Task TestModelAsync(Guid userId, string apiKey, string model, CancellationToken ct)
     {
-        await CallAndLogAsync(userId, AiFeature.ModelTest, apiKey, model, [new ChatMessage("user", "Responda apenas: ok")], null, null, 16, ct);
+        await CallAndLogAsync(userId, AiFeature.ModelTest, apiKey, model, [new ChatMessage("user", "Responda com {\"ok\": true}.")], "model_test", TestSchema, 256, ct);
     }
 
     public string Unprotect(string encryptedKey) => KeyProtector.Unprotect(encryptedKey);
@@ -104,7 +109,7 @@ public sealed class AiGateway(
         ChatResult? result = null;
         try
         {
-            result = await openRouter.ChatAsync(apiKey, model, messages, schemaName, schema, maxTokens, ct);
+            result = await openRouter.ChatAsync(apiKey, model, messages, schemaName, schema, maxTokens, await catalog.RequestForAsync(model, ct), ct);
             return result;
         }
         finally

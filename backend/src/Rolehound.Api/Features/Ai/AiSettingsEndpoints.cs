@@ -268,14 +268,16 @@ internal static class AiSettingsEndpoints
     }
 }
 
-/// <summary>Turns AI failures into problem responses with their stable codes.</summary>
+/// <summary>
+/// Turns AI failures into problem responses with their stable codes. A failed model answer is a 422, not a
+/// 5xx: an edge proxy may swap a 5xx body for its own page, and the person would lose the message that says what to do.
+/// </summary>
 internal static class AiProblems
 {
     public static ProblemHttpResult From(AiException ex) => ex.Code switch
     {
         "ai_key_missing" or "ai_model_missing" => Problems.Conflict(ex.Code, ex.Message),
         "ai_hourly_limit" or "ai_rate_limited" => Problems.Problem(StatusCodes.Status429TooManyRequests, ex.Code, ex.Message),
-        "ai_key_invalid" or "ai_no_credits" or "ai_model_unavailable" => Problems.Problem(StatusCodes.Status422UnprocessableEntity, ex.Code, ex.Message),
-        _ => Problems.Problem(StatusCodes.Status502BadGateway, ex.Code, ex.Message),
+        _ => Problems.Problem(StatusCodes.Status422UnprocessableEntity, ex.Code, ex.Message),
     };
 }

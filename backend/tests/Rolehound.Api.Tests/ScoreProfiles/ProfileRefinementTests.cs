@@ -86,7 +86,7 @@ public sealed class ProfileRefinementTests(ApiFactory factory) : ApiTest(factory
 
         var response = await browser.PostAsJsonAsync("/score-profile/refine", new { profile = Current, instruction = "Tire tudo." }, Ct);
 
-        Assert.Equal(HttpStatusCode.BadGateway, response.StatusCode);
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
         Assert.Equal("ai_invalid_output", await ProblemCodeAsync(response));
     }
 

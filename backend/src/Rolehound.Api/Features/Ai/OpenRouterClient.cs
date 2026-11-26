@@ -131,17 +131,28 @@ public sealed class OpenRouterClient(HttpClient http)
         }
     }
 
-    /// <summary>POST /chat/completions. With a schema, the answer is JSON matching it.</summary>
+    /// <summary>
+    /// POST /chat/completions. With a schema, the answer is JSON matching it. The optional parameters in
+    /// <paramref name="options"/> go only when set: with a schema every parameter is required of the provider.
+    /// </summary>
     public async Task<ChatResult> ChatAsync(
-        string apiKey, string model, IReadOnlyList<ChatMessage> messages, string? schemaName, JsonNode? schema, int maxTokens, CancellationToken ct)
+        string apiKey, string model, IReadOnlyList<ChatMessage> messages, string? schemaName, JsonNode? schema, int maxTokens, ModelRequest options, CancellationToken ct)
     {
         var body = new JsonObject
         {
             ["model"] = model,
             ["messages"] = JsonSerializer.SerializeToNode(messages, Json),
             ["max_tokens"] = maxTokens,
-            ["temperature"] = 0.2,
         };
+        if (options.Temperature is { } temperature)
+        {
+            body["temperature"] = temperature;
+        }
+
+        if (options.ReasoningEffort is { } effort)
+        {
+            body["reasoning"] = new JsonObject { ["effort"] = effort };
+        }
 
         if (schema is not null)
         {

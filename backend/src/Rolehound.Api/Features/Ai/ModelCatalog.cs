@@ -19,7 +19,22 @@ public sealed record ModelOption(
     int ContextLength,
     bool Free,
     DateOnly? ExpiresOn,
-    decimal? Intelligence);
+    decimal? Intelligence)
+{
+    /// <summary>Request parameters the model's providers accept, as OpenRouter lists them. Not sent to the browser.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public IReadOnlySet<string> Parameters { get; init; } = new HashSet<string>(StringComparer.Ordinal);
+
+    /// <summary>The reasoning efforts the model accepts, strongest first; null when OpenRouter lists none (all accepted).</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public IReadOnlyList<string>? ReasoningEfforts { get; init; }
+}
+
+/// <summary>How to call one model: the optional parameters it accepts, set as the app wants them.</summary>
+public sealed record ModelRequest(double? Temperature, string? ReasoningEffort)
+{
+    public static readonly ModelRequest Plain = new(null, null);
+}
 
 /// <summary>
 /// The models offered in the model pickers: OpenRouter's public list, kept
@@ -33,6 +48,48 @@ public sealed class ModelCatalog(OpenRouterClient openRouter, IMemoryCache cache
     public static readonly TimeSpan Lifetime = TimeSpan.FromHours(6);
 
     public const string CacheKey = "ai:model-catalog";
+
+    /// <summary>Low, so the same request gives steady answers.</summary>
+    public const double Temperature = 0.2;
+
+    /// <summary>
+    /// The optional parameters to send to a model. A request with a schema requires every parameter of its
+    /// provider, so each goes only when the model accepts it: <c>temperature</c> (some reasoning models
+    /// refuse it) and a low <c>reasoning.effort</c>. Reasoning spends the same token budget as the answer
+    /// (OpenRouter's reasoning-tokens guide), so left at its default it can use it all and cut the answer.
+    /// Unknown model or catalog unreachable: neither, since leaving them out never breaks a request.
+    /// </summary>
+    public async Task<ModelRequest> RequestForAsync(string model, CancellationToken ct)
+    {
+        ModelOption? option;
+        try
+        {
+            option = (await GetAsync(ct)).FirstOrDefault(m => m.Id == model);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            return ModelRequest.Plain;
+        }
+
+        if (option is null)
+        {
+            return ModelRequest.Plain;
+        }
+
+        var temperature = option.Parameters.Contains("temperature") ? Temperature : (double?)null;
+        return new ModelRequest(temperature, option.Parameters.Contains("reasoning") ? LowestEffort(option.ReasoningEfforts) : null);
+    }
+
+    /// <summary>"low" when accepted; otherwise the weakest effort listed that still reasons.</summary>
+    internal static string? LowestEffort(IReadOnlyList<string>? efforts)
+    {
+        if (efforts is null || efforts.Contains("low"))
+        {
+            return "low";
+        }
+
+        return efforts.LastOrDefault(e => e is not "none");
+    }
 
     public async Task<IReadOnlyList<ModelOption>> GetAsync(CancellationToken ct)
     {
@@ -80,7 +137,11 @@ public sealed class ModelCatalog(OpenRouterClient openRouter, IMemoryCache cache
                 context,
                 prompt == 0 && completion == 0,
                 expires,
-                IntelligenceOf(model)));
+                IntelligenceOf(model))
+            {
+                Parameters = ParametersOf(model),
+                ReasoningEfforts = EffortsOf(model),
+            });
         }
 
         // Rated models first, best first; unrated ones after, by name. Ratings are never negative.
@@ -98,6 +159,17 @@ public sealed class ModelCatalog(OpenRouterClient openRouter, IMemoryCache cache
         && outputs.ValueKind == JsonValueKind.Array
         && outputs.GetArrayLength() == 1
         && outputs[0].GetString() == "text";
+
+    private static HashSet<string> ParametersOf(JsonElement model) =>
+        model.TryGetProperty("supported_parameters", out var parameters) && parameters.ValueKind == JsonValueKind.Array
+            ? parameters.EnumerateArray().Select(p => p.GetString()).OfType<string>().ToHashSet(StringComparer.Ordinal)
+            : new HashSet<string>(StringComparer.Ordinal);
+
+    private static List<string>? EffortsOf(JsonElement model) =>
+        model.TryGetProperty("reasoning", out var reasoning) && reasoning.ValueKind == JsonValueKind.Object
+        && reasoning.TryGetProperty("supported_efforts", out var efforts) && efforts.ValueKind == JsonValueKind.Array
+            ? efforts.EnumerateArray().Select(e => e.GetString()).OfType<string>().ToList()
+            : null;
 
     private static bool TakesSchema(JsonElement model) =>
         model.TryGetProperty("supported_parameters", out var parameters)

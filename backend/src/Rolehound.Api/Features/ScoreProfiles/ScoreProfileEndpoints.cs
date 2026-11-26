@@ -65,7 +65,7 @@ internal static class ScoreProfileEndpoints
             var answer = await ai.CompleteJsonAsync(userId, AiSlot.ProfileAndFix, AiFeature.ScoreProfile, messages, "score_profile_options", OptionsSchema, 6_000, ct);
             var options = Parse(answer);
             return options.Count == 0
-                ? Problems.Problem(StatusCodes.Status502BadGateway, "ai_invalid_output", "O modelo não gerou opções válidas. Tente de novo ou troque o modelo.")
+                ? Problems.Problem(StatusCodes.Status422UnprocessableEntity, "ai_invalid_output", "O modelo não gerou opções válidas. Tente de novo ou troque o modelo.")
                 : TypedResults.Ok(new ProfileOptionsResponse(dossier.Value.Number, options));
         }
         catch (AiException ex)
