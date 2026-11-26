@@ -35,18 +35,14 @@ export function AppLayout() {
   }, [menuOpen])
 
   const inSettings = pathname.startsWith('/configuracoes')
+
+  const inHelp = pathname.startsWith('/ajuda')
   const inProfile = pathname.startsWith('/perfil')
 
   return (
     <ReauthProvider>
       <div className={styles.shell}>
-        <Sidebar
-          isAdmin={me?.role === 'admin'}
-          onLogout={() => logout.mutate()}
-          loggingOut={logout.isPending}
-          mobileOpen={menuOpen}
-          onCloseMobile={() => setMenuOpen(false)}
-        />
+        <Sidebar isAdmin={me?.role === 'admin'} onLogout={() => logout.mutate()} loggingOut={logout.isPending} mobileOpen={menuOpen} onCloseMobile={() => setMenuOpen(false)} />
         {menuOpen && <div className={styles.backdrop} onClick={() => setMenuOpen(false)} aria-hidden="true" />}
         <div className={styles.column}>
           <header className={styles.topbar}>
@@ -60,6 +56,15 @@ export function AppLayout() {
               </span>
             </div>
             <div className={styles.account}>
+              <Link
+                to="/ajuda"
+                className={inHelp ? `${styles.iconButton} ${styles.current}` : styles.iconButton}
+                aria-label="Ajuda e perguntas frequentes"
+                aria-current={inHelp ? 'page' : undefined}
+                title="Ajuda"
+              >
+                {icons.help}
+              </Link>
               <NotificationBell />
               <Link
                 to="/configuracoes"

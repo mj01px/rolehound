@@ -1,7 +1,9 @@
 import { createBrowserRouter } from 'react-router'
 import { DossierPage } from '../features/account/DossierPage'
 import { ProfilePage } from '../features/account/ProfilePage'
+import { ScoreProfilePage } from '../features/account/ScoreProfilePage'
 import { SettingsPage } from '../features/account/SettingsPage'
+import { HelpPage } from '../features/help/HelpPage'
 import { UserPage } from '../features/admin/users/UserPage'
 import { UsersPage } from '../features/admin/users/UsersPage'
 import { AccessPage } from '../features/auth/AccessPage'
@@ -43,6 +45,8 @@ export const router = createBrowserRouter([
   { path: '/confirmar-email', element: <ConfirmEmailPage /> },
   { path: '/termos', element: <TermsPage /> },
   { path: '/privacidade', element: <PrivacyPage /> },
+  // Public: people who cannot sign in need it most.
+  { path: '/ajuda', element: <HelpPage /> },
   {
     element: <RequireAuth />,
     children: [
@@ -60,6 +64,7 @@ export const router = createBrowserRouter([
           { path: '/qualidade', element: <AccuracyPage /> },
           { path: '/configuracoes', element: <SettingsPage /> },
           { path: '/configuracoes/dossier', element: <DossierPage /> },
+          { path: '/configuracoes/perfil', element: <ScoreProfilePage /> },
           { path: '/perfil', element: <ProfilePage /> },
           {
             element: <RequireAuth admin />,
