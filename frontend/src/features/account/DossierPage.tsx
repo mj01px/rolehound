@@ -4,6 +4,7 @@ import { Link } from 'react-router'
 import { api, errorMessage } from '../../lib/api'
 import { Alert } from '../../ui/Alert'
 import { Button } from '../../ui/Button'
+import { DossierImport } from './DossierImport'
 import styles from './account.module.css'
 
 interface Dossier {
@@ -12,10 +13,11 @@ interface Dossier {
   content: unknown
 }
 
-/** The person's current Dossier, as stored: read, copy or download. */
+/** The person's current Dossier, as stored: read, copy, download or replace with a new version. */
 export function DossierPage() {
   const dossier = useQuery({ queryKey: ['dossier', 'content'], queryFn: ({ signal }) => api.get<Dossier>('/dossier', signal) })
   const [copied, setCopied] = useState(false)
+  const [importing, setImporting] = useState(false)
   const json = dossier.data ? JSON.stringify(dossier.data.content, null, 2) : ''
 
   const copy = async () => {
@@ -46,12 +48,13 @@ export function DossierPage() {
           <h1 className={styles.title}>Seu Dossier</h1>
           <p className={styles.lead}>
             {dossier.data
-              ? `Versão ${dossier.data.number}, importada em ${new Date(dossier.data.createdAt).toLocaleDateString('pt-BR')}. Para mudar algo, importe uma versão nova em Configurações.`
+              ? `Versão ${dossier.data.number}, importada em ${new Date(dossier.data.createdAt).toLocaleDateString('pt-BR')}. Para mudar algo, importe uma versão nova.`
               : 'Carregando'}
           </p>
         </div>
         {dossier.data && (
           <div className={styles.actions}>
+            <Button onClick={() => setImporting(true)}>Importar nova versão</Button>
             <Button variant="secondary" onClick={() => void copy()}>
               {copied ? 'Copiado' : 'Copiar'}
             </Button>
@@ -62,6 +65,7 @@ export function DossierPage() {
         )}
       </div>
       {dossier.isError && <Alert>{errorMessage(dossier.error)}</Alert>}
+      {importing && <DossierImport onClose={() => setImporting(false)} />}
       {dossier.data && (
         <pre className={styles.json} tabIndex={0} aria-label="Conteúdo do Dossier">
           {json}

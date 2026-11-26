@@ -28,6 +28,8 @@ interface ProfileRefinerProps {
   /** Keeps the revised profile: replaces the option during onboarding, saves it in settings. */
   onAccept: (profile: ProfileDocument) => void | Promise<void>
   acceptLabel: string
+  /** Called with the revised profile while it waits for a decision, and with null once it is kept or dropped. */
+  onPreview?: (profile: ProfileDocument | null) => void
 }
 
 /**
@@ -35,17 +37,22 @@ interface ProfileRefinerProps {
  * revises the profile, and the person sees each change and its effect on the
  * jobs before keeping it. Nothing is saved until they accept.
  */
-export function ProfileRefiner({ profile, onAccept, acceptLabel }: ProfileRefinerProps) {
+export function ProfileRefiner({ profile, onAccept, acceptLabel, onPreview }: ProfileRefinerProps) {
   const id = useId()
   const [instruction, setInstruction] = useState('')
   const refine = useMutation({
     mutationFn: () => api.post<Refined>('/score-profile/refine', { profile, instruction }),
+    onSuccess: (result) => onPreview?.(result.changes.length > 0 ? result.profile : null),
   })
+  const discard = () => {
+    refine.reset()
+    onPreview?.(null)
+  }
   const accept = useMutation({
     mutationFn: async (revised: ProfileDocument) => onAccept(revised),
     onSuccess: () => {
       setInstruction('')
-      refine.reset()
+      discard()
     },
   })
 
@@ -83,7 +90,7 @@ export function ProfileRefiner({ profile, onAccept, acceptLabel }: ProfileRefine
         <>
           <Notice>A IA não mudou nada. Tente explicar de outro jeito.</Notice>
           <div className={styles.actions}>
-            <Button variant="ghost" onClick={() => refine.reset()}>
+            <Button variant="ghost" onClick={discard}>
               Voltar
             </Button>
           </div>
@@ -101,7 +108,7 @@ export function ProfileRefiner({ profile, onAccept, acceptLabel }: ProfileRefine
             <Button onClick={() => accept.mutate(result.profile)} disabled={accept.isPending}>
               {acceptLabel}
             </Button>
-            <Button variant="ghost" onClick={() => refine.reset()} disabled={accept.isPending}>
+            <Button variant="ghost" onClick={discard} disabled={accept.isPending}>
               Descartar
             </Button>
           </div>

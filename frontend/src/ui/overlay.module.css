@@ -2,11 +2,20 @@
 .dialog {
   width: min(520px, calc(100vw - 32px));
   max-height: calc(100vh - 32px);
+  /* Scrolls only when its content is taller than the screen, never sideways. */
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 0;
   border: 1px solid var(--border);
   border-radius: 12px;
   background: var(--surface);
   color: var(--ink);
+}
+
+/* Setup steps reused from onboarding (Dossier import, profile options): their column is up to 560px. */
+.dialogWide {
+  width: min(620px, calc(100vw - 32px));
 }
 
 .dialog::backdrop {

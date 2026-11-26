@@ -448,3 +448,150 @@
   white-space: pre;
   tab-size: 2;
 }
+
+/* Key and models steps inside a modal: the step keeps its own title, a close button sits in the corner. */
+.stepModal {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 28px 24px 24px;
+}
+
+.stepModalClose {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.stepModalClose:hover {
+  background: var(--surface-raised);
+  color: var(--ink);
+}
+
+.stepModalClose:focus-visible {
+  outline: 2px solid var(--signal-bright);
+  outline-offset: 2px;
+}
+
+/* The step's page title, sized for a modal. */
+.stepModal h1 {
+  padding-right: 40px;
+  font-size: 20px;
+  line-height: 26px;
+}
+
+/* Score profile page: the profile, plainly; editing happens in place, the AI adjustment in a modal. */
+.profileCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+
+.profileCardHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-3);
+}
+
+.cardTitle {
+  margin: 0;
+  font: 600 14px/20px var(--font-sans);
+}
+
+.profileSummary {
+  font: 400 13px/18px var(--font-sans);
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.unsaved {
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--amber) 14%, transparent);
+  color: var(--amber);
+  font: 500 12px/16px var(--font-sans);
+}
+
+.profileView {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.profileGroups {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+}
+
+.profileGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: var(--space-3) var(--space-2);
+  border-top: 1px solid var(--border);
+}
+
+.profileGroup:first-child {
+  border-top: 0;
+}
+
+.profileGroupHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.score {
+  font: 500 13px/18px var(--font-mono);
+  color: var(--ink);
+}
+
+.score.negative {
+  color: var(--danger);
+}
+
+.flag {
+  margin-left: var(--space-2);
+  color: var(--faint);
+  font: 400 12px/16px var(--font-sans);
+}
+
+.flagLabel {
+  color: var(--faint);
+  font: 500 12px/16px var(--font-sans);
+}
+
+.termLine {
+  margin: 0;
+  font: 400 13px/20px var(--font-sans);
+  color: var(--muted);
+}
+
+.profileSearch {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border);
+}

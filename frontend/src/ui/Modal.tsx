@@ -1,8 +1,11 @@
 import { useEffect, useRef, type ReactNode } from 'react'
 import styles from './overlay.module.css'
 
-/** A modal built on the native dialog: Esc and the backdrop close it, focus stays inside. */
-export function Modal({ titleId, onClose, children }: { titleId: string; onClose: () => void; children: ReactNode }) {
+/**
+ * A modal built on the native dialog: Esc and the backdrop close it, focus stays inside.
+ * Named by `titleId` (a heading inside), or by `label` when the content has none to point at.
+ */
+export function Modal({ titleId, label, wide = false, onClose, children }: { titleId?: string; label?: string; wide?: boolean; onClose: () => void; children: ReactNode }) {
   const dialog = useRef<HTMLDialogElement>(null)
 
   useEffect(() => {
@@ -12,8 +15,9 @@ export function Modal({ titleId, onClose, children }: { titleId: string; onClose
   return (
     <dialog
       ref={dialog}
-      className={styles.dialog}
+      className={wide ? `${styles.dialog} ${styles.dialogWide}` : styles.dialog}
       aria-labelledby={titleId}
+      aria-label={titleId ? undefined : label}
       onCancel={onClose}
       onClose={onClose}
       onClick={(event) => {

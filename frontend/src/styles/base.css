@@ -28,3 +28,8 @@ a {
 .mono {
   font-family: var(--font-mono);
 }
+
+/* While a modal is open the page behind it does not scroll, so it shows no scrollbar. */
+html:has(dialog[open]) {
+  overflow: hidden;
+}

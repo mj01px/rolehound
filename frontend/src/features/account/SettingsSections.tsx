@@ -2,19 +2,19 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { ApiError, api, apiUrl, errorMessage } from '../../lib/api'
-import { Alert, Notice } from '../../ui/Alert'
+import { Alert } from '../../ui/Alert'
 import { Button } from '../../ui/Button'
 import { Field } from '../../ui/Field'
 import { HelpGuide } from '../../ui/HelpGuide'
+import { Modal, ModalHead } from '../../ui/Modal'
+import { StepModal } from './StepModal'
 import { managementKeyGuide } from './keyGuides'
-import { DossierStep } from '../onboarding/DossierStep'
 import { KeyStep } from '../onboarding/KeyStep'
 import { ModelsStep } from '../onboarding/ModelsStep'
-import { ProfileRefiner } from '../onboarding/ProfileRefiner'
-import { ProfileStep } from '../onboarding/ProfileStep'
-import type { AiSettings, ProfileDocument, ProfileGroup } from '../onboarding/api'
+import type { AiSettings } from '../onboarding/api'
 import { useSensitive } from './sensitive'
 import { usageQuery } from './usage'
+import overlayStyles from '../../ui/overlay.module.css'
 import styles from './account.module.css'
 
 const isCancel = (error: unknown) => error instanceof Error && error.message === 'cancelled'
@@ -36,19 +36,19 @@ export function AiSection() {
       </h2>
       {settings.isError && <Alert>{errorMessage(settings.error)}</Alert>}
       {editing === 'key' && (
-        <div className={styles.panel}>
+        <StepModal label="Trocar a chave do OpenRouter" onClose={() => setEditing(null)}>
           <KeyStep onDone={done} />
           <Button variant="ghost" onClick={() => setEditing(null)}>
             Cancelar
           </Button>
-        </div>
+        </StepModal>
       )}
       {editing === 'models' && (
-        <div className={styles.panel}>
+        <StepModal label="Mudar os modelos" onClose={() => setEditing(null)}>
           <ModelsStep onDone={done} onBack={() => setEditing(null)} />
-        </div>
+        </StepModal>
       )}
-      {settings.data && editing === null && (
+      {settings.data && (
         <>
           <div className={styles.row}>
             <div className={styles.rowText}>
@@ -119,44 +119,46 @@ function ManagementKeyRow({ hint }: { hint: string | null }) {
         <span className={styles.rowTitle}>Chave de gerenciamento (opcional)</span>
         <span className={styles.muted}>{hint ? `Cadastrada (${hint}). Usada só para mostrar o saldo da conta.` : 'Só para mostrar o saldo da sua conta no resumo acima.'}</span>
       </div>
-      {!open && (
-        <div className={styles.actions}>
-          {hint && (
-            <Button variant="ghost" onClick={() => remove.mutate()} disabled={remove.isPending}>
-              Remover
-            </Button>
-          )}
-          <Button variant="secondary" onClick={() => setOpen(true)}>
-            {hint ? 'Trocar' : 'Cadastrar'}
+      <div className={styles.actions}>
+        {hint && (
+          <Button variant="ghost" onClick={() => remove.mutate()} disabled={remove.isPending}>
+            Remover
           </Button>
-        </div>
-      )}
+        )}
+        <Button variant="secondary" onClick={() => setOpen(true)}>
+          {hint ? 'Trocar' : 'Cadastrar'}
+        </Button>
+      </div>
       {open && (
-        <form className={styles.panel} onSubmit={submit} noValidate>
-          <Notice>
-            Crie em openrouter.ai, Management keys, com uma data de validade. O Rolehound guarda a chave criptografada e usa só para ler o saldo. Você pode remover quando
-            quiser. O passo a passo com imagens está no "?" do campo.
-          </Notice>
-          <Field
-            label="Chave de gerenciamento"
-            aside={<HelpGuide guide={managementKeyGuide} label="Como pegar a chave de gerenciamento" />}
-            type="password"
-            autoComplete="off"
-            value={key}
-            onChange={(event) => setKey(event.target.value)}
-            error={error?.field('key')}
-          />
-          {error && !error.field('key') && <Alert>{errorMessage(error)}</Alert>}
-          {save.isError && !error && !cancelled && <Alert>{errorMessage(save.error)}</Alert>}
-          <div className={styles.actions}>
-            <Button type="submit" disabled={save.isPending || !key.trim()}>
-              {save.isPending ? 'Conferindo…' : 'Salvar'}
-            </Button>
-            <Button variant="ghost" onClick={() => setOpen(false)}>
-              Cancelar
-            </Button>
-          </div>
-        </form>
+        <Modal titleId="management-key-title" onClose={() => setOpen(false)}>
+          <form className={overlayStyles.form} onSubmit={submit} noValidate>
+            <ModalHead
+              id="management-key-title"
+              title="Chave de gerenciamento"
+              text="Opcional. Serve só para mostrar o saldo da sua conta do OpenRouter."
+              onClose={() => setOpen(false)}
+            />
+            <Field
+              label="Chave de gerenciamento"
+              aside={<HelpGuide guide={managementKeyGuide} label="Como pegar a chave de gerenciamento" />}
+              type="password"
+              autoComplete="off"
+              value={key}
+              onChange={(event) => setKey(event.target.value)}
+              error={error?.field('key')}
+            />
+            {error && !error.field('key') && <Alert>{errorMessage(error)}</Alert>}
+            {save.isError && !error && !cancelled && <Alert>{errorMessage(save.error)}</Alert>}
+            <div className={overlayStyles.actions}>
+              <Button type="submit" disabled={save.isPending || !key.trim()}>
+                {save.isPending ? 'Conferindo…' : 'Salvar'}
+              </Button>
+              <Button variant="ghost" onClick={() => setOpen(false)}>
+                Cancelar
+              </Button>
+            </div>
+          </form>
+        </Modal>
       )}
       {remove.isError && <Alert>{errorMessage(remove.error)}</Alert>}
     </div>
@@ -168,239 +170,38 @@ interface DossierInfo {
   createdAt: string
 }
 
-/** Re-import the Dossier and, if the person wants, regenerate the score profile from it (FR-DOS-07). */
+/** The Dossier and the score profile: each has its own page, where it is read and changed (FR-DOS-07, FR-SCO-02). */
 export function DossierSection() {
-  const queryClient = useQueryClient()
   const dossier = useQuery({ queryKey: ['dossier'], queryFn: ({ signal }) => api.get<DossierInfo>('/dossier', signal) })
-  const [stage, setStage] = useState<'idle' | 'import' | 'ask' | 'profile'>('idle')
 
   return (
     <section className={styles.section} aria-labelledby="dossier-title">
       <h2 id="dossier-title" className={styles.sectionTitle}>
         Dossier e perfil de score
       </h2>
-      {stage === 'import' && (
-        <div className={styles.panel}>
-          <DossierStep
-            onDone={async () => {
-              await queryClient.invalidateQueries({ queryKey: ['dossier'] })
-              setStage('ask')
-            }}
-            onBack={() => setStage('idle')}
-          />
+      <div className={styles.row}>
+        <div className={styles.rowText}>
+          <span className={styles.rowTitle}>Dossier</span>
+          <span className={styles.muted}>{dossier.data ? `Versão ${dossier.data.number}, de ${new Date(dossier.data.createdAt).toLocaleDateString('pt-BR')}` : 'Carregando'}</span>
         </div>
-      )}
-      {stage === 'ask' && (
-        <div className={styles.panel}>
-          <Notice>Dossier salvo como uma nova versão.</Notice>
-          <p className={styles.muted}>Quer que a IA proponha um novo perfil de score com base nele? Seu perfil atual só muda se você escolher outro.</p>
-          <div className={styles.actions}>
-            <Button onClick={() => setStage('profile')}>Gerar novo perfil</Button>
-            <Button variant="ghost" onClick={() => setStage('idle')}>
-              Manter o atual
-            </Button>
-          </div>
+        {dossier.data && (
+          <Link to="/configuracoes/dossier" className={styles.buttonLink}>
+            Ver e importar
+          </Link>
+        )}
+      </div>
+      <div className={styles.row}>
+        <div className={styles.rowText}>
+          <span className={styles.rowTitle}>Perfil de score</span>
+          <span className={styles.muted}>Os grupos de termos e pesos que dão a nota das vagas.</span>
         </div>
-      )}
-      {stage === 'profile' && (
-        <div className={styles.panel}>
-          <ProfileStep
-            onDone={async () => {
-              await queryClient.invalidateQueries()
-              setStage('idle')
-            }}
-            onBack={() => setStage('idle')}
-          />
-        </div>
-      )}
-      {stage === 'idle' && (
-        <>
-          <div className={styles.row}>
-            <div className={styles.rowText}>
-              <span className={styles.rowTitle}>Dossier</span>
-              <span className={styles.muted}>
-                {dossier.data ? `Versão ${dossier.data.number}, de ${new Date(dossier.data.createdAt).toLocaleDateString('pt-BR')}` : 'Carregando'}
-              </span>
-            </div>
-            <div className={styles.actions}>
-              {dossier.data && (
-                <Link to="/configuracoes/dossier" className={styles.buttonLink}>
-                  Ver
-                </Link>
-              )}
-              <Button variant="secondary" onClick={() => setStage('import')}>
-                Importar nova versão
-              </Button>
-            </div>
-          </div>
-          <div className={styles.row}>
-            <div className={styles.rowText}>
-              <span className={styles.rowTitle}>Perfil de score com IA</span>
-              <span className={styles.muted}>A IA propõe até três perfis a partir do Dossier atual.</span>
-            </div>
-            <Button variant="secondary" onClick={() => setStage('profile')}>
-              Gerar opções
-            </Button>
-          </div>
-          <ProfileRefineRow />
-          <ProfileEditor />
-        </>
-      )}
+        <Link to="/configuracoes/perfil" className={styles.buttonLink}>
+          Ver e ajustar
+        </Link>
+      </div>
     </section>
   )
 }
-
-interface StoredProfile {
-  profile: ProfileDocument
-  dossierVersion: number | null
-}
-
-const split = (text: string) =>
-  text
-    .split(',')
-    .map((t) => t.trim())
-    .filter(Boolean)
-
-/** Hand edits to the score profile (FR-SCO-02). Saving rescores every active job. */
-function ProfileEditor() {
-  const stored = useQuery({ queryKey: ['score-profile'], queryFn: ({ signal }) => api.get<StoredProfile>('/score-profile', signal) })
-  const [open, setOpen] = useState(false)
-
-  return (
-    <div className={styles.row} style={{ flexDirection: 'column', alignItems: 'stretch' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
-        <div className={styles.rowText}>
-          <span className={styles.rowTitle}>Editar perfil à mão</span>
-          <span className={styles.muted}>Grupos de termos, pesos e termos de busca. Salvar recalcula o score de todas as vagas.</span>
-        </div>
-        <Button variant="secondary" onClick={() => setOpen((value) => !value)} disabled={!stored.data}>
-          {open ? 'Fechar' : 'Editar'}
-        </Button>
-      </div>
-      {stored.isError && <Alert>{errorMessage(stored.error)}</Alert>}
-      {open && stored.data && <ProfileForm key={JSON.stringify(stored.data.profile)} initial={stored.data} onSaved={() => setOpen(false)} />}
-    </div>
-  )
-}
-
-/** Changes to the saved profile described in words (FR-SCO-02); accepting saves and rescores every active job. */
-function ProfileRefineRow() {
-  const queryClient = useQueryClient()
-  const stored = useQuery({ queryKey: ['score-profile'], queryFn: ({ signal }) => api.get<StoredProfile>('/score-profile', signal) })
-
-  if (!stored.data) {
-    return null
-  }
-
-  const { dossierVersion } = stored.data
-  return (
-    <div className={styles.row} style={{ flexDirection: 'column', alignItems: 'stretch' }}>
-      <div className={styles.rowText}>
-        <span className={styles.rowTitle}>Ajustar perfil com IA</span>
-        <span className={styles.muted}>Diga o que mudar com suas palavras. Você vê cada mudança e o efeito nas vagas antes de salvar.</span>
-      </div>
-      <ProfileRefiner
-        profile={stored.data.profile}
-        acceptLabel="Aplicar e salvar"
-        onAccept={async (profile) => {
-          await api.put('/score-profile', { profile, dossierVersion })
-          await queryClient.invalidateQueries()
-        }}
-      />
-    </div>
-  )
-}
-
-function ProfileForm({ initial, onSaved }: { initial: StoredProfile; onSaved: () => void }) {
-  const queryClient = useQueryClient()
-  const [groups, setGroups] = useState(initial.profile.groups.map((g) => ({ ...g, termsText: g.terms.join(', ') })))
-  const [minHighlight, setMinHighlight] = useState(initial.profile.minHighlightScore)
-  const [searchTerms, setSearchTerms] = useState(initial.profile.searchTerms.join(', '))
-  const save = useMutation({
-    mutationFn: () => {
-      const profile: ProfileDocument = {
-        groups: groups.map(({ termsText, ...g }) => ({ ...g, terms: split(termsText) })),
-        minHighlightScore: minHighlight,
-        yearsBands: initial.profile.yearsBands,
-        searchTerms: split(searchTerms),
-      }
-      return api.put('/score-profile', { profile, dossierVersion: initial.dossierVersion })
-    },
-    onSuccess: async () => {
-      await queryClient.invalidateQueries()
-      onSaved()
-    },
-  })
-  const errors = save.error instanceof ApiError ? Object.values(save.error.problem.errors ?? {}).flat() : []
-
-  const update = (index: number, patch: Partial<ProfileGroup & { termsText: string }>) =>
-    setGroups((current) => current.map((g, i) => (i === index ? { ...g, ...patch } : g)))
-
-  const submit = (event: FormEvent) => {
-    event.preventDefault()
-    save.mutate()
-  }
-
-  return (
-    <form onSubmit={submit} className={styles.profileForm} noValidate>
-      {groups.map((group, index) => (
-        <fieldset key={index} className={styles.group}>
-          <legend className={styles.srOnly}>Grupo {index + 1}</legend>
-          <div className={styles.groupHead}>
-            <input className={styles.input} aria-label="Nome do grupo" value={group.name} onChange={(e) => update(index, { name: e.target.value })} maxLength={60} />
-            <input
-              className={`${styles.input} ${styles.weight}`}
-              aria-label="Peso"
-              type="number"
-              value={group.weight}
-              onChange={(e) => update(index, { weight: Number(e.target.value) })}
-            />
-            <button type="button" className={styles.linkButton} onClick={() => setGroups((current) => current.filter((_, i) => i !== index))}>
-              Remover
-            </button>
-          </div>
-          <textarea
-            className={styles.textarea}
-            aria-label="Termos separados por vírgula"
-            value={group.termsText}
-            onChange={(e) => update(index, { termsText: e.target.value })}
-            rows={2}
-          />
-          <div className={styles.checks}>
-            <label>
-              <input type="checkbox" checked={group.stack} onChange={(e) => update(index, { stack: e.target.checked })} /> Núcleo (conta para destaque)
-            </label>
-            <label>
-              <input type="checkbox" checked={group.bodyDampened} onChange={(e) => update(index, { bodyDampened: e.target.checked })} /> Vale metade só na descrição
-            </label>
-          </div>
-        </fieldset>
-      ))}
-      <Button
-        variant="ghost"
-        onClick={() => setGroups((current) => [...current, { name: 'Novo grupo', weight: 8, terms: [], termsText: '', stack: false, bodyDampened: false }])}
-      >
-        Adicionar grupo
-      </Button>
-      <label className={styles.inline}>
-        <span className={styles.rowTitle}>Score mínimo para destaque</span>
-        <input className={`${styles.input} ${styles.weight}`} type="number" value={minHighlight} onChange={(e) => setMinHighlight(Number(e.target.value))} />
-      </label>
-      <label className={styles.stack}>
-        <span className={styles.rowTitle}>Termos de busca (Gupy), separados por vírgula</span>
-        <textarea className={styles.textarea} value={searchTerms} onChange={(e) => setSearchTerms(e.target.value)} rows={3} />
-      </label>
-      {errors.length > 0 && <Alert>{errors.join(' ')}</Alert>}
-      {save.isError && errors.length === 0 && <Alert>{errorMessage(save.error)}</Alert>}
-      <div className={styles.actions}>
-        <Button type="submit" disabled={save.isPending}>
-          {save.isPending ? 'Salvando e recalculando...' : 'Salvar'}
-        </Button>
-      </div>
-    </form>
-  )
-}
-
 
 const featureLabel: Record<string, string> = {
   modeltest: 'Teste de modelo',
