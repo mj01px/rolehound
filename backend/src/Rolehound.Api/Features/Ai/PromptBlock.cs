@@ -14,6 +14,6 @@ public static partial class PromptBlock
     /// <summary>"&lt;/job&gt;" in the text becomes "‹/job&gt;": still readable, no longer a tag.</summary>
     public static string Defuse(string text) => BlockTag().Replace(text, match => "‹" + match.Value[1..]);
 
-    [GeneratedRegex(@"<\s*/?\s*(job|resume|dossier|profile|request|style_request)\b", RegexOptions.IgnoreCase | RegexOptions.NonBacktracking, 1000)]
+    [GeneratedRegex(@"<\s*/?\s*(job|resume|dossier|profile|request|style_request|allowed_skills)\b", RegexOptions.IgnoreCase | RegexOptions.NonBacktracking, 1000)]
     private static partial Regex BlockTag();
 }

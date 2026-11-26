@@ -90,16 +90,25 @@ public sealed class TailoredResumeTests(ApiFactory factory) : ApiTest(factory)
     }
 
     [Theory]
-    [InlineData("\"skills\": [\"python\", \"Django\", \"PostgreSQL\"]", "\"skills\": [\"Kubernetes\"]", "Kubernetes")]
     [InlineData("{ \"index\": 0, \"bullets\"", "{ \"index\": 7, \"bullets\"", "não existe")]
     [InlineData("{ \"from\": 0, \"text\"", "{ \"from\": 5, \"text\"", "não existe")]
     [InlineData("\"education\": [0]", "\"education\": [3]", "não existe")]
-    public void Anything_not_in_the_dossier_is_refused(string from, string to, string expected)
+    public void Entries_that_do_not_exist_in_the_dossier_are_refused(string from, string to, string expected)
     {
         var result = ResumeBuilder.Build(Dossier, GoodAnswer.Replace(from, to, StringComparison.Ordinal), "pt");
 
         Assert.Null(result.Document);
         Assert.Contains(expected, result.Error, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_skill_not_in_the_dossier_is_taken_out_and_reported_instead_of_refusing_the_resume()
+    {
+        var result = ResumeBuilder.Build(Dossier, GoodAnswer.Replace("\"PostgreSQL\"]", "\"PostgreSQL\", \"Kubernetes\"]", StringComparison.Ordinal), "pt");
+
+        Assert.Null(result.Error);
+        Assert.DoesNotContain("Kubernetes", result.Document!.Skills);
+        Assert.Contains(result.Cuts, c => c.Item == "Kubernetes" && c.NotInDossier);
     }
 
     [Fact]
@@ -151,14 +160,14 @@ public sealed class TailoredResumeTests(ApiFactory factory) : ApiTest(factory)
     public async Task Output_that_invents_is_rejected_and_the_person_can_try_again()
     {
         var (browser, jobId) = await ReadyAsync();
-        Factory.OpenRouter.Answers["tailored_resume"] = GoodAnswer.Replace("\"PostgreSQL\"]", "\"AWS\"]", StringComparison.Ordinal);
+        Factory.OpenRouter.Answers["tailored_resume"] = GoodAnswer.Replace("\"education\": [0]", "\"education\": [3]", StringComparison.Ordinal);
 
         var generation = await ReadAsync<ResumeGenerationResponse>(await browser.PostAsJsonAsync($"/jobs/{jobId}/resumes", new { }, Ct));
         await ProcessAsync();
 
         var failed = await ReadAsync<ResumeGenerationResponse>(await browser.GetAsync(new Uri($"/resumes/{generation.Id}", UriKind.Relative), Ct));
         Assert.Equal("failed", failed.Status);
-        Assert.Contains("AWS", failed.Error, StringComparison.Ordinal);
+        Assert.Contains("não existe", failed.Error, StringComparison.Ordinal);
         Assert.Equal(HttpStatusCode.NotFound, (await browser.GetAsync(new Uri($"/resumes/{generation.Id}/pdf", UriKind.Relative), Ct)).StatusCode);
 
         Assert.Equal(HttpStatusCode.Accepted, (await browser.PostAsJsonAsync($"/jobs/{jobId}/resumes", new { }, Ct)).StatusCode);

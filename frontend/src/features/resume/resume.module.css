@@ -180,3 +180,14 @@
   color: var(--amber);
   font-size: 0.8125rem;
 }
+
+/* Skills the model wrote that the Dossier does not have, taken out of the resume. */
+.removed {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--amber) 14%, transparent);
+  color: var(--amber);
+  font-size: 13px;
+  line-height: 19px;
+}

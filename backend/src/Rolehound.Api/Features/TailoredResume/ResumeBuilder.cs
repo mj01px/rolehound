@@ -35,8 +35,11 @@ public sealed record ResumeVolunteering(string Organization, string Role, string
 /// </summary>
 public sealed record ResumeChange(string Section, string Label, string Original, string Rewritten, IReadOnlyList<string>? NotInDossier = null);
 
-/// <summary>Something in the Dossier the resume left out (BR-AI-04).</summary>
-public sealed record ResumeCut(string Section, string Item);
+/// <summary>
+/// Something in the Dossier the resume left out (BR-AI-04), or, with <see cref="NotInDossier"/>, something the
+/// model wrote that the Dossier does not have and the app took out (a skill the job asks for, for instance).
+/// </summary>
+public sealed record ResumeCut(string Section, string Item, bool NotInDossier = false);
 
 public sealed record BuildResult(ResumeDocument? Document, IReadOnlyList<ResumeChange> Changes, IReadOnlyList<ResumeCut> Cuts, string? Error);
 
@@ -45,7 +48,8 @@ public sealed record BuildResult(ResumeDocument? Document, IReadOnlyList<ResumeC
 /// Dossier entries by position and rewords summary, bullets and project
 /// descriptions. Companies, titles, dates, institutions and degrees are copied
 /// from the Dossier here, so they cannot differ from it (FR-AI-08, BR-AI-03);
-/// every skill must exist in the Dossier; anything left out is a cut (BR-AI-04).
+/// every skill must exist in the Dossier (a skill that does not is taken out and reported, so one stray
+/// word does not cost the whole resume); anything left out is a cut (BR-AI-04).
 /// Contact details are not part of it: the PDF takes them from the Dossier (BR-AI-05).
 /// </summary>
 public static partial class ResumeBuilder
@@ -192,7 +196,8 @@ public static partial class ResumeBuilder
             v => $"{Str(v["organization"])}: {Str(v["role"])}",
             v => new ResumeVolunteering(Str(v["organization"]), Str(v["role"]), OptionalStr(v["start"]), OptionalStr(v["end"])));
 
-        // Skills: every one must exist in the Dossier; the Dossier's spelling is used.
+        // Skills: only the Dossier's, in its spelling. One the model added (usually because the job asks for it)
+        // is never shown as the person's: it is taken out and listed in the review.
         var known = KnownSkills(dossier);
         var skills = new List<string>();
         foreach (var node in Array(answer["skills"]))
@@ -200,7 +205,12 @@ public static partial class ResumeBuilder
             var wanted = Str(node).Trim();
             if (!known.TryGetValue(wanted, out var spelled))
             {
-                throw new InvalidResumeException($"O modelo citou a skill \"{Shorten(wanted)}\", que não está no seu Dossier.");
+                if (wanted.Length > 0 && !cuts.Any(c => c.NotInDossier && string.Equals(c.Item, wanted, StringComparison.OrdinalIgnoreCase)))
+                {
+                    cuts.Add(new(pt ? "Habilidades" : "Skills", Shorten(wanted), NotInDossier: true));
+                }
+
+                continue;
             }
 
             if (!skills.Contains(spelled, StringComparer.OrdinalIgnoreCase))
@@ -261,6 +271,10 @@ public static partial class ResumeBuilder
             }
         }
     }
+
+    /// <summary>Every skill name the Dossier has, in its own spelling: the only ones a resume may cite.</summary>
+    internal static IReadOnlyCollection<string> AllowedSkills(string dossierJson) =>
+        JsonNode.Parse(dossierJson) is JsonObject dossier ? KnownSkills(dossier).Values.Distinct(StringComparer.OrdinalIgnoreCase).ToList() : [];
 
     private static Dictionary<string, string> KnownSkills(JsonObject dossier)
     {

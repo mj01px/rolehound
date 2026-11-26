@@ -18,6 +18,8 @@ interface Change {
 interface Cut {
   section: string
   item: string
+  /** The model wrote it, the Dossier does not have it, so the app took it out. */
+  notInDossier?: boolean
 }
 
 interface Generation {
@@ -126,7 +128,8 @@ function GenerationView({ generation }: { generation: Generation }) {
   const data = detail.data
   if (!data) return detail.isError ? <Alert>{errorMessage(detail.error)}</Alert> : null
   const changes = data.changes ?? []
-  const cuts = data.cuts ?? []
+  const cuts = (data.cuts ?? []).filter((cut) => !cut.notInDossier)
+  const removed = (data.cuts ?? []).filter((cut) => cut.notInDossier)
 
   return (
     <div className={styles.review}>
@@ -161,6 +164,13 @@ function GenerationView({ generation }: { generation: Generation }) {
           </ul>
         )}
       </div>
+
+      {removed.length > 0 && (
+        <p className={styles.removed} role="note">
+          A IA tentou incluir {removed.map((cut) => cut.item).join(', ')}, que não {removed.length === 1 ? 'está' : 'estão'} no seu Dossier. Tiramos do currículo. Se você tem
+          {removed.length === 1 ? ' essa habilidade' : ' essas habilidades'}, inclua no Dossier e gere de novo.
+        </p>
+      )}
 
       <div>
         <h3 className={styles.listTitle}>O que ficou de fora ({cuts.length})</h3>
