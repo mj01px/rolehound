@@ -117,7 +117,7 @@ of letters, digits, `_` and `-`. The API registers the webhook when it starts.
 4. Start everything; Caddy obtains the HTTPS certificate on first request:
 
    ```bash
-   docker compose pull
+   docker compose pull --ignore-buildable
    docker compose build scheduler
    docker compose up -d
    docker compose ps
@@ -159,8 +159,12 @@ Wait for CI's "Publish API image" job on the commit, then on the VM:
 cd ~/rolehound && git pull
 cd deploy
 sed -i "s/^API_TAG=.*/API_TAG=$(git rev-parse HEAD)/" .env
-docker compose pull && docker compose build scheduler && docker compose up -d
+docker compose pull --ignore-buildable && docker compose build scheduler && docker compose up -d
 ```
+
+`--ignore-buildable` skips the scheduler image, which is built on the VM. Caddy
+reads its configuration at start, so after a change to `Caddyfile` also run
+`docker compose restart caddy`.
 
 Migrations run when the API starts. To roll back, set `API_TAG` to the previous
 SHA and run `docker compose up -d` again (a migration that already ran stays).
