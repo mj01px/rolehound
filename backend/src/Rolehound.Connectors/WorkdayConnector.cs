@@ -19,7 +19,8 @@ public sealed partial class WorkdayConnector(HttpClient http) : IJobConnector, I
     private const int MaxPages = 50;
 
     private static readonly string[] BrazilQueries = ["Brazil", "Brasil"];
-    private static readonly DetailPages.Limits Details = new(PerRun: 80, FirstRead: 80, Concurrency: 4);
+    // Workday's API answers fast and big employers list hundreds of jobs in Brazil: a first read takes them all.
+    private static readonly DetailPages.Limits Details = new(PerRun: 120, FirstRead: 400, Concurrency: 4);
 
     public JobSource Source => JobSource.Workday;
 
@@ -28,17 +29,18 @@ public sealed partial class WorkdayConnector(HttpClient http) : IJobConnector, I
         var site = Site.Parse(target) ?? throw new ConnectorException("target_invalid", $"Workday {target}: use empresa.wdN/Site.");
         var subject = $"Workday {target}";
 
-        // Workday's own search narrows a worldwide list to the jobs that mention Brazil.
+        // Best: the site's own country filter, which lists exactly the jobs located in Brazil.
+        // Without it, Workday's search for "Brazil" narrows the worldwide list, and each place is checked.
+        var brazil = await BrazilFacetAsync(site, subject, ct);
         var postings = new List<(string Path, string Title, string Locations)>();
         var complete = true;
-        foreach (var query in BrazilQueries)
+        foreach (var query in brazil is null ? BrazilQueries : [string.Empty])
         {
             var total = int.MaxValue;
             var pages = 0;
             for (var offset = 0; offset < total && pages < MaxPages; offset += PageSize, pages++)
             {
-                using var page = await HttpJson.PostAsync(
-                    http, site.Api("jobs"), new { appliedFacets = new { }, limit = PageSize, offset, searchText = query }, subject, ct);
+                using var page = await HttpJson.PostAsync(http, site.Api("jobs"), Query(brazil, query, offset), subject, ct);
                 var root = page.RootElement;
 
                 // Only the first page carries the real total; later pages say 0.
@@ -76,7 +78,7 @@ public sealed partial class WorkdayConnector(HttpClient http) : IJobConnector, I
         foreach (var (path, title, locations) in postings.DistinctBy(p => p.Path))
         {
             // Sure: the listing names Brazil. A job in several places is opened to check, unless found not in Brazil before.
-            var sure = InBrazil(locations) || InBrazil(path.Replace('-', ' '));
+            var sure = brazil is not null || InBrazil(locations) || InBrazil(path.Replace('-', ' '));
             if (sure || (SeveralPlaces().IsMatch(locations) && !known.Skipped.Contains(path)))
             {
                 candidates.Add((path, title, locations, sure));
@@ -108,6 +110,59 @@ public sealed partial class WorkdayConnector(HttpClient http) : IJobConnector, I
         // A list read only in part, or with jobs in several places left unchecked, must not close anything.
         var authoritative = complete && opened.Left.Count == 0;
         return new Snapshot(jobs, authoritative, warning, opened.Skipped);
+    }
+
+    private static Dictionary<string, object> Query(string? brazil, string searchText, int offset) => new()
+    {
+        ["appliedFacets"] = brazil is null ? new Dictionary<string, string[]>() : new Dictionary<string, string[]> { ["locationCountry"] = [brazil] },
+        ["limit"] = PageSize,
+        ["offset"] = offset,
+        ["searchText"] = searchText,
+    };
+
+    /// <summary>The id of Brazil in the site's country filter, when the site offers that filter.</summary>
+    private async Task<string?> BrazilFacetAsync(Site site, string subject, CancellationToken ct)
+    {
+        using var page = await HttpJson.PostAsync(http, site.Api("jobs"), Query(null, string.Empty, 0), subject, ct);
+        return FindBrazil(page.RootElement);
+    }
+
+    /// <summary>Walks the facets (country sits inside a location group) for locationCountry = Brazil.</summary>
+    internal static string? FindBrazil(JsonElement node)
+    {
+        if (node.ValueKind == JsonValueKind.Object)
+        {
+            if (node.String("facetParameter") == "locationCountry" && node.TryGetProperty("values", out var countries) && countries.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var country in countries.EnumerateArray())
+                {
+                    if (country.String("descriptor")?.Trim() is "Brazil" or "Brasil" && country.String("id") is { Length: > 0 } id)
+                    {
+                        return id;
+                    }
+                }
+            }
+
+            foreach (var property in node.EnumerateObject())
+            {
+                if (FindBrazil(property.Value) is { } found)
+                {
+                    return found;
+                }
+            }
+        }
+        else if (node.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in node.EnumerateArray())
+            {
+                if (FindBrazil(item) is { } found)
+                {
+                    return found;
+                }
+            }
+        }
+
+        return null;
     }
 
     /// <summary>tenant.wdN.myworkdayjobs.com[/locale]/Site[/...].</summary>

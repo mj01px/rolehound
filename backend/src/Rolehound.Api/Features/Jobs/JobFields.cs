@@ -13,14 +13,18 @@ internal static class JobFields
     /// </summary>
     public static bool Apply(Job job, CollectedJob item, string? label)
     {
-        var company = string.IsNullOrWhiteSpace(label) ? item.Company : label;
+        // A listing entry may come without title or company (a careers site lists known pages by address
+        // only): an empty value never replaces a stored one.
+        var title = string.IsNullOrWhiteSpace(item.Title) ? job.Title : item.Title;
+        var company = !string.IsNullOrWhiteSpace(label) ? label : string.IsNullOrWhiteSpace(item.Company) ? job.Company : item.Company;
+        var url = SafeUrl(item.Url) is { Length: > 0 } safe ? safe : job.Url;
         var keepDetails = !item.HasDetails && job.Description.Length > 0;
-        var changed = job.Title != item.Title || job.Company != company
+        var changed = job.Title != title || job.Company != company
             || (!keepDetails && (job.Description != item.Description || job.Location != item.Location || job.SourceWorkMode != item.WorkMode));
 
-        job.Title = Cut(item.Title, 500);
+        job.Title = Cut(title, 500);
         job.Company = Cut(company, 200);
-        job.Url = Cut(SafeUrl(item.Url), 1000);
+        job.Url = Cut(url, 1000);
         if (!keepDetails)
         {
             job.Location = Cut(item.Location, 300);

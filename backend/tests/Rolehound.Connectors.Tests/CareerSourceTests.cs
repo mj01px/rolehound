@@ -38,6 +38,20 @@ public sealed class CareerSourceTests
         Assert.Equal(target, WorkdayConnector.TargetOf(input));
 
     [Fact]
+    public void Workday_finds_brazil_in_the_sites_country_filter()
+    {
+        using var withFilter = System.Text.Json.JsonDocument.Parse("""
+            {"facets":[{"facetParameter":"locationMainGroup","values":[
+              {"facetParameter":"locationCountry","values":[{"id":"us1","descriptor":"United States of America"},{"id":"br1","descriptor":"Brazil"}]},
+              {"facetParameter":"locationRegionStateProvince","values":[{"id":"x","descriptor":"Braga"}]}]}]}
+            """);
+        using var withoutFilter = System.Text.Json.JsonDocument.Parse("""{"facets":[{"facetParameter":"timeType","values":[{"id":"f","descriptor":"Full time"}]}]}""");
+
+        Assert.Equal("br1", WorkdayConnector.FindBrazil(withFilter.RootElement));
+        Assert.Null(WorkdayConnector.FindBrazil(withoutFilter.RootElement));
+    }
+
+    [Fact]
     public async Task Workday_keeps_jobs_in_Brazil_and_opens_jobs_in_several_places_to_check()
     {
         var routes = new Routes()
