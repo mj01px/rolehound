@@ -5,14 +5,37 @@ import { Alert, Notice } from '../../../ui/Alert'
 import { Button } from '../../../ui/Button'
 import { Modal, ModalHead } from '../../../ui/Modal'
 import { MoreMenu } from '../../../ui/MoreMenu'
+import overlayStyles from '../../../ui/overlay.module.css'
 import { Pager } from '../../../ui/Pager'
 import { Select } from '../../../ui/Select'
 import { pageOf } from '../../../ui/paging'
-import { kindLabels, kinds, plural, useCollections, useRemoveSource, useRunNow, useSourcesStatus, useTargets, useToggleSource, when, type SourceKind, type SourceTarget } from './api'
+import {
+  kindLabels,
+  kinds,
+  plural,
+  useCollections,
+  useRemoveSource,
+  useRunNow,
+  useSourcesStatus,
+  useTargets,
+  useToggleSource,
+  when,
+  type SourceKind,
+  type SourceTarget,
+  useRunSource,
+} from './api'
 import { AddSourceDialog } from './AddSourceDialog'
 import styles from './sources.module.css'
 
-const nameColumn: Record<SourceKind, string> = { inhire: 'Empresa', gupy: 'Termo ou empresa', github: 'Repositório', greenhouse: 'Empresa', lever: 'Empresa', workday: 'Empresa', careersite: 'Site' }
+const nameColumn: Record<SourceKind, string> = {
+  inhire: 'Empresa',
+  gupy: 'Termo ou empresa',
+  github: 'Repositório',
+  greenhouse: 'Empresa',
+  lever: 'Empresa',
+  workday: 'Empresa',
+  careersite: 'Site',
+}
 const searchHint: Record<SourceKind, string> = {
   inhire: 'Buscar empresa',
   gupy: 'Buscar termo ou empresa',
@@ -25,7 +48,11 @@ const searchHint: Record<SourceKind, string> = {
 
 const PER_PAGE = 10
 
-const normalize = (text: string) => text.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase()
+const normalize = (text: string) =>
+  text
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .toLowerCase()
 const clock = (value: string) => new Date(value).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
 
 /** Admin › Fontes: where collection reads jobs, one tab per kind of source. */
@@ -151,7 +178,8 @@ export function SourcesPage() {
       <div id="sources-panel" aria-label={`Fontes do ${kindLabels[kind]}`} className={styles.panel}>
         {kind === 'gupy' && (
           <p className={styles.panelNote}>
-            Os termos de busca vêm dos perfis de score de quem usa o app; um termo que ninguém usa mais fica pausado. As empresas da Gupy (empresa.gupy.io) entram por Adicionar fonte ou pela página Empresas.
+            Os termos de busca vêm dos perfis de score de quem usa o app; um termo que ninguém usa mais fica pausado. As empresas da Gupy (empresa.gupy.io) entram por Adicionar
+            fonte ou pela página Empresas.
           </p>
         )}
         {targets.data && counts[kind] === 0 ? (
@@ -211,12 +239,18 @@ export function SourcesPage() {
 function Row({ target }: { target: SourceTarget }) {
   const toggle = useToggleSource(target)
   const remove = useRemoveSource(target)
+  const run = useRunSource(target)
   const [confirming, setConfirming] = useState(false)
   // Targets the app keeps itself (Gupy search terms follow everyone's score profile) cannot be paused or removed here.
   const managed = target.automatic
   const name = target.label ?? target.key
-  const failure = toggle.error ?? remove.error
+  const failure = toggle.error ?? remove.error ?? run.error
   const failureText = failure instanceof ApiError ? failure.problem.detail : failure ? errorMessage(failure) : null
+  // A paused source is not read; a source the app keeps itself cannot be removed.
+  const menu = [
+    ...(target.enabled ? [{ key: 'run', label: 'Coletar agora', run: () => run.mutate() }] : []),
+    ...(managed ? [] : [{ key: 'remove', label: 'Remover fonte', danger: true, run: () => setConfirming(true) }]),
+  ]
 
   return (
     <tr className={target.enabled ? undefined : styles.rowOff}>
@@ -238,6 +272,7 @@ function Row({ target }: { target: SourceTarget }) {
             </span>
           )}
           {failureText && <span className={styles.rowError}>{failureText}</span>}
+          {run.isSuccess && <span className={styles.rowNote}>Coleta pedida. Você recebe uma notificação quando terminar.</span>}
         </span>
       </td>
       <td className={styles.number}>{target.activeJobs}</td>
@@ -260,17 +295,17 @@ function Row({ target }: { target: SourceTarget }) {
         )}
       </td>
       <td className={styles.actions}>
-        {!managed && <MoreMenu label={`Mais ações para ${name}`} items={[{ key: 'remove', label: 'Remover fonte', danger: true, run: () => setConfirming(true) }]} />}
+        {menu.length > 0 && <MoreMenu label={`Mais ações para ${name}`} disabled={run.isPending} items={menu} />}
         {confirming && (
           <Modal titleId={`remove-${target.id}`} onClose={() => setConfirming(false)}>
-            <div className={styles.dialogForm}>
+            <div className={overlayStyles.form}>
               <ModalHead
                 id={`remove-${target.id}`}
                 title={`Remover ${name}?`}
                 text={`As ${plural(target.activeJobs, 'vaga aberta', 'vagas abertas')} dela são encerradas agora. Para só parar de coletar, use o interruptor.`}
                 onClose={() => setConfirming(false)}
               />
-              <div className={styles.dialogActions}>
+              <div className={overlayStyles.actions}>
                 <Button variant="secondary" onClick={() => setConfirming(false)}>
                   Cancelar
                 </Button>

@@ -2,6 +2,9 @@
 .dialog {
   width: min(520px, calc(100vw - 32px));
   max-height: calc(100vh - 32px);
+  /* A modal opened from a table cell must not inherit its alignment or no-wrap. */
+  text-align: left;
+  white-space: normal;
   /* Scrolls only when its content is taller than the screen, never sideways. */
   overflow-x: hidden;
   overflow-y: auto;

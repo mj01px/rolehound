@@ -49,6 +49,7 @@ internal static class SourceEndpoints
         sources.MapPut("/{id:guid}", Update);
         sources.MapDelete("/{id:guid}", Remove);
         sources.MapPost("/run", RunNow);
+        sources.MapPost("/{id:guid}/run", RunOne);
         sources.MapGet("/collections", Collections);
         sources.MapGet("/status", Status);
         return endpoints;
@@ -77,6 +78,48 @@ internal static class SourceEndpoints
         }
 
         var request = new CollectionRequest { Kind = CollectionRequestKind.Full, RequestedBy = principal.GetUserId(), RequestedAt = time.GetUtcNow(), Status = CollectionRequestStatus.Queued };
+        db.CollectionRequests.Add(request);
+        await db.SaveChangesAsync(ct);
+        backlog.Enqueue(request.Id);
+        return TypedResults.Accepted("/admin/sources/status", ToResponse(request));
+    }
+
+    /// <summary>A one-source read asked for by hand: at most once every few minutes per source.</summary>
+    public static readonly TimeSpan ManualTargetRunInterval = TimeSpan.FromMinutes(5);
+
+    /// <summary>
+    /// Reads one source now, without the full collection: in the background, and the person who asked
+    /// hears about it when it ends (bell and Telegram), like a full run. 202 with the request.
+    /// </summary>
+    private static async Task<Results<Accepted<CollectionRequestResponse>, ProblemHttpResult>> RunOne(
+        Guid id, ClaimsPrincipal principal, RolehoundDbContext db, CollectionBacklog backlog, TimeProvider time, CancellationToken ct)
+    {
+        var target = await db.SourceTargets.AsNoTracking().SingleOrDefaultAsync(t => t.Id == id, ct);
+        if (target is null)
+        {
+            return Problems.NotFound("Fonte não encontrada.");
+        }
+
+        if (!target.Enabled)
+        {
+            return Problems.Conflict("source_paused", "Essa fonte está pausada. Ligue o interruptor antes de coletar.");
+        }
+
+        var busy = await db.CollectionRequests.AnyAsync(
+            r => (r.Status == CollectionRequestStatus.Queued || r.Status == CollectionRequestStatus.Running)
+                && (r.Kind == CollectionRequestKind.Full || r.TargetId == id), ct);
+        if (busy)
+        {
+            return Problems.Conflict("run_in_progress", "Essa fonte já vai ser lida por uma coleta em andamento. Você recebe uma notificação quando ela terminar.");
+        }
+
+        var since = time.GetUtcNow() - ManualTargetRunInterval;
+        if (await db.CollectionRequests.AnyAsync(r => r.TargetId == id && r.RequestedAt > since, ct))
+        {
+            return Problems.Problem(StatusCodes.Status429TooManyRequests, "run_too_soon", $"Essa fonte foi coletada há pouco. Tente de novo em alguns minutos.");
+        }
+
+        var request = new CollectionRequest { Kind = CollectionRequestKind.Target, TargetId = id, RequestedBy = principal.GetUserId(), RequestedAt = time.GetUtcNow(), Status = CollectionRequestStatus.Queued };
         db.CollectionRequests.Add(request);
         await db.SaveChangesAsync(ct);
         backlog.Enqueue(request.Id);

@@ -205,6 +205,28 @@ public sealed class JobsTests(ApiFactory factory) : ApiTest(factory)
     }
 
     [Fact]
+    public async Task Admins_collect_one_source_on_its_own_and_hear_when_it_ends()
+    {
+        await CreateUserAsync("rafael@exemplo.test", UserRole.Admin);
+        await AddTargetAsync();
+        Factory.JobSource.Lists("exemplo", FakeJobSource.Job("1", "Dev Python"));
+        using var admin = await SignedInAsync("rafael@exemplo.test");
+        Guid id;
+        await using (var scope = Factory.Services.CreateAsyncScope())
+        {
+            id = await scope.ServiceProvider.GetRequiredService<RolehoundDbContext>().SourceTargets.Select(t => t.Id).SingleAsync(Ct);
+        }
+
+        var run = new Uri($"/admin/sources/{id}/run", UriKind.Relative);
+        Assert.Equal(HttpStatusCode.Accepted, (await admin.PostAsync(run, null, Ct)).StatusCode);
+
+        var notified = await WaitForAsync(admin, "collection");
+        Assert.Contains("lida: 1 vaga nova", notified.Title, StringComparison.Ordinal);
+        Assert.Equal("run_too_soon", await ProblemCodeAsync(await admin.PostAsync(run, null, Ct)));
+        Assert.Equal("not_found", await ProblemCodeAsync(await admin.PostAsync(new Uri($"/admin/sources/{Guid.NewGuid()}/run", UriKind.Relative), null, Ct)));
+    }
+
+    [Fact]
     public async Task Admins_run_collection_by_hand_at_most_every_15_minutes()
     {
         await CreateUserAsync("rafael@exemplo.test", UserRole.Admin);

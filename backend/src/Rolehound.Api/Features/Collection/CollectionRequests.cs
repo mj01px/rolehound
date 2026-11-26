@@ -10,7 +10,7 @@ public enum CollectionRequestKind
     /// <summary>Every enabled source, like a scheduled collection.</summary>
     Full,
 
-    /// <summary>One source, read right after it was added.</summary>
+    /// <summary>One source on its own: right after it was added, or when an admin asks for it.</summary>
     Target,
 }
 

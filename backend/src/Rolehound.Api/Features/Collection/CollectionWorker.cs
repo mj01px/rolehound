@@ -144,7 +144,7 @@ internal static class CollectionMessages
             $"Coleta terminou: {Count(r.Added, "vaga nova", "vagas novas")}, {Count(r.Closed, "encerrada", "encerradas")}"
             + (r.Failed > 0 ? $", {Count(r.Failed, "fonte com erro", "fontes com erro")}" : string.Empty),
         (CollectionRequestKind.Target, CollectionRequestStatus.Done) =>
-            $"{targetName ?? "A empresa"} lida: {Count(r.Added, "vaga", "vagas")}, {r.ForYou ?? 0} para você",
+            $"{targetName ?? "A empresa"} lida: {Count(r.Added, "vaga nova", "vagas novas")}, {r.ForYou ?? 0} para você",
         (CollectionRequestKind.Full, CollectionRequestStatus.Interrupted) => "A coleta foi interrompida",
         (CollectionRequestKind.Full, _) => "A coleta parou com erro",
         _ => $"Não deu para ler {targetName ?? "a empresa"}",

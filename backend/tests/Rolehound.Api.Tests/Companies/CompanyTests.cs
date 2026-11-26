@@ -152,7 +152,7 @@ public sealed class CompanyTests(ApiFactory factory) : ApiTest(factory)
 
         // The new company is read right away; the person hears when it ends, and it is not the collection of the hour.
         var read = await WaitForAsync(browser, "collection");
-        Assert.Equal("Empresa Exemplo lida: 1 vaga, 0 para você", read.Title);
+        Assert.Equal("Empresa Exemplo lida: 1 vaga nova, 0 para você", read.Title);
         Assert.Equal("/empresas", read.Link);
         await ListAsync(browser);
         Assert.DoesNotContain((await browser.GetFromJsonAsync<List<Notification>>("/notifications", Ct))!, n => n.Kind == "collection");

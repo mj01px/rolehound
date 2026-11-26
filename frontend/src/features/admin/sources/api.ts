@@ -119,6 +119,15 @@ export function useToggleSource(target: SourceTarget) {
   })
 }
 
+/** Reads one source now, on its own; the person hears about it by notification when it ends. */
+export function useRunSource(target: SourceTarget) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: () => api.post<CollectionRequest>(`/admin/sources/${target.id}/run`),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: sourcesKey }),
+  })
+}
+
 export function useRemoveSource(target: SourceTarget) {
   const queryClient = useQueryClient()
   return useMutation({
