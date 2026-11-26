@@ -3,6 +3,7 @@ import { useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties
 import { Link, useLocation } from 'react-router'
 import { icons } from '../../app/navIcons'
 import { api } from '../../lib/api'
+import { isReading, readingKey } from './reading'
 import styles from './NotificationBell.module.css'
 
 const PANEL_WIDTH = 340
@@ -29,14 +30,33 @@ export function NotificationBell() {
   const wrap = useRef<HTMLDivElement>(null)
   const bell = useRef<HTMLButtonElement>(null)
   const [place, setPlace] = useState<CSSProperties>({})
+  const queryClient = useQueryClient()
   const notifications = useQuery({
     queryKey: ['notifications'],
     queryFn: ({ signal }) => api.get<Notification[]>('/notifications', signal),
-    refetchInterval: 5 * 60 * 1000,
+    // Every few seconds while a collection someone asked for may be running, every few minutes otherwise.
+    refetchInterval: () => (isReading(queryClient) ? 5 * 1000 : 5 * 60 * 1000),
     staleTime: 30 * 1000,
   })
   const { refetch } = notifications
-  const queryClient = useQueryClient()
+
+  // A collection ended (a new "collection" notice): the job lists and companies change, so they reload now.
+  const seen = useRef<Set<string> | null>(null)
+  useEffect(() => {
+    const ids = (notifications.data ?? []).filter((item) => item.kind === 'collection').map((item) => item.id)
+    if (seen.current === null) {
+      seen.current = new Set(ids)
+      return
+    }
+
+    const fresh = ids.filter((id) => !seen.current!.has(id))
+    ids.forEach((id) => seen.current!.add(id))
+    if (fresh.length > 0) {
+      queryClient.setQueryData(readingKey, 0)
+      void queryClient.invalidateQueries({ queryKey: ['jobs'] })
+      void queryClient.invalidateQueries({ queryKey: ['companies'] })
+    }
+  }, [notifications.data, queryClient])
 
   // The item leaves the bell at once; the API remembers it was read.
   const markRead = useMutation({

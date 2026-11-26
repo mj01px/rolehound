@@ -1,5 +1,6 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '../../lib/api'
+import { watchReading } from '../notifications/reading'
 
 /** A company Rolehound reads jobs from, as the signed-in person sees it. */
 export interface Company {
@@ -53,9 +54,13 @@ export function useFollow(targetId: string) {
 
 export function useFollowLink() {
   const refresh = useRefresh()
+  const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (url: string) => api.post<FollowLinkResult>('/companies/follow-link', { url }),
-    onSuccess: refresh,
+    onSuccess: async (result) => {
+      if (result.reading) watchReading(queryClient)
+      await refresh()
+    },
   })
 }
 
@@ -68,7 +73,7 @@ export function followMessage(result: FollowLinkResult) {
   const paused = company.paused ? ' A coleta dela está pausada pelo admin, então nenhuma vaga nova chega até ele reativar.' : ''
   if (!added) return `Você está seguindo a ${company.name}.${paused}`
   if (listed === 0) return `Você está seguindo a ${company.name}. Ela não tem vagas abertas agora; você é avisado quando abrir.`
-  const reading = result.reading ? ' Já estamos lendo as vagas; você recebe uma notificação quando terminar.' : ''
+  const reading = result.reading ? ' Já estamos lendo as vagas dela: em um ou dois minutos elas entram em Vagas sozinhas, e você recebe uma notificação.' : ''
   return `Você está seguindo a ${company.name}, que tem ${listed === 1 ? '1 vaga aberta' : `${listed} vagas abertas`}.${reading}`
 }
 

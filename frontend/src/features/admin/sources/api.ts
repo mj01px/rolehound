@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '../../../lib/api'
+import { watchReading } from '../../notifications/reading'
 
 export type SourceKind = 'inhire' | 'gupy' | 'github' | 'greenhouse' | 'lever' | 'workday' | 'careersite'
 
@@ -99,6 +100,7 @@ export function useRunNow() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: () => api.post<CollectionRequest>('/admin/sources/run'),
+    onSuccess: () => watchReading(queryClient),
     onSettled: () => queryClient.invalidateQueries({ queryKey: sourcesKey }),
   })
 }
@@ -124,6 +126,7 @@ export function useRunSource(target: SourceTarget) {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: () => api.post<CollectionRequest>(`/admin/sources/${target.id}/run`),
+    onSuccess: () => watchReading(queryClient),
     onSettled: () => queryClient.invalidateQueries({ queryKey: sourcesKey }),
   })
 }
