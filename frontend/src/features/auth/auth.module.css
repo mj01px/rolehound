@@ -4,8 +4,12 @@
   flex-direction: column;
 }
 
+/* The sign-in column fills the screen but the footer's top edge (its brand line) still shows, hinting there is more below. */
 .main {
   flex-grow: 1;
+  box-sizing: border-box;
+  min-height: calc(100vh - 72px);
+  min-height: calc(100dvh - 72px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -85,19 +89,108 @@
 }
 
 .footer {
-  padding: var(--space-6) var(--space-8);
+  background: var(--surface);
   border-top: 1px solid var(--border);
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--muted);
+}
+
+.footerGrid {
+  max-width: 1120px;
+  margin: 0 auto;
+  box-sizing: border-box;
+  padding: 40px var(--space-8) 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr);
+  gap: 48px;
+}
+
+.footerBrand,
+.footerColumn {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.footerBrand p {
+  margin: 0;
+  max-width: 320px;
+  line-height: 20px;
+}
+
+.footerMark {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 16px;
+  line-height: 20px;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  color: var(--ink);
+}
+
+.footerBadge {
+  align-self: flex-start;
+  margin-top: var(--space-1);
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+}
+
+.footerColumn h2 {
+  margin: 0;
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  color: var(--faint);
+}
+
+.footerColumn ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.footerColumn li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.footerColumn li svg {
+  flex-shrink: 0;
+  color: var(--faint);
+}
+
+.footerBottom {
+  width: calc(100% - 2 * var(--space-8));
+  max-width: calc(1120px - 2 * var(--space-8));
+  margin: 32px auto 0;
+  box-sizing: border-box;
+  padding: var(--space-4) 0 20px;
   display: flex;
   flex-wrap: wrap;
   justify-content: space-between;
-  gap: var(--space-3);
-  font-size: 13px;
+  gap: var(--space-2) var(--space-6);
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+  line-height: 16px;
   color: var(--faint);
 }
 
 .footer a {
-  color: inherit;
+  color: var(--muted);
   text-decoration: none;
+  overflow-wrap: anywhere;
 }
 
 .footer a:hover {
@@ -107,4 +200,16 @@
 .footer a:focus-visible {
   outline: 2px solid var(--signal-bright);
   outline-offset: 2px;
+}
+
+@media (max-width: 720px) {
+  .footerGrid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-8);
+    padding: var(--space-8) var(--space-4) 0;
+  }
+
+  .footerBottom {
+    width: calc(100% - 2 * var(--space-4));
+  }
 }
