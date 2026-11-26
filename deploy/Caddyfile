@@ -28,6 +28,8 @@
 		output stdout
 		format filter {
 			request>headers>X-Rolehound-Proxy delete
+			request>headers>X-Telegram-Bot-Api-Secret-Token delete
+			request>headers>X-Task-Key delete
 			wrap json
 		}
 	}

@@ -31,6 +31,8 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Rolehound.Api.Tests" />
+    <!-- Local defaults (a development task key among them) never ship in the image. -->
+    <Content Update="appsettings.Development.json" CopyToPublishDirectory="Never" />
   </ItemGroup>
 
 </Project>

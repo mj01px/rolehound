@@ -45,8 +45,14 @@ throughout.
 
 ## 2. The VM
 
+SSH goes through Identity-Aware Proxy only: port 22 is closed to the internet
+and open to Google's IAP range, and `gcloud` asks for your Google account.
+
 ```bash
-gcloud compute ssh rolehound --zone=us-central1-a
+gcloud compute firewall-rules create rolehound-ssh-iap \
+  --allow=tcp:22 --source-ranges=35.235.240.0/20
+gcloud compute firewall-rules delete default-allow-ssh default-allow-rdp
+gcloud compute ssh rolehound --zone=us-central1-a --tunnel-through-iap
 
 # 2 GB of swap: 1 GB of RAM is tight when a PDF is being rendered.
 sudo fallocate -l 2G /swapfile && sudo chmod 600 /swapfile
@@ -106,10 +112,13 @@ of letters, digits, `_` and `-`. The API registers the webhook when it starts.
    `rolehound-api`) and set its address to the VM's static address.
    `duckdns.org` is on the Public Suffix List, so Let's Encrypt treats each
    subdomain as its own domain.
-3. Start everything; Caddy obtains the HTTPS certificate on first request:
+3. Set `API_TAG` in `.env` to the full SHA of the commit CI published (GitHub ›
+   Actions › the run's "Publish API image" job). The API runs exactly that build.
+4. Start everything; Caddy obtains the HTTPS certificate on first request:
 
    ```bash
    docker compose pull
+   docker compose build scheduler
    docker compose up -d
    docker compose ps
    curl -s https://rolehound-api.duckdns.org/health/ready
@@ -118,7 +127,7 @@ of letters, digits, `_` and `-`. The API registers the webhook when it starts.
    Any other path called directly returns 404: only the Pages proxy may reach
    the API.
 
-4. The first admin (`Admin__Email`) receives an access link by email.
+5. The first admin (`Admin__Email`) receives an access link by email.
 
 ## 5. Web app on Cloudflare Pages
 
@@ -144,13 +153,17 @@ for every path, then sign in to confirm the proxy and the session cookie.
 
 ## Updating
 
+Wait for CI's "Publish API image" job on the commit, then on the VM:
+
 ```bash
 cd ~/rolehound && git pull
-cd deploy && docker compose pull && docker compose up -d
+cd deploy
+sed -i "s/^API_TAG=.*/API_TAG=$(git rev-parse HEAD)/" .env
+docker compose pull && docker compose build scheduler && docker compose up -d
 ```
 
-Migrations run when the API starts. To pin a version, set `API_TAG` in `.env`
-to a commit SHA that CI built.
+Migrations run when the API starts. To roll back, set `API_TAG` to the previous
+SHA and run `docker compose up -d` again (a migration that already ran stays).
 
 ## Scheduled tasks
 
@@ -168,7 +181,8 @@ Logs: `docker compose logs scheduler`.
 
 The `backup` service writes `rolehound-YYYY-MM-DD.dump` at 04:00 into the
 `backups` volume and keeps 7 days. These copies live on the same disk as the
-database, so also copy one off the VM now and then:
+database, so also copy one off the VM now and then. A deleted account stays in
+these dumps until they rotate out, 7 days at most:
 
 ```bash
 docker compose cp backup:/backups ./backups-copy
