@@ -81,6 +81,19 @@ public sealed class CollectionTests(ApiFactory factory) : ApiTest(factory)
     }
 
     [Fact]
+    public async Task A_source_that_breaks_its_connector_fails_alone_and_the_run_goes_on()
+    {
+        await AddTargetAsync("estranho");
+        await AddTargetAsync("exemplo");
+        Factory.JobSource.Breaks("estranho");
+        Factory.JobSource.Lists("exemplo", FakeJobSource.Job("1", "Dev"));
+
+        var summary = await RunAsync();
+
+        Assert.Equal((1, 1), (summary.Failed, summary.Added));
+    }
+
+    [Fact]
     public async Task Running_twice_changes_nothing_the_second_time()
     {
         await AddTargetAsync("exemplo");

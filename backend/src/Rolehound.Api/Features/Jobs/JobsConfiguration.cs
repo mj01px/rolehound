@@ -24,6 +24,8 @@ internal sealed class JobConfiguration : IEntityTypeConfiguration<Job>
         builder.HasIndex(j => j.TargetId);
         builder.HasIndex(j => new { j.Status, j.ClosedAt });
         builder.HasOne<SourceTarget>().WithMany().HasForeignKey(j => j.TargetId).OnDelete(DeleteBehavior.SetNull);
+        builder.HasIndex(j => j.OwnerId);
+        builder.HasOne<User>().WithMany().HasForeignKey(j => j.OwnerId).OnDelete(DeleteBehavior.Cascade);
     }
 }
 

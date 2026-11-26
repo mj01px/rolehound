@@ -1218,6 +1218,10 @@ namespace Rolehound.Api.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("opened_at");
 
+                    b.Property<Guid?>("OwnerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("owner_id");
+
                     b.Property<DateTimeOffset?>("PublishedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("published_at");
@@ -1269,6 +1273,9 @@ namespace Rolehound.Api.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id")
                         .HasName("pk_jobs");
+
+                    b.HasIndex("OwnerId")
+                        .HasDatabaseName("ix_jobs_owner_id");
 
                     b.HasIndex("TargetId")
                         .HasDatabaseName("ix_jobs_target_id");
@@ -1863,6 +1870,12 @@ namespace Rolehound.Api.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Rolehound.Api.Features.Jobs.Job", b =>
                 {
+                    b.HasOne("Rolehound.Api.Features.Accounts.User", null)
+                        .WithMany()
+                        .HasForeignKey("OwnerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .HasConstraintName("fk_jobs_users_owner_id");
+
                     b.HasOne("Rolehound.Api.Features.Collection.SourceTarget", null)
                         .WithMany()
                         .HasForeignKey("TargetId")

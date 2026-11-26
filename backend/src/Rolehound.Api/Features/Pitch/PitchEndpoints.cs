@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 using Rolehound.Api.Features.Ai;
 using Rolehound.Api.Infrastructure.Http;
+using Rolehound.Api.Features.Jobs;
 using Rolehound.Api.Infrastructure.Persistence;
 
 namespace Rolehound.Api.Features.Pitch;
@@ -134,10 +135,7 @@ internal static class PitchEndpoints
     }
 
     private static Task<bool> CanSeeAsync(RolehoundDbContext db, Guid userId, Guid jobId, CancellationToken ct) =>
-        db.UserJobs.AnyAsync(
-            u => u.UserId == userId && u.JobId == jobId
-                && (u.IsRelevant || u.AddedByUser || db.Applications.Any(a => a.UserId == userId && a.JobId == jobId)),
-            ct);
+        JobAccess.Usable(db, userId, jobId).AnyAsync(ct);
 
     private static string Excerpt(string dossier)
     {

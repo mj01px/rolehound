@@ -60,7 +60,7 @@ internal static class ConnectorRequestEndpoints
     private static async Task<Results<Ok<ResolveConnectorResponse>, ValidationProblem, ProblemHttpResult>> Resolve(
         string platform, ResolveConnectorRequest request, RolehoundDbContext db, TelegramNotifier notifier, TimeProvider time, CancellationToken ct)
     {
-        if (!Enum.TryParse<ConnectorRequestStatus>(request.Status, ignoreCase: true, out var status) || status == ConnectorRequestStatus.Open)
+        if (!Validation.TryEnum<ConnectorRequestStatus>(request.Status, out var status) || status == ConnectorRequestStatus.Open)
         {
             return Problems.Validation("status", "Use done ou declined.");
         }
@@ -71,7 +71,11 @@ internal static class ConnectorRequestEndpoints
             return Problems.Validation("reason", "O motivo tem no máximo 200 caracteres.");
         }
 
-        var open = await db.ConnectorRequests.Where(r => r.Platform == platform && r.Status == ConnectorRequestStatus.Open).ToListAsync(ct);
+        // Row locks: two admins resolving at once cannot both close the same requests and notify twice.
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        var open = await db.ConnectorRequests
+            .FromSql($"SELECT * FROM connector_requests WHERE platform = {platform} AND status = 'Open' FOR UPDATE")
+            .ToListAsync(ct);
         if (open.Count == 0)
         {
             return Problems.NotFound();
@@ -87,6 +91,7 @@ internal static class ConnectorRequestEndpoints
         }
 
         await db.SaveChangesAsync(ct);
+        await transaction.CommitAsync(ct);
         var people = status == ConnectorRequestStatus.Done ? open.Select(r => r.UserId).Distinct().ToList() : [];
         if (people.Count > 0)
         {

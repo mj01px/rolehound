@@ -43,6 +43,7 @@ internal static class JobLinks
         CollectedJob item;
         JobSource source;
         string? targetKey = null;
+        Guid? ownerId = null;
         var fetched = false;
         var match = readers.Select(r => (Reader: r, Link: r.Parse(url))).FirstOrDefault(m => m.Link is not null);
         if (match.Link is { } link)
@@ -73,8 +74,9 @@ internal static class JobLinks
             }
 
             source = JobSource.Link;
+            ownerId = principal.GetUserId();
             item = new CollectedJob(
-                ExternalIdOf(url),
+                ExternalIdOf(url, ownerId.Value),
                 request.Title!.Trim(),
                 request.Company?.Trim() ?? string.Empty,
                 request.Location?.Trim() ?? string.Empty,
@@ -94,6 +96,7 @@ internal static class JobLinks
             {
                 Source = source,
                 ExternalId = item.ExternalId,
+                OwnerId = ownerId,
                 TargetId = target?.Id,
                 Title = string.Empty,
                 Company = string.Empty,
@@ -108,6 +111,12 @@ internal static class JobLinks
             JobFields.Apply(job, item, target?.Label);
             db.Jobs.Add(job);
         }
+        else if (ownerId is not null)
+        {
+            // The person pasted this link before: their new text replaces their old one.
+            JobFields.Apply(job, item, null);
+            job.LastSeenAt = now;
+        }
         else if (fetched)
         {
             var label = job.TargetId is { } targetId ? (await db.SourceTargets.AsNoTracking().SingleOrDefaultAsync(t => t.Id == targetId, ct))?.Label : null;
@@ -115,11 +124,12 @@ internal static class JobLinks
             job.LastSeenAt = now;
         }
 
-        if (job.Status == SourceStatus.Closed && fetched)
+        // Read again at the source, so open there. OpenedAt stays: a person adding a link
+        // must not make the job show up as new for everyone else.
+        if (job.Status == SourceStatus.Closed && (fetched || ownerId is not null))
         {
             job.Status = SourceStatus.Active;
             job.ClosedAt = null;
-            job.OpenedAt = now;
         }
 
         await db.JobTombstones.Where(t => t.Source == source && t.ExternalId == item.ExternalId).ExecuteDeleteAsync(ct);
@@ -172,10 +182,13 @@ internal static class JobLinks
         return errors.Count == 0 ? null : Problems.Validation(errors);
     }
 
-    /// <summary>Same link, same job: scheme and host lowercased, fragment dropped.</summary>
-    internal static string ExternalIdOf(Uri url)
+    /// <summary>
+    /// Same link from the same person, same job: scheme and host lowercased, fragment dropped.
+    /// The person is part of the key, so two people pasting one link get a job each.
+    /// </summary>
+    internal static string ExternalIdOf(Uri url, Guid ownerId)
     {
-        var normalized = $"{url.Scheme}://{url.Host.ToLowerInvariant()}{url.PathAndQuery}".TrimEnd('/');
+        var normalized = $"{ownerId:N}|{url.Scheme}://{url.Host.ToLowerInvariant()}{url.PathAndQuery}".TrimEnd('/');
         return Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(normalized)));
     }
 }

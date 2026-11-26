@@ -65,7 +65,7 @@ public static class DetailPages
                     skipped.Add(idOf(item));
                 }
             }
-            catch (Exception ex) when (ex is ConnectorException or KeyNotFoundException or InvalidOperationException or System.Text.Json.JsonException)
+            catch (Exception ex) when (ex is ConnectorException or KeyNotFoundException or InvalidOperationException or System.Text.Json.JsonException or System.Text.RegularExpressions.RegexMatchTimeoutException)
             {
                 failed.Add(item);
             }

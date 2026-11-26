@@ -9,6 +9,12 @@ internal static class HttpJson
 {
     private const int Attempts = 3;
 
+    /// <summary>The largest answer read from a provider; far above any real listing page.</summary>
+    public const int MaxResponseBytes = 16 * 1024 * 1024;
+
+    // HttpClient's timeout ends when the headers arrive; the body gets its own clock.
+    private static readonly TimeSpan BodyTimeout = TimeSpan.FromSeconds(60);
+
     public static async Task<JsonDocument> GetAsync(
         HttpClient http, Uri url, string subject, CancellationToken ct, IReadOnlyDictionary<string, string>? headers = null)
     {
@@ -61,7 +67,7 @@ internal static class HttpJson
             HttpResponseMessage response;
             try
             {
-                response = await http.SendAsync(request, ct);
+                response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
             }
             catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException && !ct.IsCancellationRequested)
             {
@@ -98,8 +104,60 @@ internal static class HttpJson
                     throw new ConnectorException("source_error", $"{subject}: a fonte respondeu {(int)response.StatusCode}.");
                 }
 
-                return await response.Content.ReadAsStringAsync(ct);
+                return await ReadBoundedAsync(response.Content, subject, ct);
             }
+        }
+    }
+
+    /// <summary>Reads the body up to <see cref="MaxResponseBytes"/> within <see cref="BodyTimeout"/>.</summary>
+    private static async Task<string> ReadBoundedAsync(HttpContent content, string subject, CancellationToken ct)
+    {
+        if (content.Headers.ContentLength > MaxResponseBytes)
+        {
+            throw new ConnectorException("source_invalid", $"{subject}: resposta grande demais.");
+        }
+
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        deadline.CancelAfter(BodyTimeout);
+        try
+        {
+            await using var body = await content.ReadAsStreamAsync(deadline.Token);
+            using var buffer = new MemoryStream();
+            var chunk = new byte[81920];
+            int count;
+            while ((count = await body.ReadAsync(chunk, deadline.Token)) > 0)
+            {
+                if (buffer.Length + count > MaxResponseBytes)
+                {
+                    throw new ConnectorException("source_invalid", $"{subject}: resposta grande demais.");
+                }
+
+                buffer.Write(chunk, 0, count);
+            }
+
+            var charset = content.Headers.ContentType?.CharSet;
+            var encoding = charset is null ? System.Text.Encoding.UTF8 : EncodingOf(charset);
+            return encoding.GetString(buffer.GetBuffer(), 0, (int)buffer.Length);
+        }
+        catch (OperationCanceledException ex) when (!ct.IsCancellationRequested)
+        {
+            throw new ConnectorException("source_unreachable", $"{subject}: a fonte demorou demais para responder.", ex);
+        }
+        catch (IOException ex)
+        {
+            throw new ConnectorException("source_unreachable", $"{subject}: a resposta da fonte foi interrompida.", ex);
+        }
+    }
+
+    private static System.Text.Encoding EncodingOf(string charset)
+    {
+        try
+        {
+            return System.Text.Encoding.GetEncoding(charset.Trim('"'));
+        }
+        catch (ArgumentException)
+        {
+            return System.Text.Encoding.UTF8;
         }
     }
 

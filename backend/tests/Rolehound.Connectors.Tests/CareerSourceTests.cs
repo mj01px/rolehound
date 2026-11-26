@@ -171,7 +171,14 @@ public sealed class CareerSourceTests
     [InlineData("::1", false)]
     [InlineData("fd00::1", false)]
     [InlineData("::ffff:10.0.0.1", false)]
+    [InlineData("::10.0.0.1", false)]
+    [InlineData("64:ff9b::a9fe:a9fe", false)]
+    [InlineData("64:ff9b:1::1", false)]
+    [InlineData("2002:a9fe:a9fe::1", false)]
+    [InlineData("2001:0:4136:e378:8000:63bf:3fff:fdd2", false)]
+    [InlineData("::", false)]
     [InlineData("8.8.8.8", true)]
+    [InlineData("64:ff9b::808:808", true)]
     [InlineData("2606:4700::1111", true)]
     public void Only_public_internet_addresses_are_reached(string address, bool allowed) =>
         Assert.Equal(allowed, SafeHttp.IsPublic(IPAddress.Parse(address)));

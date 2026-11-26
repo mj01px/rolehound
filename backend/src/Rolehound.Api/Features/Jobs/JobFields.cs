@@ -20,7 +20,7 @@ internal static class JobFields
 
         job.Title = Cut(item.Title, 500);
         job.Company = Cut(company, 200);
-        job.Url = Cut(item.Url, 1000);
+        job.Url = Cut(SafeUrl(item.Url), 1000);
         if (!keepDetails)
         {
             job.Location = Cut(item.Location, 300);
@@ -34,6 +34,10 @@ internal static class JobFields
         job.Seniority = JobClassifier.DetectSeniority(text);
         return changed;
     }
+
+    /// <summary>Only absolute http and https addresses are kept: the link is shown to people as a link.</summary>
+    public static string SafeUrl(string value) =>
+        Uri.TryCreate(value.Trim(), UriKind.Absolute, out var url) && url.Scheme is "http" or "https" ? value.Trim() : string.Empty;
 
     public static string Cut(string value, int max) => value.Length > max ? value[..max] : value;
 }

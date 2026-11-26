@@ -29,11 +29,17 @@ public sealed class JobScoring(RolehoundDbContext db, TimeProvider time)
         foreach (var (userId, scorer) in await ScorersAsync(null, ct))
         {
             var existing = await db.UserJobs.Where(u => u.UserId == userId && jobIds.Contains(u.JobId)).ToDictionaryAsync(u => u.JobId, ct);
-            Apply(userId, scorer, jobs, existing);
+            Apply(userId, scorer, jobs.Where(j => j.OwnerId is null || j.OwnerId == userId), existing, ct);
         }
 
         await db.SaveChangesAsync(ct);
     }
+
+    /// <summary>Jobs scored per round trip in a rescore: memory stays flat however many jobs there are.</summary>
+    public const int RescoreBatch = 500;
+
+    // One rescore at a time in the process: each reads every active job, and the API shares a small memory limit.
+    private static readonly SemaphoreSlim RescoreGate = new(1, 1);
 
     /// <summary>Scores every active job for one person; used when their profile changes or onboarding ends.</summary>
     public async Task<ScoreSummary> RescoreUserAsync(Guid userId, CancellationToken ct)
@@ -44,12 +50,41 @@ public sealed class JobScoring(RolehoundDbContext db, TimeProvider time)
             return new ScoreSummary(0, 0, 0);
         }
 
-        var jobs = await db.Jobs.Where(j => j.Status == SourceStatus.Active).ToListAsync(ct);
-        var existing = await db.UserJobs.Where(u => u.UserId == userId).ToDictionaryAsync(u => u.JobId, ct);
-        var scored = Apply(userId, scorers[0].Scorer, jobs, existing);
-        await db.SaveChangesAsync(ct);
+        await RescoreGate.WaitAsync(ct);
+        try
+        {
+            int analyzed = 0, matching = 0, highlights = 0;
+            Guid? after = null;
+            while (true)
+            {
+                var jobs = await db.Jobs.AsNoTracking()
+                    .Where(j => j.Status == SourceStatus.Active && (j.OwnerId == null || j.OwnerId == userId) && (after == null || j.Id > after))
+                    .OrderBy(j => j.Id)
+                    .Take(RescoreBatch)
+                    .ToListAsync(ct);
+                if (jobs.Count == 0)
+                {
+                    break;
+                }
 
-        return new ScoreSummary(jobs.Count, scored.Count(u => u.IsRelevant), scored.Count(u => u.IsRelevant && u.IsHighlight));
+                var ids = jobs.Select(j => j.Id).ToList();
+                var existing = await db.UserJobs.Where(u => u.UserId == userId && ids.Contains(u.JobId)).ToDictionaryAsync(u => u.JobId, ct);
+                var scored = Apply(userId, scorers[0].Scorer, jobs, existing, ct);
+                await db.SaveChangesAsync(ct);
+                db.ChangeTracker.Clear();
+
+                analyzed += jobs.Count;
+                matching += scored.Count(u => u.IsRelevant);
+                highlights += scored.Count(u => u.IsRelevant && u.IsHighlight);
+                after = jobs[^1].Id;
+            }
+
+            return new ScoreSummary(analyzed, matching, highlights);
+        }
+        finally
+        {
+            RescoreGate.Release();
+        }
     }
 
     /// <summary>
@@ -58,7 +93,7 @@ public sealed class JobScoring(RolehoundDbContext db, TimeProvider time)
     /// </summary>
     public async Task<ProfileImpact> CompareAsync(ScoreProfile before, ScoreProfile after, CancellationToken ct)
     {
-        var jobs = await db.Jobs.AsNoTracking().Where(j => j.Status == SourceStatus.Active).ToListAsync(ct);
+        var jobs = await db.Jobs.AsNoTracking().Where(j => j.Status == SourceStatus.Active && j.OwnerId == null).ToListAsync(ct);
         var (oldScorer, newScorer) = (new JobScorer(before), new JobScorer(after));
         int matchingBefore = 0, highlightsBefore = 0, matchingAfter = 0, highlightsAfter = 0;
         foreach (var job in jobs)
@@ -74,12 +109,13 @@ public sealed class JobScoring(RolehoundDbContext db, TimeProvider time)
         return new ProfileImpact(jobs.Count, matchingBefore, matchingAfter, highlightsBefore, highlightsAfter);
     }
 
-    private List<UserJob> Apply(Guid userId, JobScorer scorer, IEnumerable<Job> jobs, Dictionary<Guid, UserJob> existing)
+    private List<UserJob> Apply(Guid userId, JobScorer scorer, IEnumerable<Job> jobs, Dictionary<Guid, UserJob> existing, CancellationToken ct)
     {
         var now = time.GetUtcNow();
         var result = new List<UserJob>();
         foreach (var job in jobs)
         {
+            ct.ThrowIfCancellationRequested();
             var score = scorer.Score(job.ToText());
             if (!existing.TryGetValue(job.Id, out var userJob))
             {

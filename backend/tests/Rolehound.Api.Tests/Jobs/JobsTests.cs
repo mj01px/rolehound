@@ -142,6 +142,25 @@ public sealed class JobsTests(ApiFactory factory) : ApiTest(factory)
     }
 
     [Fact]
+    public async Task A_pasted_job_is_seen_only_by_the_person_who_pasted_it()
+    {
+        await OnboardedAsync("ana@exemplo.test");
+        await OnboardedAsync("bia@exemplo.test");
+        var request = new { url = "https://www.linkedin.com/jobs/view/555", title = "Dev Python", company = "Exemplo", description = "Python e Django." };
+        using var ana = await SignedInAsync("ana@exemplo.test");
+        var anaJob = await ReadAsync<AddJobLinkResponse>(await ana.PostAsJsonAsync("/jobs/links", request, Ct));
+
+        using var bia = await SignedInAsync("bia@exemplo.test");
+        Assert.Empty((await ListAsync(bia, "all")).Items);
+        Assert.Equal(HttpStatusCode.NotFound, (await bia.GetAsync(new Uri($"/jobs/{anaJob.Id}", UriKind.Relative), Ct)).StatusCode);
+
+        // The same link pasted by someone else is their own job, with their own text.
+        var biaJob = await ReadAsync<AddJobLinkResponse>(await bia.PostAsJsonAsync("/jobs/links", request with { title = "Outro título" }, Ct));
+        Assert.NotEqual(anaJob.Id, biaJob.Id);
+        Assert.Equal("Dev Python", Assert.Single((await ListAsync(ana, "all")).Items).Title);
+    }
+
+    [Fact]
     public async Task A_link_with_connector_is_fetched_and_brings_a_deleted_job_back()
     {
         await OnboardedAsync("ana@exemplo.test");

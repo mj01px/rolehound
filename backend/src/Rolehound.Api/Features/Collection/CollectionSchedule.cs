@@ -49,8 +49,14 @@ internal static class CollectionSchedule
         return new DateTimeOffset(slotLocal, FunnelEndpoints.Zone.GetUtcOffset(slotLocal)).ToUniversalTime();
     }
 
-    public static async Task<Ok<DueCollectionResponse>> RunIfDue(RolehoundDbContext db, CollectionRunner runner, TimeProvider time, CancellationToken ct)
+    /// <remarks>
+    /// The run goes on if the scheduler stops waiting for the answer: a run cut
+    /// halfway would still count as the slot's run and leave the last sources unread.
+    /// Only the API shutting down stops it.
+    /// </remarks>
+    public static async Task<Ok<DueCollectionResponse>> RunIfDue(RolehoundDbContext db, CollectionRunner runner, TimeProvider time, IHostApplicationLifetime lifetime)
     {
+        var ct = lifetime.ApplicationStopping;
         var slot = LatestSlot(time.GetUtcNow());
         // A source read on its own (just added) is not the collection of the hour.
         if (await db.CollectionRuns.AnyAsync(r => r.StartedAt >= slot && !r.Partial, ct))

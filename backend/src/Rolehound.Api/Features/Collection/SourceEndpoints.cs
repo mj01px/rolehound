@@ -203,7 +203,7 @@ internal static class SourceEndpoints
         AddSourceTargetRequest request, ClaimsPrincipal principal, RolehoundDbContext db, CollectionBacklog backlog, TimeProvider time, CancellationToken ct)
     {
         // The platform reads what was typed (key, link or domain); its rules say what the target is.
-        if (!Enum.TryParse<JobSource>(request.Source, ignoreCase: true, out var source) || TargetCatalog.For(source) is not { } rules)
+        if (!Validation.TryEnum<JobSource>(request.Source, out var source) || TargetCatalog.For(source) is not { } rules)
         {
             return Problems.Validation("source", $"Fonte inválida: use {string.Join(", ", TargetCatalog.All.Select(r => r.Source.ToString().ToLowerInvariant()))}.");
         }

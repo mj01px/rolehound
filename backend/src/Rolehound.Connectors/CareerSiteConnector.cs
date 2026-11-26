@@ -19,6 +19,10 @@ public sealed partial class CareerSiteConnector(HttpClient http) : IJobConnector
     private const int MaxSitemaps = 12;
     private const int MaxUrls = 3000;
     private const int ProbePages = 8;
+    private const int MaxRobotsRules = 200;
+    private const int MaxRuleLength = 300;
+    // HttpClient's timeout ends when the headers arrive; the body gets its own clock.
+    private static readonly TimeSpan BodyTimeout = TimeSpan.FromSeconds(30);
     // Polite to sites people add: two pages at a time, a short pause after each (R58).
     private static readonly DetailPages.Limits Pages = new(PerRun: 60, FirstRead: 200, Concurrency: 2, Pause: TimeSpan.FromMilliseconds(300));
 
@@ -158,8 +162,26 @@ public sealed partial class CareerSiteConnector(HttpClient http) : IJobConnector
         return page.Scheme == Uri.UriSchemeHttps && (pageHost == host || pageHost.EndsWith($".{host}", StringComparison.Ordinal));
     }
 
-    /// <summary>GET with a size limit; 404 is null when <paramref name="missingIsEmpty"/>.</summary>
+    /// <summary>GET with a size and time limit; 404 is null when <paramref name="missingIsEmpty"/>.</summary>
     private async Task<string?> GetTextAsync(Uri url, string subject, bool missingIsEmpty, CancellationToken ct)
+    {
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        deadline.CancelAfter(BodyTimeout);
+        try
+        {
+            return await GetTextCoreAsync(url, subject, missingIsEmpty, deadline.Token);
+        }
+        catch (OperationCanceledException ex) when (!ct.IsCancellationRequested)
+        {
+            throw new ConnectorException("source_unreachable", $"{subject}: o site demorou demais para responder.", ex);
+        }
+        catch (Exception ex) when (ex is IOException or InvalidDataException)
+        {
+            throw new ConnectorException("source_invalid", $"{subject}: resposta corrompida.", ex);
+        }
+    }
+
+    private async Task<string?> GetTextCoreAsync(Uri url, string subject, bool missingIsEmpty, CancellationToken ct)
     {
         HttpResponseMessage response;
         try
@@ -233,7 +255,10 @@ public sealed partial class CareerSiteConnector(HttpClient http) : IJobConnector
                 switch (field)
                 {
                     case "sitemap":
-                        sitemaps.Add(value);
+                        if (sitemaps.Count < MaxSitemaps)
+                        {
+                            sitemaps.Add(value);
+                        }
                         break;
                     case "user-agent":
                         if (inRules)
@@ -246,7 +271,8 @@ public sealed partial class CareerSiteConnector(HttpClient http) : IJobConnector
                         break;
                     case "allow" or "disallow":
                         inRules = true;
-                        if (value.Length > 0 && agents.Contains("*"))
+                        // The file is the site's: a cap on rules and their size bounds the matching work it can cause.
+                        if (value.Length is > 0 and <= MaxRuleLength && rules.Count < MaxRobotsRules && agents.Contains("*"))
                         {
                             rules.Add((field == "allow", PatternOf(value), value.Length));
                         }
@@ -258,18 +284,26 @@ public sealed partial class CareerSiteConnector(HttpClient http) : IJobConnector
             return new Robots(sitemaps, rules);
         }
 
-        /// <summary>The longest matching rule wins; allow wins a tie.</summary>
+        /// <summary>The longest matching rule wins; allow wins a tie. A rule too slow to check counts as a disallow.</summary>
         public bool Disallows(string path)
         {
-            var match = Rules.Where(r => r.Pattern.IsMatch(path)).OrderByDescending(r => r.Length).ThenByDescending(r => r.Allow).FirstOrDefault();
-            return match.Pattern is not null && !match.Allow;
+            try
+            {
+                var match = Rules.Where(r => r.Pattern.IsMatch(path)).OrderByDescending(r => r.Length).ThenByDescending(r => r.Allow).FirstOrDefault();
+                return match.Pattern is not null && !match.Allow;
+            }
+            catch (RegexMatchTimeoutException)
+            {
+                return true;
+            }
         }
 
+        // Non-backtracking: matching time grows with the path length only, whatever the rule.
         private static Regex PatternOf(string rule)
         {
             var anchored = rule.EndsWith('$');
             var body = Regex.Escape(anchored ? rule[..^1] : rule).Replace(@"\*", ".*", StringComparison.Ordinal);
-            return new Regex($"^{body}{(anchored ? "$" : string.Empty)}", RegexOptions.None, TimeSpan.FromSeconds(1));
+            return new Regex($"^{body}{(anchored ? "$" : string.Empty)}", RegexOptions.NonBacktracking, TimeSpan.FromMilliseconds(200));
         }
     }
 

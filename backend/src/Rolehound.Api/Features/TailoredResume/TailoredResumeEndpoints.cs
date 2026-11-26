@@ -4,6 +4,7 @@ using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 using Rolehound.Api.Infrastructure.Http;
+using Rolehound.Api.Features.Jobs;
 using Rolehound.Api.Infrastructure.Persistence;
 
 namespace Rolehound.Api.Features.TailoredResume;
@@ -63,10 +64,7 @@ internal static class TailoredResumeEndpoints
         }
 
         var userId = principal.GetUserId();
-        var visible = await db.UserJobs.AnyAsync(
-            u => u.UserId == userId && u.JobId == jobId
-                && (u.IsRelevant || u.AddedByUser || db.Applications.Any(a => a.UserId == userId && a.JobId == jobId)),
-            ct);
+        var visible = await JobAccess.Usable(db, userId, jobId).AnyAsync(ct);
         if (!visible)
         {
             return Problems.NotFound("Vaga não encontrada.");

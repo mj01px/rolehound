@@ -127,8 +127,14 @@ internal static class CompanyEndpoints
         var found = readers.Select(r => (r.Source, Key: r.CompanyOf(url))).FirstOrDefault(r => r.Key is not null);
         if (found.Key is null && CompanyLinks.UnsupportedPlatform(host) is { } platform)
         {
-            db.ConnectorRequests.Add(new ConnectorRequest { Platform = platform, Host = host.Length > 255 ? host[..255] : host, UserId = userId, RequestedAt = time.GetUtcNow() });
-            await db.SaveChangesAsync(ct);
+            // One open request per person and site: pasting the same link again adds nothing.
+            var requestHost = host.Length > 255 ? host[..255] : host;
+            if (!await db.ConnectorRequests.AnyAsync(r => r.UserId == userId && r.Platform == platform && r.Host == requestHost && r.Status == ConnectorRequestStatus.Open, ct))
+            {
+                db.ConnectorRequests.Add(new ConnectorRequest { Platform = platform, Host = requestHost, UserId = userId, RequestedAt = time.GetUtcNow() });
+                await db.SaveChangesAsync(ct);
+            }
+
             return Problems.Problem(StatusCodes.Status422UnprocessableEntity, "platform_unsupported",
                 $"Essa empresa usa o {platform}, que o Rolehound ainda não lê. O pedido ficou anotado para o admin.");
         }
@@ -154,6 +160,19 @@ internal static class CompanyEndpoints
         var listed = 0;
         if (target is null)
         {
+            // Every source joins every scheduled collection for good, so how many people can add is bounded.
+            if (await db.SourceTargets.CountAsync(t => t.AddedByUserId == userId && t.Enabled, ct) >= MaxSourcesPerPerson)
+            {
+                return Problems.Problem(StatusCodes.Status422UnprocessableEntity, "too_many_sources",
+                    $"Você já adicionou {MaxSourcesPerPerson} fontes. Peça ao admin para remover as que não usa mais.");
+            }
+
+            if (await db.SourceTargets.CountAsync(t => t.AddedByUserId != null && t.Enabled, ct) >= MaxPeopleSources)
+            {
+                return Problems.Problem(StatusCodes.Status422UnprocessableEntity, "too_many_sources",
+                    "O Rolehound chegou ao limite de fontes adicionadas. Avise o admin.");
+            }
+
             if (!limiter.TryTake(userId))
             {
                 return Problems.Problem(StatusCodes.Status429TooManyRequests, "too_many_links",
@@ -182,6 +201,11 @@ internal static class CompanyEndpoints
             catch (OperationCanceledException) when (!ct.IsCancellationRequested)
             {
                 return ProbeFailed("source_unreachable");
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                // The site's content broke the reader in a way it did not foresee: not followable.
+                return ProbeFailed("source_error");
             }
 
             var name = probe.Company;
@@ -234,6 +258,12 @@ internal static class CompanyEndpoints
         _ => Problems.Problem(StatusCodes.Status422UnprocessableEntity, "company_not_found",
             "Não achamos página de vagas nesse endereço. Confira o link."),
     };
+
+    /// <summary>Enabled sources one person can have added.</summary>
+    public const int MaxSourcesPerPerson = 30;
+
+    /// <summary>Enabled sources everyone together can have added; the catalog's own are not counted.</summary>
+    public const int MaxPeopleSources = 150;
 
     public const int JobsPerPage = 20;
     public const int MaxSearchLength = 100;

@@ -25,6 +25,13 @@ public sealed class Job
 
     public required string ExternalId { get; init; }
 
+    /// <summary>
+    /// Set on a job a person pasted by hand (a link with no connector): its text is
+    /// theirs, so only they score and see it, and it goes when their account goes.
+    /// Null for jobs read from a source, which everyone shares.
+    /// </summary>
+    public Guid? OwnerId { get; init; }
+
     /// <summary>The collection target that lists it; null for jobs added by link or email.</summary>
     public Guid? TargetId { get; set; }
 

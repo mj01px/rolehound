@@ -200,7 +200,7 @@ public static partial class JobPostingReader
         var tag = open.Groups[1].Value;
         var start = open.Index + open.Length;
         var depth = 1;
-        var tags = new Regex($@"<(/?){Regex.Escape(tag)}\b[^>]*>", RegexOptions.IgnoreCase, TimeSpan.FromSeconds(1));
+        var tags = new Regex($@"<(/?){Regex.Escape(tag)}\b[^>]*>", RegexOptions.IgnoreCase | RegexOptions.NonBacktracking, TimeSpan.FromSeconds(1));
         for (var m = tags.Match(html, start); m.Success; m = m.NextMatch())
         {
             depth += m.Groups[1].Value == "/" ? -1 : 1;
@@ -242,18 +242,18 @@ public static partial class JobPostingReader
 
     private static string Clip(string value, int max) => value.Length > max ? value[..max] : value;
 
-    [GeneratedRegex(@"<script[^>]*type\s*=\s*[""']application/ld\+json[""'][^>]*>(.*?)</script>", RegexOptions.IgnoreCase | RegexOptions.Singleline, 1000)]
+    [GeneratedRegex(@"<script[^>]*type\s*=\s*[""']application/ld\+json[""'][^>]*>(.*?)</script>", RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.NonBacktracking, 1000)]
     private static partial Regex JsonLdScript();
 
-    [GeneratedRegex(@"itemtype\s*=\s*[""']https?://schema\.org/JobPosting[""']", RegexOptions.IgnoreCase, 1000)]
+    [GeneratedRegex(@"itemtype\s*=\s*[""']https?://schema\.org/JobPosting[""']", RegexOptions.IgnoreCase | RegexOptions.NonBacktracking, 1000)]
     private static partial Regex ItemScope();
 
     private static Regex MetaProperty(string name) =>
-        new($@"<meta[^>]*itemprop\s*=\s*[""']{Regex.Escape(name)}[""'][^>]*content\s*=\s*[""']([^""']*)[""']", RegexOptions.IgnoreCase, TimeSpan.FromSeconds(1));
+        new($@"<meta[^>]*itemprop\s*=\s*[""']{Regex.Escape(name)}[""'][^>]*content\s*=\s*[""']([^""']*)[""']", RegexOptions.IgnoreCase | RegexOptions.NonBacktracking, TimeSpan.FromSeconds(1));
 
     private static Regex MetaContentFirst(string name) =>
-        new($@"<meta[^>]*content\s*=\s*[""']([^""']*)[""'][^>]*itemprop\s*=\s*[""']{Regex.Escape(name)}[""']", RegexOptions.IgnoreCase, TimeSpan.FromSeconds(1));
+        new($@"<meta[^>]*content\s*=\s*[""']([^""']*)[""'][^>]*itemprop\s*=\s*[""']{Regex.Escape(name)}[""']", RegexOptions.IgnoreCase | RegexOptions.NonBacktracking, TimeSpan.FromSeconds(1));
 
     private static Regex OpenTag(string name) =>
-        new($@"<([a-z][a-z0-9]*)\b[^>]*itemprop\s*=\s*[""']{Regex.Escape(name)}[""'][^>]*>", RegexOptions.IgnoreCase, TimeSpan.FromSeconds(1));
+        new($@"<([a-z][a-z0-9]*)\b[^>]*itemprop\s*=\s*[""']{Regex.Escape(name)}[""'][^>]*>", RegexOptions.IgnoreCase | RegexOptions.NonBacktracking, TimeSpan.FromSeconds(1));
 }

@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 using Rolehound.Api.Features.Ai;
 using Rolehound.Api.Infrastructure.Http;
+using Rolehound.Api.Features.Jobs;
 using Rolehound.Api.Infrastructure.Persistence;
 
 namespace Rolehound.Api.Features.Ats;
@@ -54,10 +55,7 @@ internal static class AtsEndpoints
         Guid jobId, ClaimsPrincipal principal, RolehoundDbContext db, AiGateway ai, TimeProvider time, CancellationToken ct)
     {
         var userId = principal.GetUserId();
-        var userJob = await db.UserJobs.SingleOrDefaultAsync(
-            u => u.UserId == userId && u.JobId == jobId
-                && (u.IsRelevant || u.AddedByUser || db.Applications.Any(a => a.UserId == userId && a.JobId == jobId)),
-            ct);
+        var userJob = await JobAccess.Usable(db, userId, jobId).SingleOrDefaultAsync(ct);
         if (userJob is null)
         {
             return Problems.NotFound("Vaga não encontrada.");

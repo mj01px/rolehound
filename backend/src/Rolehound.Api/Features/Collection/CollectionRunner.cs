@@ -28,6 +28,12 @@ public sealed partial class CollectionRunner(
     TimeProvider time,
     ILogger<CollectionRunner> logger)
 {
+    /// <summary>
+    /// The longest one source may take in a run. A slow or stalling site fails on
+    /// its own instead of holding the collection lock for everyone.
+    /// </summary>
+    public static readonly TimeSpan TargetBudget = TimeSpan.FromMinutes(4);
+
     /// <summary>How long jobs of searches, email alerts and pasted links stay open (BR-JOB-05).</summary>
     public static readonly TimeSpan MaxAge = TimeSpan.FromDays(30);
 
@@ -87,7 +93,7 @@ public sealed partial class CollectionRunner(
                 var detailed = (await db.Jobs.Where(j => j.TargetId == target.Id && j.Description != string.Empty)
                     .Select(j => j.ExternalId).ToListAsync(ct)).ToHashSet(StringComparer.Ordinal);
                 var skipped = (await db.SkippedPages.Where(p => p.TargetId == target.Id).Select(p => p.PageId).ToListAsync(ct)).ToHashSet(StringComparer.Ordinal);
-                var snapshot = await connector.FetchAsync(target.Key, new KnownPages(detailed, skipped), ct);
+                var snapshot = await FetchAsync(connector, target, new KnownPages(detailed, skipped), ct);
                 complete = snapshot.Authoritative;
                 var changed = await ApplyAsync(target, snapshot, run, ct);
                 target.LastJobCount = run.Listed;
@@ -126,6 +132,29 @@ public sealed partial class CollectionRunner(
         await notifier.NotifyHighlightsAsync(_opened, ct);
         await notifier.NotifyCompaniesAsync(_opened, ct);
         return new CollectionSummary(targets.Count, failed, added, reopened, closed);
+    }
+
+    /// <summary>
+    /// Reads one source within <see cref="TargetBudget"/>. Whatever goes wrong inside
+    /// a connector (it parses third-party content) becomes a failure of that source
+    /// only; the run goes on with the next one.
+    /// </summary>
+    private static async Task<Snapshot> FetchAsync(IJobConnector connector, SourceTarget target, KnownPages known, CancellationToken ct)
+    {
+        using var budget = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        budget.CancelAfter(TargetBudget);
+        try
+        {
+            return await connector.FetchAsync(target.Key, known, budget.Token);
+        }
+        catch (OperationCanceledException ex) when (!ct.IsCancellationRequested)
+        {
+            throw new ConnectorException("source_timeout", $"{target.Key}: a leitura passou de {TargetBudget.TotalMinutes:0} minutos.", ex);
+        }
+        catch (Exception ex) when (ex is not ConnectorException and not OperationCanceledException)
+        {
+            throw new ConnectorException("source_error", $"{target.Key}: a fonte mandou algo que não deu para ler.", ex);
+        }
     }
 
     /// <summary>

@@ -19,6 +19,9 @@ public sealed class FakeJobSource(JobSource source, bool authoritative = true) :
 
     public void Fails(string target) => _answers[target] = () => throw new ConnectorException("source_unreachable", $"{source} {target}: sem resposta da fonte.");
 
+    /// <summary>The connector itself breaks on what the source sent, with an exception it did not foresee.</summary>
+    public void Breaks(string target) => _answers[target] = () => throw new InvalidOperationException($"{source} {target}: unexpected content.");
+
     /// <summary>The source answers with an error of the given code, such as target_not_found or target_closed.</summary>
     public void Rejects(string target, string code) => _answers[target] = () => throw new ConnectorException(code, $"{source} {target}: {code}.");
 

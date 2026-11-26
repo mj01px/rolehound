@@ -114,17 +114,17 @@ internal static class JobEndpoints
             filtered = filtered.Where(r => EF.Functions.ILike(r.Job.Title, pattern, "\\") || EF.Functions.ILike(r.Job.Company, pattern, "\\"));
         }
 
-        if (Enum.TryParse<JobSource>(source, ignoreCase: true, out var sourceValue))
+        if (Validation.TryEnum<JobSource>(source, out var sourceValue))
         {
             filtered = filtered.Where(r => r.Job.Source == sourceValue);
         }
 
-        if (Enum.TryParse<WorkMode>(workMode, ignoreCase: true, out var workModeValue))
+        if (Validation.TryEnum<WorkMode>(workMode, out var workModeValue))
         {
             filtered = filtered.Where(r => r.Job.WorkMode == workModeValue);
         }
 
-        if (Enum.TryParse<Seniority>(seniority, ignoreCase: true, out var seniorityValue))
+        if (Validation.TryEnum<Seniority>(seniority, out var seniorityValue))
         {
             filtered = filtered.Where(r => r.Job.Seniority == seniorityValue);
         }
