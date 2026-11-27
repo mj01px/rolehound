@@ -84,7 +84,9 @@ public sealed partial class CollectionRunner(
     private async Task<CollectionSummary> CollectAsync(IReadOnlyCollection<Guid>? only, CancellationToken ct)
     {
         var byKind = connectors.ToDictionary(c => c.Source);
-        var targets = await db.SourceTargets.Where(t => t.Enabled && (only == null || only.Contains(t.Id))).OrderBy(t => t.Source).ThenBy(t => t.Key).ToListAsync(ct);
+        // Each source is tracked only while it is read (see the end of the loop).
+        ForgetReadData();
+        var targets = await db.SourceTargets.AsNoTracking().Where(t => t.Enabled && (only == null || only.Contains(t.Id))).OrderBy(t => t.Source).ThenBy(t => t.Key).ToListAsync(ct);
         int failed = 0, added = 0, reopened = 0, closed = 0;
         var batch = Guid.CreateVersion7();
         var troubled = new List<SourceTarget>();
@@ -96,6 +98,7 @@ public sealed partial class CollectionRunner(
                 continue;
             }
 
+            db.SourceTargets.Attach(target);
             var run = new CollectionRun { TargetId = target.Id, BatchId = batch, StartedAt = time.GetUtcNow(), Partial = only is not null };
             db.CollectionRuns.Add(run);
             var complete = false;
@@ -129,6 +132,8 @@ public sealed partial class CollectionRunner(
             }
 
             await db.SaveChangesAsync(ct);
+
+            ForgetReadData();
             added += run.Added;
             reopened += run.Reopened;
             closed += run.Closed;
@@ -143,6 +148,19 @@ public sealed partial class CollectionRunner(
         await notifier.NotifyHighlightsAsync(_opened, ct);
         await notifier.NotifyCompaniesAsync(_opened, ct);
         return new CollectionSummary(targets.Count, failed, added, reopened, closed);
+    }
+
+    /// <summary>
+    /// Stops tracking what was read. Without this, every job and score of the sources read so far
+    /// stays tracked, and each save compares all of them again: the CPU a collection takes from
+    /// people using the app. The collection request the worker holds in this context stays tracked.
+    /// </summary>
+    private void ForgetReadData()
+    {
+        foreach (var entry in db.ChangeTracker.Entries().Where(e => e.Entity is not CollectionRequest).ToList())
+        {
+            entry.State = EntityState.Detached;
+        }
     }
 
     /// <summary>
