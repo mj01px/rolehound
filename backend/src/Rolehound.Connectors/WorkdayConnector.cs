@@ -112,33 +112,39 @@ public sealed partial class WorkdayConnector(HttpClient http) : IJobConnector, I
         return new Snapshot(jobs, authoritative, warning, opened.Skipped);
     }
 
-    private static Dictionary<string, object> Query(string? brazil, string searchText, int offset) => new()
+    private static Dictionary<string, object> Query(CountryFilter? brazil, string searchText, int offset) => new()
     {
-        ["appliedFacets"] = brazil is null ? new Dictionary<string, string[]>() : new Dictionary<string, string[]> { ["locationCountry"] = [brazil] },
+        ["appliedFacets"] = brazil is null ? new Dictionary<string, string[]>() : new Dictionary<string, string[]> { [brazil.Parameter] = [brazil.Id] },
         ["limit"] = PageSize,
         ["offset"] = offset,
         ["searchText"] = searchText,
     };
 
     /// <summary>The id of Brazil in the site's country filter, when the site offers that filter.</summary>
-    private async Task<string?> BrazilFacetAsync(Site site, string subject, CancellationToken ct)
+    private async Task<CountryFilter?> BrazilFacetAsync(Site site, string subject, CancellationToken ct)
     {
         using var page = await HttpJson.PostAsync(http, site.Api("jobs"), Query(null, string.Empty, 0), subject, ct);
         return FindBrazil(page.RootElement);
     }
 
-    /// <summary>Walks the facets (country sits inside a location group) for locationCountry = Brazil.</summary>
-    internal static string? FindBrazil(JsonElement node)
+    /// <summary>The country filter's name and Brazil's id in it.</summary>
+    internal sealed record CountryFilter(string Parameter, string Id);
+
+    /// <summary>
+    /// Walks the facets for Brazil in the country filter. Sites name it locationCountry
+    /// (often inside a location group) or country.
+    /// </summary>
+    internal static CountryFilter? FindBrazil(JsonElement node)
     {
         if (node.ValueKind == JsonValueKind.Object)
         {
-            if (node.String("facetParameter") == "locationCountry" && node.TryGetProperty("values", out var countries) && countries.ValueKind == JsonValueKind.Array)
+            if (node.String("facetParameter") is "locationCountry" or "country" && node.TryGetProperty("values", out var countries) && countries.ValueKind == JsonValueKind.Array)
             {
                 foreach (var country in countries.EnumerateArray())
                 {
                     if (country.String("descriptor")?.Trim() is "Brazil" or "Brasil" && country.String("id") is { Length: > 0 } id)
                     {
-                        return id;
+                        return new CountryFilter(node.String("facetParameter")!, id);
                     }
                 }
             }
