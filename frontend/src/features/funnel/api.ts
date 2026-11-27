@@ -74,10 +74,20 @@ export interface InteractionForm {
 
 const funnelKey = ['funnel'] as const
 
-/** Funnel changes also change the job views (a job in the funnel leaves them). */
+/**
+ * Funnel changes also change the job views (a job in the funnel leaves them). They reload in
+ * the background, so a button is free after one round trip. Only the application on screen
+ * is awaited when given: the next save builds on its data, and stale data would undo a change.
+ */
 function useInvalidate() {
   const queryClient = useQueryClient()
-  return () => Promise.all([queryClient.invalidateQueries({ queryKey: funnelKey }), queryClient.invalidateQueries({ queryKey: ['jobs'] })])
+  return async (detailId?: string) => {
+    void queryClient.invalidateQueries({ queryKey: funnelKey, predicate: (query) => !(detailId && query.queryKey[2] === detailId) })
+    void queryClient.invalidateQueries({ queryKey: ['jobs'] })
+    if (detailId) {
+      await queryClient.invalidateQueries({ queryKey: [...funnelKey, 'detail', detailId] })
+    }
+  }
 }
 
 export function useBoard() {
@@ -119,7 +129,7 @@ export function useMoveApplication() {
     onError: (_error, _move, context) => {
       if (context?.before) queryClient.setQueryData(boardKey, context.before)
     },
-    onSettled: invalidate,
+    onSettled: () => invalidate(),
   })
 }
 
@@ -131,7 +141,7 @@ export function useEnterFunnel(jobId: string) {
   const invalidate = useInvalidate()
   return useMutation({
     mutationFn: (status: ApplicationStatus) => api.post<ApplicationCard>(`/jobs/${jobId}/application`, { status }),
-    onSuccess: invalidate,
+    onSuccess: () => invalidate(),
   })
 }
 
@@ -139,7 +149,7 @@ export function useSaveApplication(id: string) {
   const invalidate = useInvalidate()
   return useMutation({
     mutationFn: (form: ApplicationForm) => api.put<ApplicationCard>(`/applications/${id}`, form),
-    onSuccess: invalidate,
+    onSuccess: () => invalidate(id),
   })
 }
 
@@ -164,13 +174,13 @@ export function useSaveInteraction(applicationId: string) {
   return useMutation({
     mutationFn: ({ id, form }: { id?: string; form: InteractionForm }) =>
       id ? api.put(`/applications/${applicationId}/interactions/${id}`, form) : api.post(`/applications/${applicationId}/interactions`, form),
-    onSuccess: invalidate,
+    onSuccess: () => invalidate(applicationId),
   })
 }
 
 export function useDeleteInteraction(applicationId: string) {
   const invalidate = useInvalidate()
-  return useMutation({ mutationFn: (id: string) => api.delete(`/applications/${applicationId}/interactions/${id}`), onSuccess: invalidate })
+  return useMutation({ mutationFn: (id: string) => api.delete(`/applications/${applicationId}/interactions/${id}`), onSuccess: () => invalidate(applicationId) })
 }
 
 /** "21/11/2026" from "2026-11-21", without timezone shifts. */

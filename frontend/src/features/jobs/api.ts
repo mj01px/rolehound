@@ -1,4 +1,4 @@
-import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient, type InfiniteData, type QueryClient } from '@tanstack/react-query'
 import { api } from '../../lib/api'
 import type { ArchiveReason } from './labels'
 
@@ -86,11 +86,29 @@ export function useJob(id: string) {
   })
 }
 
+/** Takes a job out of every loaded list at once, so it leaves the screen before the lists reload. */
+function dropFromLists(queryClient: QueryClient, id: string) {
+  queryClient.setQueriesData<InfiniteData<JobListResponse>>({ queryKey: [...jobsKey, 'list'] }, (data) =>
+    data ? { ...data, pages: data.pages.map((page) => ({ ...page, items: page.items.filter((item) => item.id !== id) })) } : data,
+  )
+}
+
+/**
+ * Lists reload in the background: each API call costs a long round trip, so a button
+ * that waited for them would stay busy for one more call per loaded page.
+ */
+function refreshLists(queryClient: QueryClient) {
+  void queryClient.invalidateQueries({ queryKey: jobsKey })
+}
+
 export function useArchive(id: string) {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (body: { reason: ArchiveReason; note: string }) => api.put(`/jobs/${id}/archive`, body),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: jobsKey }),
+    onSuccess: () => {
+      dropFromLists(queryClient, id)
+      refreshLists(queryClient)
+    },
   })
 }
 
@@ -98,7 +116,12 @@ export function useRestore(id: string) {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: () => api.delete(`/jobs/${id}/archive`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: jobsKey }),
+    onSuccess: async () => {
+      dropFromLists(queryClient, id)
+      refreshLists(queryClient)
+      // The open drawer shows the job as restored only after its detail reloads.
+      await queryClient.refetchQueries({ queryKey: [...jobsKey, 'detail', id] })
+    },
   })
 }
 
@@ -114,6 +137,6 @@ export function useAddLink() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (body: AddLinkRequest) => api.post<{ id: string; fetched: boolean }>('/jobs/links', body),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: jobsKey }),
+    onSuccess: () => refreshLists(queryClient),
   })
 }

@@ -4,3 +4,7 @@
   X-Frame-Options: DENY
   Referrer-Policy: no-referrer
   Permissions-Policy: camera=(), microphone=(), geolocation=()
+
+# Built files carry a content hash in their name, so a new build gets new names: cache them for good.
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
