@@ -135,6 +135,24 @@ internal static class SourceEndpoints
         backlog.Enqueue(request.Id);
     }
 
+    /// <summary>
+    /// Starts the Gupy searches of new search terms in the background, so a profile gets its
+    /// jobs now instead of at the next scheduled collection. Nobody is notified: the jobs that
+    /// arrive reach the person like any other. One waiting request is enough for everyone.
+    /// </summary>
+    internal static async Task RequestSearchTermsReadAsync(RolehoundDbContext db, CollectionBacklog backlog, TimeProvider time, CancellationToken ct)
+    {
+        if (await db.CollectionRequests.AnyAsync(r => r.Kind == CollectionRequestKind.SearchTerms && r.Status == CollectionRequestStatus.Queued, ct))
+        {
+            return;
+        }
+
+        var request = new CollectionRequest { Kind = CollectionRequestKind.SearchTerms, RequestedAt = time.GetUtcNow(), Status = CollectionRequestStatus.Queued };
+        db.CollectionRequests.Add(request);
+        await db.SaveChangesAsync(ct);
+        backlog.Enqueue(request.Id);
+    }
+
     /// <summary>The latest full collection that started or was asked for (one-source reads do not count).</summary>
     private static async Task<DateTimeOffset?> LastFullCollectionAsync(RolehoundDbContext db, CancellationToken ct)
     {

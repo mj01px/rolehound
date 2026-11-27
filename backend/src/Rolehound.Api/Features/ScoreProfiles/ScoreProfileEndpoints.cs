@@ -4,6 +4,7 @@ using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 using Rolehound.Api.Features.Ai;
+using Rolehound.Api.Features.Collection;
 using Rolehound.Api.Features.Jobs;
 using Rolehound.Api.Features.Onboarding;
 using Rolehound.Api.Infrastructure.Http;
@@ -75,7 +76,7 @@ internal static class ScoreProfileEndpoints
     }
 
     private static async Task<Results<Ok<ScoreProfileResponse>, ValidationProblem>> Save(
-        SaveScoreProfileRequest request, ClaimsPrincipal principal, RolehoundDbContext db, JobScoring scoring, TimeProvider time, CancellationToken ct)
+        SaveScoreProfileRequest request, ClaimsPrincipal principal, RolehoundDbContext db, JobScoring scoring, CollectionBacklog backlog, TimeProvider time, CancellationToken ct)
     {
         if (request.Profile is null)
         {
@@ -97,6 +98,7 @@ internal static class ScoreProfileEndpoints
             db.ScoreProfiles.Add(stored);
         }
 
+        var termsBefore = stored.Document.Length == 0 ? [] : JsonSerializer.Deserialize<ProfileDocument>(stored.Document, Json)?.SearchTerms ?? [];
         stored.Document = JsonSerializer.Serialize(profile, Json);
         stored.DossierVersion = request.DossierVersion ?? stored.DossierVersion;
         stored.UpdatedAt = time.GetUtcNow();
@@ -106,6 +108,12 @@ internal static class ScoreProfileEndpoints
         if (await db.Users.AnyAsync(u => u.Id == userId && u.OnboardingCompletedAt != null, ct))
         {
             await scoring.RescoreUserAsync(userId, ct);
+
+            // New search terms become Gupy searches now, not at the next scheduled collection.
+            if (profile.SearchTerms.Except(termsBefore, StringComparer.OrdinalIgnoreCase).Any())
+            {
+                await SourceEndpoints.RequestSearchTermsReadAsync(db, backlog, time, ct);
+            }
         }
 
         return TypedResults.Ok(new ScoreProfileResponse(profile, stored.DossierVersion, stored.UpdatedAt));

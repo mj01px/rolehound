@@ -80,9 +80,12 @@ internal sealed partial class CollectionWorker(IServiceScopeFactory scopes, Coll
             }
             else
             {
-                var summary = request.Kind == CollectionRequestKind.Full
-                    ? await runner.RunAsync(ct)
-                    : await runner.RunTargetAsync(request.TargetId!.Value, ct);
+                var summary = request.Kind switch
+                {
+                    CollectionRequestKind.Full => await runner.RunAsync(ct),
+                    CollectionRequestKind.SearchTerms => await runner.RunNewSearchTermsAsync(ct),
+                    _ => await runner.RunTargetAsync(request.TargetId!.Value, ct),
+                };
                 (request.Targets, request.Added, request.Reopened, request.Closed, request.Failed) =
                     (summary.Targets, summary.Added, summary.Reopened, summary.Closed, summary.Failed);
                 if (request.Kind == CollectionRequestKind.Target && request.RequestedBy is { } person)

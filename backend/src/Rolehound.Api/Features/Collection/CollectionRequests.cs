@@ -12,6 +12,9 @@ public enum CollectionRequestKind
 
     /// <summary>One source on its own: right after it was added, or when an admin asks for it.</summary>
     Target,
+
+    /// <summary>The Gupy searches of new search terms, right after someone finishes or changes their profile.</summary>
+    SearchTerms,
 }
 
 public enum CollectionRequestStatus

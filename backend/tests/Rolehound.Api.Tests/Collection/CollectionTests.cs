@@ -164,6 +164,42 @@ public sealed class CollectionTests(ApiFactory factory) : ApiTest(factory)
     }
 
     [Fact]
+    public async Task Finishing_onboarding_reads_the_new_search_terms_without_waiting_for_the_schedule()
+    {
+        Factory.Gupy.Lists("python", FakeJobSource.Job("g1", "Desenvolvedor Python Júnior"));
+        var ana = await CreateUserAsync("ana@exemplo.test", onboarded: false);
+        await GiveProfileAsync(ana.Id);
+        await using (var scope = Factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<RolehoundDbContext>();
+            db.AiSettings.Add(new Rolehound.Api.Features.Ai.AiSettings { UserId = ana.Id, EncryptedKey = "x", PitchAndAtsModel = "a/b", ResumeModel = "a/b", ProfileAndFixModel = "a/b" });
+            db.DossierVersions.Add(new Rolehound.Api.Features.Dossier.DossierVersion { UserId = ana.Id, Number = 1, SchemaVersion = 1, Content = SampleDossier.Valid, CreatedAt = DateTimeOffset.UtcNow });
+            await db.SaveChangesAsync(Ct);
+        }
+
+        using var browser = await SignedInAsync("ana@exemplo.test");
+        Assert.Equal(HttpStatusCode.OK, (await browser.PostAsync(new Uri("/onboarding/complete", UriKind.Relative), null, Ct)).StatusCode);
+
+        // The Gupy search runs in the background; its job reaches Ana with no scheduled collection.
+        var relevant = false;
+        for (var attempt = 0; attempt < 100 && !relevant; attempt++)
+        {
+            await Task.Delay(100, Ct);
+            await using var scope = Factory.Services.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<RolehoundDbContext>();
+            relevant = await db.UserJobs.Join(db.Jobs, u => u.JobId, j => j.Id, (u, j) => new { u.UserId, j.ExternalId, u.IsRelevant })
+                .AnyAsync(r => r.UserId == ana.Id && r.ExternalId == "g1" && r.IsRelevant, Ct);
+        }
+
+        Assert.True(relevant);
+        await using (var scope = Factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<RolehoundDbContext>();
+            Assert.True(await db.CollectionRuns.AllAsync(r => r.Partial, Ct));
+        }
+    }
+
+    [Fact]
     public async Task Admins_manage_sources_and_keys_are_checked()
     {
         await CreateUserAsync("rafael@exemplo.test", UserRole.Admin);

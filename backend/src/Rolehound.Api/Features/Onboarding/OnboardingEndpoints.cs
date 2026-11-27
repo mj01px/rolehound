@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
+using Rolehound.Api.Features.Collection;
 using Rolehound.Api.Features.Jobs;
 using Rolehound.Api.Infrastructure.Http;
 using Rolehound.Api.Infrastructure.Persistence;
@@ -64,7 +65,7 @@ internal static class OnboardingEndpoints
         TypedResults.Ok(new OnboardingStatus(await StepAsync(db, principal.GetUserId(), ct)));
 
     private static async Task<Results<Ok<OnboardingResult>, ProblemHttpResult>> Complete(
-        ClaimsPrincipal principal, RolehoundDbContext db, JobScoring scoring, TimeProvider time, CancellationToken ct)
+        ClaimsPrincipal principal, RolehoundDbContext db, JobScoring scoring, CollectionBacklog backlog, TimeProvider time, CancellationToken ct)
     {
         var userId = principal.GetUserId();
         var step = await StepAsync(db, userId, ct);
@@ -78,6 +79,9 @@ internal static class OnboardingEndpoints
         await db.SaveChangesAsync(ct);
 
         var summary = await scoring.RescoreUserAsync(userId, ct);
+
+        // The profile's search terms become Gupy searches now, not at the next scheduled collection.
+        await SourceEndpoints.RequestSearchTermsReadAsync(db, backlog, time, ct);
         return TypedResults.Ok(new OnboardingResult(summary.JobsAnalyzed, summary.JobsMatching, summary.Highlights));
     }
 }

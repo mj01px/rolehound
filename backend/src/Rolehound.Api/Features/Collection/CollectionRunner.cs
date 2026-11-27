@@ -44,20 +44,35 @@ public sealed partial class CollectionRunner(
     private static readonly HashSet<JobSource> Untargeted = [JobSource.Link, JobSource.EmailAlert];
 
     /// <summary>A full collection: every enabled source, then the age-based closing.</summary>
-    public Task<CollectionSummary> RunAsync(CancellationToken ct) => RunCoreAsync(null, ct);
+    public Task<CollectionSummary> RunAsync(CancellationToken ct) => LockedAsync(async () =>
+    {
+        await SyncSearchTermsAsync(ct);
+        return await CollectAsync(null, ct);
+    }, ct);
 
     /// <summary>
     /// One source on its own, right after it was added. Marked partial, so it does
     /// not count as the scheduled collection of the hour or as a manual collection.
     /// </summary>
-    public Task<CollectionSummary> RunTargetAsync(Guid targetId, CancellationToken ct) => RunCoreAsync(targetId, ct);
+    public Task<CollectionSummary> RunTargetAsync(Guid targetId, CancellationToken ct) => LockedAsync(() => CollectAsync([targetId], ct), ct);
 
-    private async Task<CollectionSummary> RunCoreAsync(Guid? only, CancellationToken ct)
+    /// <summary>
+    /// Brings the Gupy searches up to date with everyone's search terms and reads only the ones
+    /// that just started, so a new or changed profile gets its jobs before the next scheduled
+    /// collection. Marked partial, like a one-source read.
+    /// </summary>
+    public Task<CollectionSummary> RunNewSearchTermsAsync(CancellationToken ct) => LockedAsync(async () =>
+    {
+        var started = await SyncSearchTermsAsync(ct);
+        return started.Count == 0 ? new CollectionSummary(0, 0, 0, 0, 0) : await CollectAsync(started, ct);
+    }, ct);
+
+    private async Task<CollectionSummary> LockedAsync(Func<Task<CollectionSummary>> collect, CancellationToken ct)
     {
         await gate.Gate.WaitAsync(ct);
         try
         {
-            return await CollectAsync(only, ct);
+            return await collect();
         }
         finally
         {
@@ -65,15 +80,11 @@ public sealed partial class CollectionRunner(
         }
     }
 
-    private async Task<CollectionSummary> CollectAsync(Guid? only, CancellationToken ct)
+    /// <summary>Reads every enabled source, or only <paramref name="only"/>: then the run is partial and closes nothing by age.</summary>
+    private async Task<CollectionSummary> CollectAsync(IReadOnlyCollection<Guid>? only, CancellationToken ct)
     {
         var byKind = connectors.ToDictionary(c => c.Source);
-        if (only is null)
-        {
-            await SyncSearchTermsAsync(ct);
-        }
-
-        var targets = await db.SourceTargets.Where(t => t.Enabled && (only == null || t.Id == only)).OrderBy(t => t.Source).ThenBy(t => t.Key).ToListAsync(ct);
+        var targets = await db.SourceTargets.Where(t => t.Enabled && (only == null || only.Contains(t.Id))).OrderBy(t => t.Source).ThenBy(t => t.Key).ToListAsync(ct);
         int failed = 0, added = 0, reopened = 0, closed = 0;
         var batch = Guid.CreateVersion7();
         var troubled = new List<SourceTarget>();
@@ -160,9 +171,10 @@ public sealed partial class CollectionRunner(
     /// <summary>
     /// Makes the Gupy targets match the union of the search terms of everyone
     /// active and onboarded: new terms are added, terms nobody uses any more
-    /// are disabled (their jobs stay and age out).
+    /// are disabled (their jobs stay and age out). Returns the searches that
+    /// started now: new, or enabled again.
     /// </summary>
-    private async Task SyncSearchTermsAsync(CancellationToken ct)
+    private async Task<List<Guid>> SyncSearchTermsAsync(CancellationToken ct)
     {
         var documents = await db.ScoreProfiles.AsNoTracking()
             .Join(db.Users.AsNoTracking(), p => p.UserId, u => u.Id, (p, u) => new { p.Document, u.IsActive, u.OnboardingCompletedAt })
@@ -178,17 +190,27 @@ public sealed partial class CollectionRunner(
 
         // Only the terms the app keeps itself; Gupy company pages are sources people add.
         var current = await db.SourceTargets.Where(t => t.Source == JobSource.Gupy && t.Automatic).ToListAsync(ct);
+        var started = new List<Guid>();
         foreach (var target in current)
         {
-            target.Enabled = wanted.Remove(target.Key);
+            var enabled = wanted.Remove(target.Key);
+            if (enabled && !target.Enabled)
+            {
+                started.Add(target.Id);
+            }
+
+            target.Enabled = enabled;
         }
 
         foreach (var term in wanted)
         {
-            db.SourceTargets.Add(new SourceTarget { Source = JobSource.Gupy, Key = term, Kind = TargetKind.Search, Automatic = true, CreatedAt = time.GetUtcNow() });
+            var target = new SourceTarget { Source = JobSource.Gupy, Key = term, Kind = TargetKind.Search, Automatic = true, CreatedAt = time.GetUtcNow() };
+            db.SourceTargets.Add(target);
+            started.Add(target.Id);
         }
 
         await db.SaveChangesAsync(ct);
+        return started;
     }
 
     /// <summary>
