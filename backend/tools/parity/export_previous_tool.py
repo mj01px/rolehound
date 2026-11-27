@@ -10,7 +10,7 @@ outside this repository. Usage:
 
     python3 -I backend/tools/parity/export_previous_tool.py \
         --backend PATH_TO_PREVIOUS_TOOL/backend \
-        --database PATH_TO/job-watcher.sqlite3 \
+        --database PATH_TO/previous-tool.sqlite3 \
         --output ~/.rolehound/parity/jobs.jsonl
 
 Then run the tests with ROLEHOUND_PARITY_FIXTURE pointing at the output file.

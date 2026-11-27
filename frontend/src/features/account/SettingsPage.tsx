@@ -58,12 +58,12 @@ function Summary() {
     <section aria-label="Resumo da IA" className={styles.summary}>
       <div className={styles.summaryCell}>
         <span className={styles.summaryLabel}>Gasto em {month}</span>
-        <span className={styles.summaryValue}>{key ? usd.format(key.usageMonthly) : '–'}</span>
+        <span className={styles.summaryValue}>{key ? usd.format(key.usageMonthly) : '-'}</span>
         <span className={styles.summaryHint}>{missing ?? 'Nesta chave, pelo OpenRouter'}</span>
       </div>
       <div className={styles.summaryCell}>
         <span className={styles.summaryLabel}>Saldo da conta</span>
-        <span className={styles.summaryValue}>{data?.balance != null ? usd.format(data.balance) : '–'}</span>
+        <span className={styles.summaryValue}>{data?.balance != null ? usd.format(data.balance) : '-'}</span>
         <span className={styles.summaryHint}>
           {spending.isError
             ? 'Não deu para ler agora. Tente de novo em instantes'
@@ -77,7 +77,7 @@ function Summary() {
       <div className={styles.summaryCell}>
         <span className={styles.summaryLabel}>Uso nos últimos 30 dias</span>
         <span className={styles.summaryValue}>
-          {calls ?? '–'} <span className={styles.summaryUnit}>{calls === 1 ? 'pedido' : 'pedidos'}</span>
+          {calls ?? '-'} <span className={styles.summaryUnit}>{calls === 1 ? 'pedido' : 'pedidos'}</span>
         </span>
         <span className={styles.summaryHint}>
           <a href="#uso">Ver por função</a>

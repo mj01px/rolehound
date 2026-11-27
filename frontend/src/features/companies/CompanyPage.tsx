@@ -130,7 +130,7 @@ function JobLine({ job, companyId, open, panelOpen }: { job: CompanyJob; company
         className={open ? `${jobStyles.row} ${jobStyles.rowOpen}` : jobStyles.row}
       >
         <span className={job.highlight ? `${jobStyles.rowScore} ${jobStyles.rowScoreHigh}` : jobStyles.rowScore} title={job.score === null ? 'Fora do seu perfil' : 'Score'}>
-          {job.score ?? '–'}
+          {job.score ?? '-'}
         </span>
         <span className={jobStyles.rowMain}>
           <span className={jobStyles.rowTitle}>{job.title}</span>
