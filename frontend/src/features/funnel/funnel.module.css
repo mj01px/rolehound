@@ -131,7 +131,9 @@
   background: var(--surface);
   color: inherit;
   text-decoration: none;
-  transition: border-color 120ms ease, opacity 120ms ease;
+  transition:
+    border-color 120ms ease,
+    opacity 120ms ease;
 }
 
 .card:hover {
@@ -236,7 +238,9 @@
   padding: 4px;
   border: 1px dashed transparent;
   border-radius: var(--radius-lg);
-  transition: background 120ms ease, border-color 120ms ease;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease;
 }
 
 .columnOver .cards {
@@ -270,3 +274,17 @@
   max-width: 480px;
 }
 
+/* Phones cannot drag cards: the hint says to open one instead. */
+.forTouch {
+  display: none;
+}
+
+@media (hover: none) and (pointer: coarse) {
+  .forMouse {
+    display: none;
+  }
+
+  .forTouch {
+    display: inline;
+  }
+}

@@ -43,7 +43,6 @@
   color: var(--muted);
 }
 
-
 .srOnly {
   position: absolute;
   width: 1px;
@@ -88,6 +87,8 @@
 
 /* The table. */
 .tableWrap {
+  /* Holds the screen-reader-only header text, which would otherwise widen the page on phones. */
+  position: relative;
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   overflow-x: auto;
@@ -170,7 +171,6 @@
   font-size: 13px;
   font-weight: 600;
 }
-
 
 .badge {
   display: inline-flex;

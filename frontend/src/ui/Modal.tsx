@@ -7,6 +7,9 @@ import styles from './overlay.module.css'
  */
 export function Modal({ titleId, label, wide = false, onClose, children }: { titleId?: string; label?: string; wide?: boolean; onClose: () => void; children: ReactNode }) {
   const dialog = useRef<HTMLDialogElement>(null)
+  // Closes on the backdrop only when the press also began there: on phones a tap that
+  // removes what was under the finger (a list closing) must not land on the backdrop.
+  const pressedBackdrop = useRef(false)
 
   useEffect(() => {
     dialog.current?.showModal()
@@ -20,8 +23,12 @@ export function Modal({ titleId, label, wide = false, onClose, children }: { tit
       aria-label={titleId ? undefined : label}
       onCancel={onClose}
       onClose={onClose}
+      onPointerDown={(event) => {
+        pressedBackdrop.current = event.target === dialog.current
+      }}
       onClick={(event) => {
-        if (event.target === dialog.current) onClose()
+        if (event.target === dialog.current && pressedBackdrop.current) onClose()
+        pressedBackdrop.current = false
       }}
     >
       {children}

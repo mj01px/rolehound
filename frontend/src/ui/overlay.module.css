@@ -158,3 +158,15 @@
     animation: none;
   }
 }
+
+@media (max-width: 640px) {
+  .dialog,
+  .dialogWide {
+    width: calc(100vw - 16px);
+    max-height: calc(100dvh - 16px);
+  }
+
+  .form {
+    padding: 20px 16px;
+  }
+}

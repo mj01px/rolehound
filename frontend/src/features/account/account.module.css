@@ -484,6 +484,17 @@
   outline-offset: 2px;
 }
 
+@media (max-width: 640px) {
+  .stepModal {
+    padding: 20px 16px 16px;
+  }
+
+  .stepModalClose {
+    top: 12px;
+    right: 8px;
+  }
+}
+
 /* The step's page title, sized for a modal. */
 .stepModal h1 {
   padding-right: 40px;

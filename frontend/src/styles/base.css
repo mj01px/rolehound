@@ -29,6 +29,15 @@ a {
   font-family: var(--font-mono);
 }
 
+/* iOS zooms the page into any field under 16px on focus, and does not zoom back. */
+@media (max-width: 768px) and (pointer: coarse) {
+  input:not([type='checkbox']):not([type='radio']),
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+}
+
 /* While a modal is open the page behind it does not scroll, so it shows no scrollbar. */
 html:has(dialog[open]) {
   overflow: hidden;

@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { useId, useMemo, useState, type KeyboardEvent, type ReactNode } from 'react'
+import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { api } from '../lib/api'
 import styles from './ModelPicker.module.css'
 import type { ModelUsage } from './modelUsage'
@@ -55,6 +55,22 @@ export function ModelPicker({ label, value, onChange, usage, suggested, error, a
   const [query, setQuery] = useState('')
   const [onlyFree, setOnlyFree] = useState(false)
   const [active, setActive] = useState(0)
+  const wrapRef = useRef<HTMLDivElement>(null)
+
+  // A tap outside closes the list. Blur alone cannot tell: on phones, tapping the
+  // "Só grátis" box blurs the field with no element receiving focus.
+  useEffect(() => {
+    if (!open) {
+      return
+    }
+    const onPointerDown = (event: PointerEvent) => {
+      if (!wrapRef.current?.contains(event.target as Node)) {
+        setOpen(false)
+      }
+    }
+    document.addEventListener('pointerdown', onPointerDown)
+    return () => document.removeEventListener('pointerdown', onPointerDown)
+  }, [open])
 
   const models = catalog.data
   const selected = models?.find((m) => m.id === value)
@@ -109,9 +125,11 @@ export function ModelPicker({ label, value, onChange, usage, suggested, error, a
         {aside}
       </div>
       <div
+        ref={wrapRef}
         className={styles.wrap}
         onBlur={(event) => {
-          if (!event.currentTarget.contains(event.relatedTarget)) {
+          // Only a move of focus to somewhere else (Tab) closes; a tap with no new focus is handled above.
+          if (event.relatedTarget && !event.currentTarget.contains(event.relatedTarget)) {
             setOpen(false)
           }
         }}
@@ -145,7 +163,8 @@ export function ModelPicker({ label, value, onChange, usage, suggested, error, a
           onKeyDown={onKeyDown}
         />
         {open && models && (
-          <div className={styles.panel}>
+          // Pressing inside the list keeps focus in the field; otherwise a tap on "Só grátis" moves it to the modal and the list closes.
+          <div className={styles.panel} onMouseDown={(event) => event.preventDefault()}>
             <label className={styles.filter}>
               <input type="checkbox" checked={onlyFree} onChange={(event) => setOnlyFree(event.target.checked)} />
               Só grátis

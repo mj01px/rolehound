@@ -45,7 +45,10 @@ export function FunnelPage() {
     <div className={styles.page}>
       <header className={styles.header}>
         <h1 className={styles.title}>Funil</h1>
-        <p className={styles.muted}>Arraste um card para mudar a etapa. Vagas entram aqui pelo detalhe delas.</p>
+        <p className={styles.muted}>
+          <span className={styles.forMouse}>Arraste um card para mudar a etapa.</span>
+          <span className={styles.forTouch}>Toque num card para mudar a etapa.</span> Vagas entram aqui pelo detalhe delas.
+        </p>
       </header>
 
       {board.isError && <Alert>{errorMessage(board.error)}</Alert>}

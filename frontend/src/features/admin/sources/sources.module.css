@@ -247,6 +247,8 @@
 }
 
 .tableWrap {
+  /* Holds the screen-reader-only header text, which would otherwise widen the page on phones. */
+  position: relative;
   overflow-x: auto;
 }
 

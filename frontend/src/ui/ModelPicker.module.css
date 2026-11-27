@@ -95,3 +95,17 @@
   font: 400 13px/18px var(--font-sans);
   color: var(--faint);
 }
+
+@media (pointer: coarse) {
+  .filter {
+    padding: var(--space-3);
+  }
+
+  .filter input {
+    width: 18px;
+    height: 18px;
+  }
+  .list {
+    max-height: 45dvh;
+  }
+}
