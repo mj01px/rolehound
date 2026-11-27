@@ -45,9 +45,13 @@ public sealed class CareerSourceTests
               {"facetParameter":"locationCountry","values":[{"id":"us1","descriptor":"United States of America"},{"id":"br1","descriptor":"Brazil"}]},
               {"facetParameter":"locationRegionStateProvince","values":[{"id":"x","descriptor":"Braga"}]}]}]}
             """);
+        using var plainCountry = System.Text.Json.JsonDocument.Parse("""
+            {"facets":[{"facetParameter":"country","values":[{"id":"mx1","descriptor":"Mexico"},{"id":"br2","descriptor":"Brazil"}]}]}
+            """);
         using var withoutFilter = System.Text.Json.JsonDocument.Parse("""{"facets":[{"facetParameter":"timeType","values":[{"id":"f","descriptor":"Full time"}]}]}""");
 
-        Assert.Equal("br1", WorkdayConnector.FindBrazil(withFilter.RootElement));
+        Assert.Equal(new WorkdayConnector.CountryFilter("locationCountry", "br1"), WorkdayConnector.FindBrazil(withFilter.RootElement));
+        Assert.Equal(new WorkdayConnector.CountryFilter("country", "br2"), WorkdayConnector.FindBrazil(plainCountry.RootElement));
         Assert.Null(WorkdayConnector.FindBrazil(withoutFilter.RootElement));
     }
 
@@ -235,5 +239,20 @@ public sealed class CareerSourceTests
 
         Assert.Equal("no_job_listing", missing.Code);
         Assert.Equal("no_job_postings", unreadable.Code);
+    }
+
+    [Fact]
+    public async Task A_showcase_page_gives_its_links_so_the_platform_behind_it_can_be_found()
+    {
+        var routes = new Routes().On("/pt/", () => (HttpStatusCode.OK, """
+            <a href="https://acme.wd103.myworkdayjobs.com/Careers/job/Sao-Paulo/Dev_JR1">Dev</a>
+            <a href='/pt/sobre'>Sobre</a> <a href="mailto:rh@acme.test">RH</a> <a href="#topo">Topo</a>
+            """));
+
+        var links = await new CareerSiteConnector(new HttpClient(routes)).LinksOnPageAsync(new Uri("https://jobs.acme.test/pt/"), Ct);
+        var workday = new WorkdayConnector(new HttpClient(new Routes()));
+
+        Assert.Equal(["https://acme.wd103.myworkdayjobs.com/Careers/job/Sao-Paulo/Dev_JR1", "https://jobs.acme.test/pt/sobre"], links.Select(l => l.ToString()));
+        Assert.Equal("acme.wd103/Careers", workday.CompanyOf(links[0]));
     }
 }

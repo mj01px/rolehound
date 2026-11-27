@@ -82,6 +82,26 @@ public sealed partial class CareerSiteConnector(HttpClient http) : IJobConnector
         throw new ConnectorException("no_job_postings", $"{host}: as páginas não publicam as vagas num formato legível.");
     }
 
+    /// <summary>
+    /// The https links on one page of the site, for a site that shows jobs hosted elsewhere
+    /// (a careers page whose "apply" buttons lead to Workday, Gupy and the like).
+    /// </summary>
+    public async Task<IReadOnlyList<Uri>> LinksOnPageAsync(Uri page, CancellationToken ct)
+    {
+        if (HostOf(page) is null)
+        {
+            return [];
+        }
+
+        var html = await GetTextAsync(page, page.Host, missingIsEmpty: true, ct) ?? string.Empty;
+        return Href().Matches(html)
+            .Select(m => WebUtility.HtmlDecode(m.Groups[1].Value))
+            .Select(link => Uri.TryCreate(page, link, out var url) && url.Scheme == Uri.UriSchemeHttps ? url : null)
+            .OfType<Uri>()
+            .Take(MaxUrls)
+            .ToList();
+    }
+
     private static string Host(string target) =>
         DomainPattern().IsMatch(target.Trim().ToLowerInvariant())
             ? target.Trim().ToLowerInvariant()
@@ -347,6 +367,9 @@ public sealed partial class CareerSiteConnector(HttpClient http) : IJobConnector
             return (isIndex, locations);
         }
     }
+
+    [GeneratedRegex(@"href\s*=\s*[""']([^""'#\s]+)[""']", RegexOptions.IgnoreCase)]
+    private static partial Regex Href();
 
     [GeneratedRegex(@"^(?=.{4,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$")]
     private static partial Regex DomainPattern();

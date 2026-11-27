@@ -106,6 +106,7 @@ internal static class CompanyEndpoints
         IEnumerable<ICompanyLinkReader> readers,
         IEnumerable<IJobConnector> connectors,
         IEnumerable<ITargetProber> probers,
+        CareerSiteConnector careers,
         CompanyLinkLimiter limiter,
         CollectionBacklog backlog,
         TimeProvider time,
@@ -196,6 +197,13 @@ internal static class CompanyEndpoints
             }
             catch (ConnectorException ex)
             {
+                // A showcase site whose jobs live on a platform Rolehound reads: follow that one instead.
+                if (source == JobSource.CareerSite && ex.Code is "no_job_postings" or "no_job_listing"
+                    && await HostedElsewhereAsync(url, careers, readers, ct) is { } elsewhere)
+                {
+                    return await FollowLink(new FollowLinkRequest(elsewhere.ToString()), principal, db, readers, connectors, probers, careers, limiter, backlog, time, ct);
+                }
+
                 return ProbeFailed(ex.Code);
             }
             catch (OperationCanceledException) when (!ct.IsCancellationRequested)
@@ -237,6 +245,31 @@ internal static class CompanyEndpoints
 
         var company = (await DescribeAsync(db, userId, [target], ct)).Single();
         return TypedResults.Ok(new FollowLinkResponse(company, added, already, added ? listed : company.OpenJobs, added));
+    }
+
+    /// <summary>
+    /// The platform a showcase careers page sends people to: among the page's links, the
+    /// company most of them point at on a platform Rolehound reads. Null when there is none.
+    /// </summary>
+    private static async Task<Uri?> HostedElsewhereAsync(Uri page, CareerSiteConnector careers, IEnumerable<ICompanyLinkReader> readers, CancellationToken ct)
+    {
+        IReadOnlyList<Uri> links;
+        try
+        {
+            links = await careers.LinksOnPageAsync(page, ct);
+        }
+        catch (Exception ex) when (ex is ConnectorException or HttpRequestException || (ex is OperationCanceledException && !ct.IsCancellationRequested))
+        {
+            return null;
+        }
+
+        return links
+            .Select(link => (Link: link, Company: readers.Select(r => r.CompanyOf(link) is { } key ? $"{r.Source}:{key}" : null).FirstOrDefault(k => k is not null)))
+            .Where(l => l.Company is not null)
+            .GroupBy(l => l.Company, StringComparer.OrdinalIgnoreCase)
+            .OrderByDescending(g => g.Count())
+            .Select(g => g.First().Link)
+            .FirstOrDefault();
     }
 
     /// <summary>A probe made from a full read: the job count and the most common company name.</summary>
