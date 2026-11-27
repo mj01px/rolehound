@@ -94,8 +94,12 @@ public sealed partial class CareerSiteConnector(HttpClient http) : IJobConnector
         }
 
         var html = await GetTextAsync(page, page.Host, missingIsEmpty: true, ct) ?? string.Empty;
-        return Href().Matches(html)
-            .Select(m => WebUtility.HtmlDecode(m.Groups[1].Value))
+
+        // Links in the markup, and addresses inside the page's data (sites built with Next.js and the like
+        // keep the job list in JSON, where slashes may come escaped).
+        var inMarkup = Href().Matches(html).Select(m => WebUtility.HtmlDecode(m.Groups[1].Value));
+        var inData = AbsoluteUrl().Matches(html.Replace(@"\/", "/", StringComparison.Ordinal)).Select(m => m.Value);
+        return inMarkup.Concat(inData)
             .Select(link => Uri.TryCreate(page, link, out var url) && url.Scheme == Uri.UriSchemeHttps ? url : null)
             .OfType<Uri>()
             .Take(MaxUrls)
@@ -370,6 +374,9 @@ public sealed partial class CareerSiteConnector(HttpClient http) : IJobConnector
 
     [GeneratedRegex(@"href\s*=\s*[""']([^""'#\s]+)[""']", RegexOptions.IgnoreCase)]
     private static partial Regex Href();
+
+    [GeneratedRegex(@"https://[a-z0-9.-]+\.[a-z]{2,63}(/[^\s""'<>\\]*)?", RegexOptions.IgnoreCase)]
+    private static partial Regex AbsoluteUrl();
 
     [GeneratedRegex(@"^(?=.{4,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$")]
     private static partial Regex DomainPattern();

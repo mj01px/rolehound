@@ -247,12 +247,14 @@ public sealed class CareerSourceTests
         var routes = new Routes().On("/pt/", () => (HttpStatusCode.OK, """
             <a href="https://acme.wd103.myworkdayjobs.com/Careers/job/Sao-Paulo/Dev_JR1">Dev</a>
             <a href='/pt/sobre'>Sobre</a> <a href="mailto:rh@acme.test">RH</a> <a href="#topo">Topo</a>
+            <script id="__NEXT_DATA__">{"jobs":[{"url":"https:\/\/job-boards.greenhouse.io\/acme\/jobs\/42"}]}</script>
             """));
 
         var links = await new CareerSiteConnector(new HttpClient(routes)).LinksOnPageAsync(new Uri("https://jobs.acme.test/pt/"), Ct);
         var workday = new WorkdayConnector(new HttpClient(new Routes()));
 
-        Assert.Equal(["https://acme.wd103.myworkdayjobs.com/Careers/job/Sao-Paulo/Dev_JR1", "https://jobs.acme.test/pt/sobre"], links.Select(l => l.ToString()));
+        Assert.Equal(["https://acme.wd103.myworkdayjobs.com/Careers/job/Sao-Paulo/Dev_JR1", "https://jobs.acme.test/pt/sobre"], links.Take(2).Select(l => l.ToString()));
         Assert.Equal("acme.wd103/Careers", workday.CompanyOf(links[0]));
+        Assert.Contains(links, l => new GreenhouseConnector(new HttpClient(new Routes())).CompanyOf(l) == "acme");
     }
 }
